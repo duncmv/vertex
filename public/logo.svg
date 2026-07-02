@@ -1,0 +1,10 @@
+<svg viewBox="0 0 400 200" xmlns="http://www.w3.org/2000/svg">
+  <!-- Checkmark / stylized V shape -->
+  <!-- Left horizontal swoosh -->
+  <path d="M 120 85 C 130 83 145 75 160 55 C 135 65 110 75 80 85 Z" fill="#2E7250"/>
+  <!-- Main V shape -->
+  <path d="M 125 100 L 165 150 L 250 50 C 220 55 195 70 170 115 L 140 85 Z" fill="#2E7250"/>
+  <!-- Text -->
+  <text x="200" y="195" font-family="Inter, system-ui, sans-serif" font-weight="800" font-size="76" fill="#2E7250" text-anchor="middle" letter-spacing="-1.5">vertex</text>
+  <text x="328" y="145" font-family="Inter, system-ui, sans-serif" font-weight="600" font-size="20" fill="#2E7250">®</text>
+</svg>

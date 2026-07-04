@@ -107,8 +107,8 @@ const CANDIDATE_STEPS: { name: string; text: string; pictogram: "apply" | "match
     pictogram: "match",
   },
   {
-    name: "Fly",
-    text: "Contract signed, visa supported, flight booked — you arrive with accommodation arranged and start work.",
+    name: "Relocate",
+    text: "With your contract signed and visa secured, we arrange your travel — you arrive with accommodation ready and begin work.",
     pictogram: "fly",
   },
 ];

@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import {
@@ -173,82 +174,110 @@ function PersonFigure({ className }: { className?: string }) {
   );
 }
 
-/* A line-art figure that walks in place — limbs swing like the midnight-am walker. */
-function WalkingFigure({ className, phase = 0 }: { className?: string; phase?: number }) {
-  const swing = { duration: 0.85, repeat: Infinity, ease: "easeInOut" as const, delay: phase };
+/* ===== Hero program finder =====
+   Peninsula-style glass widget: pick a destination program without leaving
+   the hero. Frosted card, pill tabs, check-badges, one clear CTA. */
+
+const HERO_PROGRAMS = [
+  {
+    id: "hungary",
+    label: "Hungary",
+    tag: "Official Partner",
+    sealed: true,
+    headline: "Work in Hungary",
+    points: ["EU work permit sponsored", "Accommodation & meals arranged", "€1,000 – €1,500 per month"],
+    text: "Factory, warehouse and food processing roles with full relocation guidance.",
+    href: "/apply/hungary",
+    cta: "View Hungary Program",
+  },
+  {
+    id: "greece",
+    label: "Greece",
+    tag: "Now Recruiting",
+    sealed: false,
+    headline: "Work in Greece",
+    points: ["Seasonal & long-term contracts", "Hospitality, agriculture & logistics", "Visa support included"],
+    text: "Placements across the Greek mainland and islands, matched to your experience.",
+    href: "/apply/greece",
+    cta: "View Greece Program",
+  },
+  {
+    id: "all",
+    label: "All Roles",
+    tag: "30+ Countries",
+    sealed: false,
+    headline: "Browse every role",
+    points: ["Five sectors, one standard", "Vetted employers only", "24/7 WhatsApp support"],
+    text: "Explore every open position across our full network of vetted employers.",
+    href: "/jobs",
+    cta: "Browse All Jobs",
+  },
+];
+
+function HeroProgramWidget() {
+  const [active, setActive] = useState(0);
+  const program = HERO_PROGRAMS[active];
   return (
-    <motion.div
-      animate={{ y: [0, -5, 0] }}
-      transition={{ duration: 0.425, repeat: Infinity, ease: "easeInOut", delay: phase }}
-    >
-      <svg viewBox="0 0 80 132" fill="none" className={className} aria-hidden="true">
-        <circle cx="40" cy="17" r="11" stroke="currentColor" strokeWidth="5" />
-        <path d="M40 31 L40 70" stroke="currentColor" strokeWidth="5" strokeLinecap="round" />
-        {/* arms */}
-        <motion.line
-          x1="40" y1="38" x2="54" y2="66"
-          stroke="currentColor" strokeWidth="5" strokeLinecap="round"
-          animate={{ x2: [54, 26, 54] }} transition={swing}
-        />
-        <motion.line
-          x1="40" y1="38" x2="26" y2="66"
-          stroke="currentColor" strokeWidth="5" strokeLinecap="round"
-          animate={{ x2: [26, 54, 26] }} transition={swing}
-        />
-        {/* legs */}
-        <motion.line
-          x1="40" y1="70" x2="52" y2="108"
-          stroke="currentColor" strokeWidth="5" strokeLinecap="round"
-          animate={{ x2: [52, 28, 52] }} transition={swing}
-        />
-        <motion.line
-          x1="40" y1="70" x2="28" y2="108"
-          stroke="currentColor" strokeWidth="5" strokeLinecap="round"
-          animate={{ x2: [28, 52, 28] }} transition={swing}
-        />
-      </svg>
-    </motion.div>
-  );
-}
-
-/* One person walks in and becomes two — you, joined by Vertex. */
-function HeroFigures() {
-  const times = [0, 0.3, 0.48, 0.85, 1];
-  return (
-    <div className="hidden lg:flex relative items-center justify-center aspect-square max-w-[500px] w-full mx-auto">
-      {/* orbit rings */}
-      <div className="absolute inset-6 rounded-full border border-white/10" />
-      <div className="absolute inset-20 rounded-full border border-white/5" />
-
-      <div className="relative w-full h-64 flex items-center justify-center">
-        {/* connecting line, drawn while the two walk together */}
-        <motion.div
-          animate={{ scaleX: [0, 0, 1, 1, 0], opacity: [0, 0, 1, 1, 0] }}
-          transition={{ duration: 8, times, repeat: Infinity, ease: "easeInOut" }}
-          className="absolute w-24 h-px bg-gold-400/50 origin-center"
-        />
-
-        {/* primary figure — walks in from the left, then steps aside */}
-        <motion.div
-          animate={{ x: [-170, 0, -74, -74, -74], opacity: [0, 1, 1, 1, 0] }}
-          transition={{ duration: 8, times, repeat: Infinity, ease: "easeInOut" }}
-          className="absolute text-ivory-50"
-        >
-          <WalkingFigure className="w-28 h-[11.5rem]" />
-        </motion.div>
-
-        {/* the double — splits off to the right */}
-        <motion.div
-          animate={{ x: [0, 0, 74, 74, 74], opacity: [0, 0, 1, 1, 0] }}
-          transition={{ duration: 8, times, repeat: Infinity, ease: "easeInOut" }}
-          className="absolute text-gold-300"
-        >
-          <WalkingFigure className="w-28 h-[11.5rem]" phase={0.28} />
-        </motion.div>
+    <div className="w-full max-w-[480px] lg:ml-auto rounded-3xl border border-white/20 bg-white/[0.07] backdrop-blur-2xl shadow-[inset_0_1px_1px_rgba(255,255,255,0.15),0_24px_60px_-15px_rgba(0,0,0,0.6)] p-6 md:p-8">
+      <div className="flex items-center justify-between mb-6">
+        <span className="text-[10px] font-semibold uppercase tracking-[0.3em] text-ivory-50/50">
+          Find your program
+        </span>
+        <span className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-gold-300">
+          <span className="w-1.5 h-1.5 rounded-full bg-gold-400 animate-pulse" />
+          Now hiring
+        </span>
       </div>
 
-      <p className="absolute bottom-8 left-1/2 -translate-x-1/2 text-[10px] font-semibold uppercase tracking-[0.35em] text-ivory-50/35 whitespace-nowrap">
-        You × Vertex
+      <div className="flex flex-wrap gap-2 mb-7" role="tablist" aria-label="Destination programs">
+        {HERO_PROGRAMS.map((p, i) => (
+          <button
+            key={p.id}
+            role="tab"
+            aria-selected={i === active}
+            onClick={() => setActive(i)}
+            className={`px-4 py-2 rounded-full text-[11px] font-semibold uppercase tracking-[0.12em] border transition-all duration-200 ${
+              i === active
+                ? "bg-gold-400 text-midnight-950 border-gold-400"
+                : "bg-white/10 text-ivory-50/70 border-white/20 hover:bg-white/15 hover:text-ivory-50"
+            }`}
+          >
+            {p.label}
+          </button>
+        ))}
+      </div>
+
+      <motion.div
+        key={program.id}
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.35, ease: "easeOut" }}
+      >
+        <p className="inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.25em] text-gold-300 mb-3">
+          {program.sealed && <SealCheck size={14} weight="fill" />}
+          {program.tag}
+        </p>
+        <h3 className="text-2xl md:text-3xl font-semibold tracking-tight text-ivory-50 mb-5">
+          {program.headline}
+        </h3>
+        <ul className="space-y-2.5 mb-5">
+          {program.points.map((point) => (
+            <li key={point} className="flex items-center gap-2.5 text-sm text-ivory-50/75 font-light">
+              <span className="flex items-center justify-center w-4.5 h-4.5 shrink-0 text-gold-300">
+                <Check size={15} weight="bold" />
+              </span>
+              {point}
+            </li>
+          ))}
+        </ul>
+        <p className="text-sm text-ivory-50/50 font-light leading-relaxed mb-6">{program.text}</p>
+        <Link href={program.href} className="btn-gold w-full py-3.5 text-[12px]">
+          {program.cta} <ArrowRight size={15} weight="bold" />
+        </Link>
+      </motion.div>
+
+      <p className="mt-5 text-center text-[11px] text-ivory-50/40 font-light">
+        Free to register · Guided at every step
       </p>
     </div>
   );
@@ -427,7 +456,7 @@ export default function HomeClient({ jobs }: { jobs: any[] }) {
             animate={{ opacity: 1 }}
             transition={{ duration: 1.2, delay: 0.5 }}
           >
-            <HeroFigures />
+            <HeroProgramWidget />
           </motion.div>
         </div>
 

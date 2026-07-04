@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { CaretDown, Check } from "@phosphor-icons/react";
 
 const NAV_LINKS = [
   { href: "/", label: "Home" },
@@ -10,6 +11,12 @@ const NAV_LINKS = [
   { href: "/jobs", label: "Jobs" },
   { href: "/apply", label: "Apply" },
   { href: "/contact", label: "Contact" },
+];
+
+const LANGUAGES = [
+  { code: "it", label: "Italiano" },
+  { code: "fr", label: "Français" },
+  { code: "pt", label: "Português" },
 ];
 
 export default function Navbar() {
@@ -26,83 +33,104 @@ export default function Navbar() {
   useEffect(() => setOpen(false), [pathname]);
 
   const handleTranslate = (lang: string) => {
-    if (lang === 'en') {
-        document.cookie = "googtrans=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
-        document.cookie = "googtrans=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=" + window.location.hostname;
+    if (lang === "en") {
+      document.cookie = "googtrans=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+      document.cookie = "googtrans=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=" + window.location.hostname;
     } else {
-        document.cookie = `googtrans=/en/${lang}; path=/;`;
-        document.cookie = `googtrans=/en/${lang}; path=/; domain=${window.location.hostname}`;
+      document.cookie = `googtrans=/en/${lang}; path=/;`;
+      document.cookie = `googtrans=/en/${lang}; path=/; domain=${window.location.hostname}`;
     }
     window.location.reload();
   };
 
   return (
     <header
-      className={`sticky top-0 z-50 w-full transition-all duration-300 ${
-        scrolled ? "bg-white/95 backdrop-blur-md shadow-md" : "bg-white shadow-sm"
+      className={`sticky top-0 z-50 w-full transition-all duration-300 border-b ${
+        scrolled
+          ? "bg-midnight-950/95 backdrop-blur-md border-white/10"
+          : "bg-midnight-950 border-white/5"
       }`}
     >
-      <nav className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-20 md:h-24 transition-all duration-300">
+      <nav className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex items-center justify-between h-20">
           {/* Logo */}
-          <Link href="/" className="flex items-center gap-3">
-            <img src="/logo.svg" alt="Vertex" className="h-[42px] md:h-[48px] w-auto transition-all drop-shadow-sm" />
-            <div className="hidden sm:flex flex-col justify-center translate-y-0.5">
-              <span className="text-[#104F36] font-black text-[22px] leading-none tracking-wide">
+          <Link href="/" className="flex items-center gap-3 group">
+            <img
+              src="/logo.svg"
+              alt="Vertex"
+              className="h-9 w-auto brightness-0 invert opacity-95 transition-opacity group-hover:opacity-100"
+            />
+            <div className="hidden sm:flex flex-col justify-center">
+              <span className="text-ivory-50 font-semibold text-lg leading-none tracking-[0.2em]">
                 VERTEX
               </span>
-              <span className="text-amber-500 font-extrabold text-[9px] leading-none tracking-[0.25em] uppercase mt-1">
-                INTERNATIONAL
+              <span className="text-gold-400 font-medium text-[9px] leading-none tracking-[0.35em] uppercase mt-1.5">
+                International
               </span>
             </div>
           </Link>
 
           {/* Desktop nav */}
-          <div className="hidden lg:flex items-center gap-8">
+          <div className="hidden lg:flex items-center gap-9">
             {NAV_LINKS.map((link) => (
               <Link
                 key={link.href}
                 href={link.href}
-                className={`text-[15px] xl:text-[16px] font-bold tracking-wide transition-all duration-300 relative group uppercase ${
-                  pathname === link.href
-                    ? "text-[#104F36]"
-                    : "text-slate-500 hover:text-[#104F36]"
+                className={`text-[12px] font-semibold tracking-[0.2em] uppercase transition-colors duration-300 relative group ${
+                  pathname === link.href ? "text-ivory-50" : "text-ivory-50/50 hover:text-ivory-50"
                 }`}
               >
                 {link.label}
-                <span className={`absolute -bottom-2 left-0 w-full h-[3px] bg-amber-400 rounded-full origin-left transition-transform duration-300 ${
-                  pathname === link.href ? "scale-x-100" : "scale-x-0 group-hover:scale-x-100"
-                }`} />
+                <span
+                  className={`absolute -bottom-2 left-0 w-full h-px bg-gold-400 origin-left transition-transform duration-300 ${
+                    pathname === link.href ? "scale-x-100" : "scale-x-0 group-hover:scale-x-100"
+                  }`}
+                />
               </Link>
             ))}
           </div>
 
-          {/* Auth buttons & Lang Menu */}
-          <div className="hidden md:flex items-center gap-4">
-            {/* Lang Dropdown */}
-            <div className="relative group py-2 pl-2 md:pl-0 lg:pl-2">
-               <div className="flex items-center gap-1.5 text-[14px] font-bold text-slate-500 hover:text-[#104F36] cursor-pointer uppercase tracking-wide">
-                  <span>🌍 EN</span>
-                  <svg className="w-4 h-4 transition-transform group-hover:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
-               </div>
-               <div className="absolute top-full right-0 mt-0 bg-white border border-slate-100 shadow-xl rounded-xl py-2 w-36 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 transform origin-top-right group-hover:translate-y-0 translate-y-2 flex flex-col z-50">
-                  <button onClick={() => handleTranslate('it')} className="text-left px-4 py-2 hover:bg-emerald-50 hover:text-[#104F36] text-sm font-semibold text-slate-700 transition-colors cursor-pointer">🇮🇹 Italian</button>
-                  <button onClick={() => handleTranslate('fr')} className="text-left px-4 py-2 hover:bg-emerald-50 hover:text-[#104F36] text-sm font-semibold text-slate-700 transition-colors cursor-pointer">🇫🇷 French</button>
-                  <button onClick={() => handleTranslate('pt')} className="text-left px-4 py-2 hover:bg-emerald-50 hover:text-[#104F36] text-sm font-semibold text-slate-700 transition-colors cursor-pointer">🇵🇹 Portuguese</button>
-                  <div className="border-t border-slate-100 my-1"></div>
-                  <button onClick={() => handleTranslate('en')} className="text-left px-4 py-2 hover:bg-emerald-50 hover:text-[#1CA36A] text-sm font-black text-[#1CA36A] transition-colors flex items-center justify-between cursor-pointer">
-                     🇬🇧 English
-                     <span className="text-[12px]">✓</span>
+          {/* Language + auth */}
+          <div className="hidden md:flex items-center gap-6">
+            {/* Language dropdown */}
+            <div className="relative group py-2">
+              <div className="flex items-center gap-1.5 text-[12px] font-semibold text-ivory-50/50 hover:text-ivory-50 cursor-pointer uppercase tracking-[0.2em] transition-colors">
+                <span>EN</span>
+                <CaretDown size={12} weight="bold" className="transition-transform group-hover:rotate-180" />
+              </div>
+              <div className="absolute top-full right-0 bg-midnight-900 border border-white/10 shadow-2xl rounded-xl py-2 w-40 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 transform origin-top-right group-hover:translate-y-0 translate-y-2 flex flex-col z-50">
+                {LANGUAGES.map((lang) => (
+                  <button
+                    key={lang.code}
+                    onClick={() => handleTranslate(lang.code)}
+                    className="text-left px-4 py-2 hover:bg-white/5 text-sm text-ivory-50/70 hover:text-ivory-50 transition-colors cursor-pointer"
+                  >
+                    {lang.label}
                   </button>
-               </div>
+                ))}
+                <div className="border-t border-white/10 my-1" />
+                <button
+                  onClick={() => handleTranslate("en")}
+                  className="text-left px-4 py-2 hover:bg-white/5 text-sm font-semibold text-gold-300 transition-colors flex items-center justify-between cursor-pointer"
+                >
+                  English
+                  <Check size={14} weight="bold" />
+                </button>
+              </div>
             </div>
 
-            <div className="h-6 w-px bg-slate-200 mx-1 hidden lg:block"></div>
+            <div className="h-5 w-px bg-white/15 hidden lg:block" />
 
-            <Link href="/auth/login" className="text-[15px] font-bold tracking-wide text-slate-500 hover:text-[#104F36] transition-colors uppercase">
+            <Link
+              href="/auth/login"
+              className="text-[12px] font-semibold tracking-[0.2em] uppercase text-ivory-50/50 hover:text-ivory-50 transition-colors"
+            >
               Log In
             </Link>
-            <Link href="/auth/register" className="bg-[#104F36] hover:bg-emerald-900 text-white font-bold text-[14px] py-3 px-6 lg:px-8 rounded-full shadow-[0_8px_20px_rgba(16,79,54,0.25)] hover:shadow-[0_12px_25px_rgba(16,79,54,0.35)] transition-all uppercase tracking-wider transform hover:scale-105 active:scale-95">
+            <Link
+              href="/auth/register"
+              className="bg-gold-400 hover:bg-gold-300 text-midnight-950 font-semibold text-[12px] py-3 px-6 rounded-full transition-all uppercase tracking-[0.15em]"
+            >
               Get Started
             </Link>
           </div>
@@ -111,7 +139,7 @@ export default function Navbar() {
           <button
             id="mobile-menu-button"
             onClick={() => setOpen(!open)}
-            className="md:hidden p-2 rounded-lg text-slate-600 hover:bg-slate-100"
+            className="md:hidden p-2 rounded-lg text-ivory-50 hover:bg-white/10"
             aria-label="Toggle menu"
           >
             <div className="w-5 flex flex-col gap-1">
@@ -124,31 +152,37 @@ export default function Navbar() {
 
         {/* Mobile menu */}
         {open && (
-          <div className="md:hidden pb-4 border-t border-slate-100 mt-1">
+          <div className="md:hidden pb-5 border-t border-white/10 mt-1">
             <div className="flex flex-col gap-1 pt-3">
               {NAV_LINKS.map((link) => (
                 <Link
                   key={link.href}
                   href={link.href}
-                  className={`px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                    pathname === link.href ? "bg-emerald-50 text-emerald-700" : "text-slate-600 hover:bg-slate-50"
+                  className={`px-4 py-2.5 rounded-lg text-sm font-medium uppercase tracking-[0.15em] transition-colors ${
+                    pathname === link.href
+                      ? "bg-white/10 text-ivory-50"
+                      : "text-ivory-50/60 hover:bg-white/5 hover:text-ivory-50"
                   }`}
                 >
                   {link.label}
                 </Link>
               ))}
-              <hr className="my-2 border-slate-100" />
-              
+              <hr className="my-2 border-white/10" />
+
               <div className="px-4 py-1 pb-3 flex items-center gap-2">
-                 <button onClick={() => handleTranslate('en')} className="px-3 py-1.5 bg-[#104F36] text-white text-xs font-bold rounded-md">EN</button>
-                 <button onClick={() => handleTranslate('it')} className="px-3 py-1.5 bg-slate-100 hover:bg-emerald-50 text-slate-600 text-xs font-bold rounded-md transition-colors">IT</button>
-                 <button onClick={() => handleTranslate('fr')} className="px-3 py-1.5 bg-slate-100 hover:bg-emerald-50 text-slate-600 text-xs font-bold rounded-md transition-colors">FR</button>
-                 <button onClick={() => handleTranslate('pt')} className="px-3 py-1.5 bg-slate-100 hover:bg-emerald-50 text-slate-600 text-xs font-bold rounded-md transition-colors">PT</button>
+                <button onClick={() => handleTranslate("en")} className="px-3 py-1.5 bg-gold-400 text-midnight-950 text-xs font-bold rounded-md">EN</button>
+                <button onClick={() => handleTranslate("it")} className="px-3 py-1.5 bg-white/10 hover:bg-white/20 text-ivory-50/70 text-xs font-bold rounded-md transition-colors">IT</button>
+                <button onClick={() => handleTranslate("fr")} className="px-3 py-1.5 bg-white/10 hover:bg-white/20 text-ivory-50/70 text-xs font-bold rounded-md transition-colors">FR</button>
+                <button onClick={() => handleTranslate("pt")} className="px-3 py-1.5 bg-white/10 hover:bg-white/20 text-ivory-50/70 text-xs font-bold rounded-md transition-colors">PT</button>
               </div>
 
-              <hr className="my-1 border-slate-100" />
-              <Link href="/auth/login" className="px-4 py-2.5 text-sm font-medium text-slate-600">Log In</Link>
-              <Link href="/auth/register" className="btn-primary text-sm mx-2">Get Started</Link>
+              <hr className="my-1 border-white/10" />
+              <Link href="/auth/login" className="px-4 py-2.5 text-sm font-medium uppercase tracking-[0.15em] text-ivory-50/60">
+                Log In
+              </Link>
+              <Link href="/auth/register" className="btn-gold text-sm mx-2 mt-1">
+                Get Started
+              </Link>
             </div>
           </div>
         )}

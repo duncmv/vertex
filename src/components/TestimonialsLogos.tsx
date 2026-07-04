@@ -3,12 +3,12 @@
 import { motion } from "framer-motion";
 
 const COMPANIES = [
-  { name: "Global Build", logo: "🏗️" },
-  { name: "CarePlus Med", logo: "🏥" },
-  { name: "TechManufacture", logo: "🏭" },
-  { name: "AeroWorks", logo: "🛫" },
-  { name: "Prime Logistics", logo: "📦" },
-  { name: "ConstructPro", logo: "🚧" },
+  "Global Build",
+  "CarePlus Med",
+  "TechManufacture",
+  "AeroWorks",
+  "Prime Logistics",
+  "ConstructPro",
 ];
 
 const TESTIMONIALS = [
@@ -19,55 +19,58 @@ const TESTIMONIALS = [
 
 export default function TestimonialsLogos() {
   return (
-    <section className="py-20 bg-white overflow-hidden">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-20">
-        <div className="text-center mb-12">
-          <h2 className="section-title">Trusted By Global Companies</h2>
-          <p className="section-subtitle mx-auto">We partner with industry leaders across the world</p>
-        </div>
-        
-        {/* Infinite Logo Slider */}
-        <div className="relative flex overflow-hidden mask-image-m-fade">
+    <section className="py-24 bg-ivory-50 overflow-hidden">
+      {/* Partner wordmark marquee */}
+      <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 mb-24">
+        <p className="eyebrow justify-center w-full text-center mb-10">
+          <span className="eyebrow-rule" />
+          Trusted by global companies
+        </p>
+
+        <div className="relative flex overflow-hidden marquee-mask">
           <motion.div
-            className="flex items-center space-x-16 md:space-x-32 w-max"
+            className="flex items-center w-max"
             animate={{ x: ["0%", "-50%"] }}
-            transition={{
-              ease: "linear",
-              duration: 30,
-              repeat: Infinity,
-            }}
+            transition={{ ease: "linear", duration: 30, repeat: Infinity }}
           >
             {[...COMPANIES, ...COMPANIES, ...COMPANIES, ...COMPANIES].map((company, i) => (
-              <div key={i} className="flex flex-col items-center justify-center shrink-0 w-32 opacity-70 hover:opacity-100 transition-opacity">
-                <span className="text-6xl mb-4 grayscale filter">{company.logo}</span>
-                <span className="text-sm font-bold text-slate-600 whitespace-nowrap">{company.name}</span>
-              </div>
+              <span
+                key={i}
+                className="shrink-0 px-10 md:px-14 text-lg md:text-xl font-semibold tracking-[0.15em] uppercase text-midnight-900/30 hover:text-midnight-900/60 transition-colors whitespace-nowrap"
+              >
+                {company}
+              </span>
             ))}
           </motion.div>
         </div>
       </div>
 
-      <div className="bg-emerald-50 rounded-3xl py-16 px-4">
-        <div className="max-w-7xl mx-auto sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <h2 className="section-title">Success Stories</h2>
-            <p className="section-subtitle mx-auto">Hear from professionals we've placed globally</p>
-          </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {TESTIMONIALS.map((t, i) => (
-              <div key={i} className="bg-white p-8 rounded-2xl shadow-sm border border-emerald-100 hover:shadow-md transition-shadow">
-                <div className="text-amber-400 mb-4 text-xl">
-                  {"★".repeat(5)}
-                </div>
-                <p className="text-slate-600 italic mb-6 leading-relaxed">"{t.text}"</p>
-                <div>
-                  <div className="font-bold text-slate-800">{t.author}</div>
-                  <div className="text-sm text-emerald-700">{t.role}</div>
-                </div>
-              </div>
-            ))}
-          </div>
+      {/* Testimonials */}
+      <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="mb-14 max-w-2xl">
+          <p className="eyebrow mb-5">
+            <span className="eyebrow-rule" />
+            Success stories
+          </p>
+          <h2 className="section-title">Placed. Settled. Thriving.</h2>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {TESTIMONIALS.map((t, i) => (
+            <figure
+              key={i}
+              className="flex flex-col justify-between bg-white border border-midnight-900/10 rounded-2xl p-8 hover:border-gold-500/60 transition-colors"
+            >
+              <blockquote className="text-midnight-900/70 font-light leading-relaxed mb-8">
+                &ldquo;{t.text}&rdquo;
+              </blockquote>
+              <figcaption>
+                <div className="w-8 h-px bg-gold-500 mb-4" />
+                <div className="font-semibold text-midnight-900">{t.author}</div>
+                <div className="text-sm text-midnight-900/50 font-light mt-0.5">{t.role}</div>
+              </figcaption>
+            </figure>
+          ))}
         </div>
       </div>
     </section>

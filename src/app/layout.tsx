@@ -32,7 +32,7 @@ import Script from "next/script";
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={font.variable}>
-      <body className="min-h-screen flex flex-col bg-white">
+      <body className="min-h-screen flex flex-col bg-ivory-50">
         <Navbar />
         <main className="flex-1">{children}</main>
         <Footer />

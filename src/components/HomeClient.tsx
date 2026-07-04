@@ -1,285 +1,638 @@
 "use client";
 
-import { motion, useMotionValue, useTransform } from "framer-motion";
+import { motion } from "framer-motion";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import {
+  AirplaneTilt,
+  ArrowRight,
+  ArrowUpRight,
+  Buildings,
+  Certificate,
+  ChatCircleText,
+  Check,
+  CheckCircle,
+  Clock,
+  CurrencyEur,
+  EnvelopeSimple,
+  Factory,
+  FirstAid,
+  ForkKnife,
+  GraduationCap,
+  HardHat,
+  House,
+  MapPin,
+  Package,
+  PaperPlaneTilt,
+  Plus,
+  SealCheck,
+  Wrench,
+} from "@phosphor-icons/react";
 
-interface HomeClientProps {
-  jobs: any[];
-  stats: { value: string; label: string }[];
-  categories: any[];
-  benefits: any[];
-  requirements: any[];
+/* ===== Static marketing content ===== */
+
+const STATS = [
+  { value: "€1,000+", label: "Starting Monthly Salary" },
+  { value: "5", label: "Job Sectors" },
+  { value: "30+", label: "Countries Served" },
+  { value: "24/7", label: "WhatsApp Support" },
+];
+
+const SECTORS = [
+  {
+    icon: Factory,
+    title: "Factory",
+    industries: "Automotive, Electronics & Food Industries",
+    roles: ["Assembly Line Worker", "Packaging Worker", "Machine Operator", "Production Assistant"],
+  },
+  {
+    icon: HardHat,
+    title: "Construction",
+    industries: "Residential & Commercial Construction",
+    roles: ["General Laborer", "Mason Helper", "Steel Fixer", "Painter Assistant"],
+  },
+  {
+    icon: Wrench,
+    title: "Technical",
+    industries: "Manufacturing & Engineering",
+    roles: ["Maintenance Technician", "Electrician Assistant", "CNC Machine Operator", "HVAC Technician"],
+  },
+  {
+    icon: Package,
+    title: "Warehouse",
+    industries: "Logistics & Distribution",
+    roles: ["Warehouse Picker", "Packing Staff", "Inventory Assistant", "Forklift Operator"],
+  },
+  {
+    icon: ForkKnife,
+    title: "Food Processing",
+    industries: "Food & Beverage Industry",
+    roles: ["Meat Processing Worker", "Chicken Factory Worker", "Food Packaging Staff"],
+  },
+];
+
+const DESTINATIONS = [
+  {
+    country: "Hungary",
+    href: "/apply/hungary",
+    tag: "Official Partner",
+    blurb: "Factory, warehouse and food processing roles with EU work permits and full relocation guidance.",
+    featured: true,
+  },
+  {
+    country: "Greece",
+    href: "/apply/greece",
+    tag: "Now Recruiting",
+    blurb: "Seasonal and long-term placements across hospitality, agriculture and logistics.",
+    featured: false,
+  },
+  {
+    country: "Wider Europe",
+    href: "/jobs",
+    tag: "30+ Countries",
+    blurb: "Browse every open position across our full network of vetted employers.",
+    featured: false,
+  },
+];
+
+const CANDIDATE_STEPS: { name: string; text: string; pictogram: "apply" | "match" | "fly" }[] = [
+  {
+    name: "Apply",
+    text: "Create your free profile, choose a role and submit your application with your documents online.",
+    pictogram: "apply",
+  },
+  {
+    name: "Match",
+    text: "We verify your passport, medical and police clearance, then match you with a vetted employer abroad.",
+    pictogram: "match",
+  },
+  {
+    name: "Fly",
+    text: "Contract signed, visa supported, flight booked — you arrive with accommodation arranged and start work.",
+    pictogram: "fly",
+  },
+];
+
+const BENEFITS = [
+  { icon: CurrencyEur, label: "Salary", value: "€1,000 – €1,500 per month" },
+  { icon: Clock, label: "Overtime", value: "Overtime available" },
+  { icon: House, label: "Housing", value: "Accommodation & meals often provided" },
+  { icon: FirstAid, label: "Medical", value: "Medical insurance included" },
+];
+
+const REQUIREMENTS = [
+  "Valid passport",
+  "Job offer & contract secured",
+  "Medical certificate",
+  "Police clearance",
+];
+
+const QUALIFICATION_TIERS = [
+  { icon: GraduationCap, title: "Unskilled", text: "High school diploma is all you need." },
+  { icon: Certificate, title: "Semi-skilled", text: "A trade certificate in your field." },
+  { icon: Buildings, title: "Technical", text: "A degree or diploma is required." },
+];
+
+const FAQS = [
+  {
+    q: "Who can apply through Vertex International?",
+    a: "Anyone with a valid passport who meets the qualification level for their chosen role — from unskilled positions requiring only a high school diploma, to technical roles requiring a degree or diploma.",
+  },
+  {
+    q: "What documents do I need?",
+    a: "A valid passport, a medical certificate and a police clearance. Once you are matched with an employer, we help you secure the job offer and contract before any travel arrangements are made.",
+  },
+  {
+    q: "What salary can I expect?",
+    a: "Placements typically start from €1,000 to €1,500 per month, with overtime available in most roles. Accommodation and meals are often provided by the employer.",
+  },
+  {
+    q: "Which countries do you place candidates in?",
+    a: "Our flagship programs are in Hungary and Greece, and our wider network covers placements across more than 30 countries in Europe and the Middle East.",
+  },
+  {
+    q: "How do I get support during the process?",
+    a: "Our team is available around the clock on WhatsApp and Telegram, and you can track every application from your personal dashboard.",
+  },
+];
+
+const WHATSAPP_NUMBERS = ["+44 7440 167608", "+44 7438 299563", "+44 7405 368405", "+44 7438 613251"];
+
+/* ===== Animated figures (midnight-am style pictograms, drawn in-house) ===== */
+
+function PersonFigure({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 64 96" fill="none" className={className} aria-hidden="true">
+      <circle cx="32" cy="18" r="12" stroke="currentColor" strokeWidth="3" />
+      <path
+        d="M12 90 C12 62 20 46 32 46 C44 46 52 62 52 90"
+        stroke="currentColor"
+        strokeWidth="3"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
 }
 
-export default function HomeClient({ jobs, stats, categories, benefits, requirements }: HomeClientProps) {
+/* A line-art figure that walks in place — limbs swing like the midnight-am walker. */
+function WalkingFigure({ className, phase = 0 }: { className?: string; phase?: number }) {
+  const swing = { duration: 0.85, repeat: Infinity, ease: "easeInOut" as const, delay: phase };
+  return (
+    <motion.div
+      animate={{ y: [0, -5, 0] }}
+      transition={{ duration: 0.425, repeat: Infinity, ease: "easeInOut", delay: phase }}
+    >
+      <svg viewBox="0 0 80 132" fill="none" className={className} aria-hidden="true">
+        <circle cx="40" cy="17" r="11" stroke="currentColor" strokeWidth="5" />
+        <path d="M40 31 L40 70" stroke="currentColor" strokeWidth="5" strokeLinecap="round" />
+        {/* arms */}
+        <motion.line
+          x1="40" y1="38" x2="54" y2="66"
+          stroke="currentColor" strokeWidth="5" strokeLinecap="round"
+          animate={{ x2: [54, 26, 54] }} transition={swing}
+        />
+        <motion.line
+          x1="40" y1="38" x2="26" y2="66"
+          stroke="currentColor" strokeWidth="5" strokeLinecap="round"
+          animate={{ x2: [26, 54, 26] }} transition={swing}
+        />
+        {/* legs */}
+        <motion.line
+          x1="40" y1="70" x2="52" y2="108"
+          stroke="currentColor" strokeWidth="5" strokeLinecap="round"
+          animate={{ x2: [52, 28, 52] }} transition={swing}
+        />
+        <motion.line
+          x1="40" y1="70" x2="28" y2="108"
+          stroke="currentColor" strokeWidth="5" strokeLinecap="round"
+          animate={{ x2: [28, 52, 28] }} transition={swing}
+        />
+      </svg>
+    </motion.div>
+  );
+}
+
+/* One person walks in and becomes two — you, joined by Vertex. */
+function HeroFigures() {
+  const times = [0, 0.3, 0.48, 0.85, 1];
+  return (
+    <div className="hidden lg:flex relative items-center justify-center aspect-square max-w-[500px] w-full mx-auto">
+      {/* orbit rings */}
+      <div className="absolute inset-6 rounded-full border border-white/10" />
+      <div className="absolute inset-20 rounded-full border border-white/5" />
+
+      <div className="relative w-full h-64 flex items-center justify-center">
+        {/* connecting line, drawn while the two walk together */}
+        <motion.div
+          animate={{ scaleX: [0, 0, 1, 1, 0], opacity: [0, 0, 1, 1, 0] }}
+          transition={{ duration: 8, times, repeat: Infinity, ease: "easeInOut" }}
+          className="absolute w-24 h-px bg-gold-400/50 origin-center"
+        />
+
+        {/* primary figure — walks in from the left, then steps aside */}
+        <motion.div
+          animate={{ x: [-170, 0, -74, -74, -74], opacity: [0, 1, 1, 1, 0] }}
+          transition={{ duration: 8, times, repeat: Infinity, ease: "easeInOut" }}
+          className="absolute text-ivory-50"
+        >
+          <WalkingFigure className="w-28 h-[11.5rem]" />
+        </motion.div>
+
+        {/* the double — splits off to the right */}
+        <motion.div
+          animate={{ x: [0, 0, 74, 74, 74], opacity: [0, 0, 1, 1, 0] }}
+          transition={{ duration: 8, times, repeat: Infinity, ease: "easeInOut" }}
+          className="absolute text-gold-300"
+        >
+          <WalkingFigure className="w-28 h-[11.5rem]" phase={0.28} />
+        </motion.div>
+      </div>
+
+      <p className="absolute bottom-8 left-1/2 -translate-x-1/2 text-[10px] font-semibold uppercase tracking-[0.35em] text-ivory-50/35 whitespace-nowrap">
+        You × Vertex
+      </p>
+    </div>
+  );
+}
+
+/* Looping pictograms for the candidate process steps — drawn in currentColor
+   so they sit directly on each card's background, midnight-am style. */
+function StepPictogram({ type }: { type: "apply" | "match" | "fly" }) {
+  return (
+    <div className="relative h-44 w-full flex items-center justify-center">
+      {type === "apply" && (
+        <div className="relative w-24 h-28 border-[3px] border-current rounded-lg p-3.5 flex flex-col gap-3">
+          {[0, 1, 2].map((i) => (
+            <motion.span
+              key={i}
+              animate={{ scaleX: [0, 1, 1, 0] }}
+              transition={{ duration: 3.2, times: [0, 0.2, 0.9, 1], delay: i * 0.35, repeat: Infinity, ease: "easeOut" }}
+              className="block h-1.5 bg-current opacity-50 rounded-full origin-left"
+            />
+          ))}
+          <motion.span
+            animate={{ scale: [0, 1.15, 1, 1, 0], opacity: [0, 1, 1, 1, 0] }}
+            transition={{ duration: 3.2, times: [0.4, 0.5, 0.55, 0.9, 1], repeat: Infinity, ease: "easeOut" }}
+            className="absolute -bottom-3.5 -right-3.5 w-9 h-9 rounded-full border-[3px] border-current flex items-center justify-center"
+          >
+            <Check size={18} weight="bold" />
+          </motion.span>
+        </div>
+      )}
+
+      {type === "match" && (
+        <div className="relative flex items-center justify-center w-full">
+          <motion.div
+            animate={{ x: [-48, -22, -22, -48], opacity: [0, 1, 1, 0] }}
+            transition={{ duration: 3.6, times: [0, 0.3, 0.85, 1], repeat: Infinity, ease: "easeInOut" }}
+          >
+            <PersonFigure className="w-14 h-[84px]" />
+          </motion.div>
+          <motion.span
+            animate={{ scale: [0, 1, 1, 0], opacity: [0, 1, 1, 0] }}
+            transition={{ duration: 3.6, times: [0.35, 0.45, 0.85, 1], repeat: Infinity, ease: "easeOut" }}
+            className="w-2.5 h-2.5 rounded-full bg-current mx-1"
+          />
+          <motion.div
+            animate={{ x: [48, 22, 22, 48], opacity: [0, 1, 1, 0] }}
+            transition={{ duration: 3.6, times: [0, 0.3, 0.85, 1], repeat: Infinity, ease: "easeInOut" }}
+            className="opacity-60"
+          >
+            <PersonFigure className="w-14 h-[84px]" />
+          </motion.div>
+        </div>
+      )}
+
+      {type === "fly" && (
+        <div className="relative w-full h-full">
+          <div className="absolute left-10 right-10 top-1/2 border-t-2 border-dashed border-current opacity-30 -rotate-[14deg]" />
+          <motion.div
+            animate={{ x: [-64, 64], y: [26, -26], opacity: [0, 1, 1, 0] }}
+            transition={{ duration: 3, times: [0, 0.25, 0.8, 1], repeat: Infinity, ease: "easeInOut" }}
+            className="absolute left-1/2 top-1/2 -ml-5 -mt-5"
+          >
+            <AirplaneTilt size={40} weight="fill" />
+          </motion.div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ===== Motion helper ===== */
+
+function FadeIn({
+  children,
+  delay = 0,
+  className,
+}: {
+  children: React.ReactNode;
+  delay?: number;
+  className?: string;
+}) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 24 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, margin: "-60px" }}
+      transition={{ duration: 0.7, delay, ease: [0.22, 1, 0.36, 1] }}
+      className={className}
+    >
+      {children}
+    </motion.div>
+  );
+}
+
+/* ===== Page ===== */
+
+export default function HomeClient({ jobs }: { jobs: any[] }) {
   return (
     <div className="overflow-x-hidden">
       {/* ===== Hero ===== */}
-      <section className="relative overflow-hidden min-h-[95vh] flex items-center bg-[#072F20] text-white">
-        {/* Sleek abstract luxury background */}
+      <section className="relative bg-midnight-950 text-ivory-50 flex flex-col justify-between min-h-[92vh]">
         <div className="absolute inset-0 pointer-events-none">
-          {/* Base gradient map */}
-          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-emerald-800/40 via-[#072F20] to-[#041A11]" />
-          
-          {/* Subtle grid pattern for modern touch */}
-          <div className="absolute inset-0" style={{ backgroundImage: 'linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px)', backgroundSize: '40px 40px' }} />
-
-          {/* Animated luxury glow orbs */}
-          <motion.div 
-            animate={{ 
-              scale: [1, 1.05, 1],
-              opacity: [0.3, 0.4, 0.3],
+          <div
+            className="absolute inset-0 opacity-[0.35]"
+            style={{
+              backgroundImage:
+                "linear-gradient(rgba(255,255,255,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.04) 1px, transparent 1px)",
+              backgroundSize: "72px 72px",
             }}
-            transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
-            className="absolute -top-1/4 -right-1/4 w-[800px] h-[800px] rounded-full bg-emerald-500/10 blur-[120px]" 
           />
-          <motion.div 
-            animate={{ 
-              scale: [1, 1.1, 1],
-              opacity: [0.2, 0.3, 0.2],
-            }}
-            transition={{ duration: 12, repeat: Infinity, ease: "easeInOut" }}
-            className="absolute bottom-0 -left-1/4 w-[600px] h-[600px] rounded-full bg-amber-500/10 blur-[100px]" 
-          />
+          <div className="absolute -top-1/3 right-0 w-[700px] h-[700px] rounded-full bg-midnight-600/20 blur-[140px]" />
+          <div className="absolute bottom-0 -left-40 w-[500px] h-[500px] rounded-full bg-gold-500/[0.07] blur-[120px]" />
         </div>
 
-        <div className="relative max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-32 md:py-48 w-full">
-          <div className="grid lg:grid-cols-[1fr_1.1fr] gap-12 lg:gap-20 items-center">
-            
-            {/* TEXT COLUMN (LEFT) */}
-            <div className="max-w-2xl text-center lg:text-left mx-auto lg:mx-0 order-1 lg:order-1 z-10 relative">
-              <motion.div 
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.8, ease: "easeOut" }}
-                className="inline-flex items-center gap-3 bg-white/5 backdrop-blur-md border border-white/10 rounded-full px-5 py-2.5 text-xs sm:text-sm font-bold tracking-[0.15em] text-emerald-300 uppercase mb-8 shadow-2xl shadow-emerald-900/50"
-              >
-                <span className="w-2.5 h-2.5 bg-amber-400 rounded-full animate-pulse shadow-[0_0_10px_rgba(251,191,36,0.8)]" />
-                Now Hiring Across 30+ Countries
-              </motion.div>
-
-              <motion.h1 
-                initial={{ opacity: 0, y: 30 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.8, delay: 0.2, ease: "easeOut" }}
-                className="text-[2.75rem] sm:text-6xl md:text-[4.5rem] lg:text-[5.5rem] font-black leading-[1.05] mb-8 tracking-tight"
-              >
-                Your Gateway to <br className="hidden md:block" />
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-200 via-amber-400 to-amber-500 drop-shadow-sm">
-                  Global Careers
-                </span>
-              </motion.h1>
-              
-              <motion.p 
-                initial={{ opacity: 0, y: 30 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.8, delay: 0.4, ease: "easeOut" }}
-                className="text-lg md:text-xl text-emerald-50/80 leading-relaxed mb-12 max-w-xl md:mx-0 mx-auto font-light tracking-wide lg:mx-0"
-              >
-                Vertex International Recruitment bridges the gap between talented professionals and world-class employers
-                across Africa, the Middle East, and Europe.
-              </motion.p>
-
-              <motion.div 
-                initial={{ opacity: 0, y: 30 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.8, delay: 0.6, ease: "easeOut" }}
-                className="flex flex-col sm:flex-row gap-5 justify-center lg:justify-start"
-              >
-                <Link href="/jobs" className="bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-900 font-extrabold text-[15px] sm:text-lg px-8 py-4 rounded-full shadow-[0_10px_40px_rgba(245,158,11,0.3)] transition-all hover:scale-105 active:scale-95 flex items-center justify-center gap-2 uppercase tracking-wide">
-                  Browse Open Jobs <span className="text-xl leading-none">→</span>
-                </Link>
-                <Link
-                  href="/about"
-                  className="inline-flex items-center justify-center gap-2 bg-transparent hover:bg-white/5 border-2 border-white/20 text-white font-bold text-[15px] sm:text-lg px-8 py-4 rounded-full transition-all duration-300 hover:border-white/40 uppercase tracking-wide"
-                >
-                  Learn About Us
-                </Link>
-              </motion.div>
-            </div>
-
-            {/* IMAGE COLUMN (RIGHT) */}
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 1, delay: 0.3, ease: "easeOut" }}
-              className="relative flex justify-center lg:justify-start order-2 lg:order-2 h-full w-full mt-10 lg:mt-0"
+        <div className="relative max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 w-full flex-1 grid lg:grid-cols-[1.15fr_0.85fr] gap-12 items-center pt-24 pb-16">
+          <div className="max-w-2xl">
+            <motion.p
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.7, ease: "easeOut" }}
+              className="eyebrow-dark mb-8"
             >
-               <div className="relative w-full max-w-[400px] lg:max-w-[550px] mx-auto xl:mx-0 xl:mr-auto">
-                 {/* Decorative elements around image */}
-                 <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[110%] lg:w-[120%] h-[110%] lg:h-[120%] bg-emerald-500/10 blur-[60px] lg:blur-[80px] rounded-full pointer-events-none" />
-                 <motion.div 
-                    animate={{ y: [0, -10, 0] }} 
-                    transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
-                    className="relative z-10"
-                 >
-                   <img 
-                     src="/hero-handshake.png" 
-                     alt="Vertex Recruitment Partnership" 
-                     className="w-full lg:w-[120%] lg:max-w-[650px] lg:ml-4 h-auto object-contain drop-shadow-[0_20px_40px_rgba(0,0,0,0.5)] lg:drop-shadow-[0_30px_50px_rgba(0,0,0,0.6)]"
-                   />
-                 </motion.div>
-                 
-                 {/* Trust Badge Overlay */}
-                 <motion.div 
-                   initial={{ opacity: 0, y: 30 }}
-                   animate={{ opacity: 1, y: 0 }}
-                   transition={{ delay: 0.8, duration: 0.8 }}
-                   className="absolute -bottom-6 lg:bottom-4 left-0 lg:-left-8 bg-white/10 backdrop-blur-xl border border-white/20 p-3 lg:p-4 rounded-2xl shadow-2xl flex items-center gap-3 lg:gap-4 z-20 w-max pr-6 lg:pr-8 border-l-[4px] border-l-amber-400"
-                 >
-                    <div className="bg-amber-400 p-2 lg:p-3 rounded-full text-[#072F20] shadow-[0_0_15px_rgba(251,191,36,0.5)]">
-                       <svg className="w-5 h-5 lg:w-7 lg:h-7" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 012.812 2.812c.051.643.304 1.254.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812 3.066 3.066 0 00-.723-1.745 3.066 3.066 0 010-3.976 3.066 3.066 0 00.723-1.745 3.066 3.066 0 012.812-2.812zm7.44 5.252a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"></path></svg>
-                    </div>
-                    <div>
-                       <p className="text-white font-black text-sm lg:text-[15px] leading-tight tracking-wide">Official Partner</p>
-                       <p className="text-emerald-300 text-xs lg:text-sm font-bold tracking-wider">HUNGARY & EU SECTOR</p>
-                    </div>
-                 </motion.div>
-               </div>
+              <span className="eyebrow-rule" />
+              Global Recruitment — Africa · Middle East · Europe
+            </motion.p>
+
+            <motion.h1
+              initial={{ opacity: 0, y: 28 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.8, delay: 0.15, ease: [0.22, 1, 0.36, 1] }}
+              className="text-5xl sm:text-6xl md:text-7xl lg:text-[6.5rem] font-semibold leading-[0.98] tracking-tight mb-10"
+            >
+              Careers beyond
+              <br />
+              <span className="text-gold-300">borders.</span>
+            </motion.h1>
+
+            <motion.p
+              initial={{ opacity: 0, y: 28 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.8, delay: 0.3, ease: [0.22, 1, 0.36, 1] }}
+              className="text-lg md:text-xl text-ivory-50/60 leading-relaxed mb-12 max-w-xl font-light"
+            >
+              Vertex International Recruitment places talented professionals with world-class employers —
+              from application to visa to your first day at work.
+            </motion.p>
+
+            <motion.div
+              initial={{ opacity: 0, y: 28 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.8, delay: 0.45, ease: [0.22, 1, 0.36, 1] }}
+              className="flex flex-col sm:flex-row gap-4"
+            >
+              <Link href="/jobs" className="btn-gold px-9 py-4">
+                Browse Open Roles <ArrowRight size={16} weight="bold" />
+              </Link>
+              <Link href="#process" className="btn-ghost-dark px-9 py-4">
+                How It Works
+              </Link>
+            </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 1, delay: 0.7 }}
+              className="mt-12 inline-flex items-center gap-3 text-ivory-50/50"
+            >
+              <SealCheck size={20} weight="fill" className="text-gold-400" />
+              <span className="text-[11px] font-semibold uppercase tracking-[0.25em]">
+                Official Partner — Hungary & EU Sector
+              </span>
             </motion.div>
           </div>
+
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 1.2, delay: 0.5 }}
+          >
+            <HeroFigures />
+          </motion.div>
         </div>
-        
-        {/* Scroll indicator */}
-        <motion.div 
-           initial={{ opacity: 0 }}
-           animate={{ opacity: 1 }}
-           transition={{ delay: 1.5, duration: 1 }}
-           className="absolute bottom-10 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2"
+
+        {/* Stats strip */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 1, delay: 0.8 }}
+          className="relative border-t border-white/10"
         >
-           <span className="text-[10px] font-bold tracking-[0.3em] uppercase text-emerald-400/70">Scroll Down</span>
-           <div className="w-[1px] h-12 bg-gradient-to-b from-emerald-400/70 to-transparent" />
+          <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-2 md:grid-cols-4">
+            {STATS.map((stat, idx) => (
+              <div
+                key={stat.label}
+                className={`py-8 md:py-10 pr-6 ${idx > 0 ? "md:border-l md:border-white/10 md:pl-8" : ""}`}
+              >
+                <div className="text-2xl md:text-4xl font-semibold tracking-tight text-ivory-50">{stat.value}</div>
+                <div className="text-ivory-50/40 text-[11px] uppercase tracking-[0.2em] mt-2">{stat.label}</div>
+              </div>
+            ))}
+          </div>
         </motion.div>
       </section>
 
-      {/* ===== Stats ===== */}
-      <section className="bg-white border-b border-slate-100">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
-            {stats.map((stat, idx) => (
-              <motion.div 
-                key={stat.label}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.5, delay: idx * 0.1 }}
-              >
-                <div className="text-3xl md:text-4xl font-black text-emerald-800">{stat.value}</div>
-                <div className="text-slate-500 text-sm mt-1">{stat.label}</div>
-              </motion.div>
+      {/* ===== Sector marquee ===== */}
+      <section className="bg-midnight-900 border-y border-white/5 py-5 overflow-hidden marquee-mask">
+        <div className="flex w-max animate-marquee">
+          {[...Array(2)].map((_, dup) => (
+            <div key={dup} className="flex items-center shrink-0">
+              {[...SECTORS, ...SECTORS].map((s, idx) => (
+                <span
+                  key={`${dup}-${idx}`}
+                  className="flex items-center text-[12px] font-semibold uppercase tracking-[0.35em] text-ivory-50/40"
+                >
+                  <span className="px-8">{s.title}</span>
+                  <span className="text-gold-500/60 text-[8px]">◆</span>
+                </span>
+              ))}
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ===== Our Process × Candidates ===== */}
+      <section id="process" className="bg-ivory-50 py-24 md:py-32 scroll-mt-20">
+        <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8">
+          <FadeIn className="mb-16 max-w-3xl">
+            <p className="eyebrow mb-5">
+              <span className="eyebrow-rule" />
+              Our Process × Candidates
+            </p>
+            <h2 className="section-title">Fair, fast and guided.</h2>
+            <p className="section-subtitle">
+              We handle the paperwork, the employer and the visa — you focus on the journey.
+              Three steps from application to arrival.
+            </p>
+          </FadeIn>
+
+          <div className="process-cards grid md:grid-cols-3 gap-6">
+            {CANDIDATE_STEPS.map((step, idx) => {
+              const cardStyles = [
+                "bg-white text-midnight-950 border border-midnight-900/10",
+                "bg-midnight-900 text-ivory-100",
+                "bg-gold-400 text-midnight-950",
+              ];
+              return (
+                <FadeIn key={step.name} delay={idx * 0.1} className="h-full">
+                  <div className={`process-card rounded-2xl p-8 md:p-10 h-full min-h-[440px] flex flex-col ${cardStyles[idx]}`}>
+                    <h3 className="text-2xl md:text-3xl font-semibold tracking-tight">
+                      {idx + 1}:{step.name}
+                    </h3>
+                    <div className="flex-1 flex items-center justify-center py-6">
+                      <StepPictogram type={step.pictogram} />
+                    </div>
+                    <p className="opacity-70 leading-relaxed font-light">{step.text}</p>
+                  </div>
+                </FadeIn>
+              );
+            })}
+          </div>
+        </div>
+      </section>
+
+      {/* ===== Destinations ===== */}
+      <section className="bg-ivory-100 py-24 md:py-32">
+        <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8">
+          <FadeIn className="mb-14 flex flex-col md:flex-row md:items-end justify-between gap-6">
+            <div className="max-w-2xl">
+              <p className="eyebrow mb-5">
+                <span className="eyebrow-rule" />
+                Destinations
+              </p>
+              <h2 className="section-title">Where we place you.</h2>
+            </div>
+            <Link
+              href="/jobs"
+              className="group inline-flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.2em] text-midnight-800 hover:text-gold-600 transition-colors shrink-0"
+            >
+              All destinations
+              <ArrowRight size={16} weight="bold" className="transition-transform group-hover:translate-x-1" />
+            </Link>
+          </FadeIn>
+
+          <div className="grid md:grid-cols-3 gap-6">
+            {DESTINATIONS.map((dest, idx) => (
+              <FadeIn key={dest.country} delay={idx * 0.1} className="h-full">
+                <Link
+                  href={dest.href}
+                  className={`group flex flex-col justify-between h-full min-h-[320px] rounded-2xl p-8 transition-all duration-300 ${
+                    dest.featured
+                      ? "bg-midnight-900 text-ivory-50 hover:bg-midnight-800"
+                      : "bg-white text-midnight-900 border border-midnight-900/10 hover:border-gold-500/60"
+                  }`}
+                >
+                  <div>
+                    <span
+                      className={`inline-flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.25em] ${
+                        dest.featured ? "text-gold-300" : "text-gold-600"
+                      }`}
+                    >
+                      {dest.featured && <SealCheck size={14} weight="fill" />}
+                      {dest.tag}
+                    </span>
+                    <h3 className="text-3xl md:text-4xl font-semibold tracking-tight mt-6">{dest.country}</h3>
+                    <p className={`text-sm leading-relaxed mt-4 font-light ${dest.featured ? "text-ivory-50/60" : "text-midnight-900/55"}`}>
+                      {dest.blurb}
+                    </p>
+                  </div>
+                  <div className="flex items-center justify-between mt-10">
+                    <span className={`text-[11px] uppercase tracking-[0.2em] font-semibold ${dest.featured ? "text-ivory-50/50" : "text-midnight-900/40"}`}>
+                      View program
+                    </span>
+                    <span
+                      className={`w-10 h-10 rounded-full border flex items-center justify-center transition-all group-hover:translate-x-1 ${
+                        dest.featured
+                          ? "border-white/20 text-gold-300 group-hover:border-gold-300"
+                          : "border-midnight-900/15 text-midnight-800 group-hover:border-gold-500 group-hover:text-gold-600"
+                      }`}
+                    >
+                      <ArrowRight size={16} weight="bold" />
+                    </span>
+                  </div>
+                </Link>
+              </FadeIn>
             ))}
           </div>
         </div>
       </section>
 
-      {/* ===== Job Categories ===== */}
-      <section className="bg-slate-50 py-20 overflow-hidden">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <motion.div 
-            initial={{ opacity: 0, y: 30 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            className="text-center mb-14"
-          >
-            <h2 className="section-title">Job Categories</h2>
-            <p className="section-subtitle mx-auto">
-              Vertex International actively recruits for unskilled, semi-skilled, and engineering graduate roles abroad.
-            </p>
-          </motion.div>
-
-          <div 
-            className="relative flex overflow-hidden py-4 -mx-4 px-4"
-            style={{ WebkitMaskImage: 'linear-gradient(to right, transparent, black 5%, black 95%, transparent)' }}
-          >
-            <motion.div
-              className="flex items-stretch gap-6 w-max"
-              animate={{ x: ["0%", "-50%"] }}
-              transition={{
-                ease: "linear",
-                duration: 45,
-                repeat: Infinity,
-              }}
-              whileHover={{ animationPlayState: "paused" }}
+      {/* ===== Featured jobs ===== */}
+      <section className="bg-ivory-50 py-24 md:py-32">
+        <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8">
+          <FadeIn className="mb-12 flex flex-col md:flex-row md:items-end justify-between gap-6">
+            <div className="max-w-2xl">
+              <p className="eyebrow mb-5">
+                <span className="eyebrow-rule" />
+                Open positions
+              </p>
+              <h2 className="section-title">Featured opportunities.</h2>
+            </div>
+            <Link
+              href="/jobs"
+              className="group inline-flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.2em] text-midnight-800 hover:text-gold-600 transition-colors shrink-0"
             >
-              {[...categories, ...categories, ...categories, ...categories].map((cat, idx) => (
-                <div key={`${cat.title}-${idx}`} className="w-[300px] shrink-0">
-                  <TiltCard idx={idx} disableEntryAnimation={true}>
-                    <div className="text-4xl mb-3">{cat.icon}</div>
-                    <h3 className="font-bold text-slate-800 text-base mb-2 group-hover:text-emerald-700 transition-colors">{cat.title}</h3>
-                    <p className="text-xs text-amber-600 font-semibold mb-3">{cat.industries}</p>
-                    <ul className="space-y-1">
-                      {cat.roles.map((role: string) => (
-                        <li key={role} className="text-slate-500 text-xs flex text-left items-start gap-1.5 whitespace-normal">
-                          <span className="w-1.5 h-1.5 mt-1 rounded-full bg-emerald-400 flex-shrink-0" />
-                          <span className="leading-tight">{role}</span>
-                        </li>
-                      ))}
-                    </ul>
-                    <div className="mt-4 pt-4 border-t border-slate-100 flex items-center justify-between">
-                      <Link href="/jobs" className="text-xs font-semibold text-emerald-700 hover:underline">Browse {cat.title} →</Link>
-                    </div>
-                  </TiltCard>
-                </div>
-              ))}
-            </motion.div>
-          </div>
-        </div>
-      </section>
-
-      {/* ===== Featured Jobs ===== */}
-      <section className="bg-white py-20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-10 gap-4">
-            <motion.div
-              initial={{ opacity: 0, x: -20 }}
-              whileInView={{ opacity: 1, x: 0 }}
-              viewport={{ once: true }}
-            >
-              <h2 className="section-title">Featured Opportunities</h2>
-              <p className="text-slate-500 mt-2">Explore our latest open positions</p>
-            </motion.div>
-            <Link href="/jobs" className="btn-secondary text-sm py-2.5 px-5">
-              View All Jobs →
+              View all jobs
+              <ArrowRight size={16} weight="bold" className="transition-transform group-hover:translate-x-1" />
             </Link>
-          </div>
+          </FadeIn>
 
           {jobs.length === 0 ? (
-            <div className="text-center py-16 text-slate-400">
-              <div className="text-5xl mb-4">💼</div>
-              <p>No jobs available yet. Check back soon!</p>
-            </div>
+            <FadeIn>
+              <div className="text-center py-20 border border-midnight-900/10 rounded-2xl bg-white text-midnight-900/50">
+                <p className="font-light">No jobs available yet. Check back soon.</p>
+              </div>
+            </FadeIn>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="border-t border-midnight-900/10">
               {jobs.map((job: any, idx: number) => (
-                <motion.div
-                  key={job.id}
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  whileInView={{ opacity: 1, scale: 1 }}
-                  viewport={{ once: true }}
-                  transition={{ duration: 0.4, delay: idx * 0.1 }}
-                >
-                  <Link href={`/jobs/${job.id}`} className="card p-6 block group h-full">
-                    <div className="flex items-start justify-between gap-2 mb-3">
-                      <h3 className="font-bold text-slate-800 group-hover:text-emerald-700 transition-colors leading-snug">
+                <FadeIn key={job.id} delay={idx * 0.04}>
+                  <Link
+                    href={`/jobs/${job.id}`}
+                    className="group grid grid-cols-1 md:grid-cols-[1fr_auto_auto_56px] items-start md:items-center gap-3 md:gap-10 py-7 border-b border-midnight-900/10 transition-colors hover:bg-white px-2 md:px-4 -mx-2 md:-mx-4"
+                  >
+                    <div>
+                      <h3 className="text-lg md:text-xl font-semibold tracking-tight text-midnight-900 group-hover:text-midnight-700 transition-colors">
                         {job.title}
                       </h3>
-                      <span className="badge-active flex-shrink-0">Active</span>
+                      <p className="flex items-center gap-1.5 text-sm text-midnight-900/50 mt-1 font-light">
+                        <MapPin size={14} weight="regular" />
+                        {job.city}, {job.country}
+                      </p>
                     </div>
-                    <div className="flex items-center gap-4 text-sm text-slate-500 mb-4">
-                      <span>📍 {job.city}, {job.country}</span>
-                    </div>
-                    {job.salary_range && (
-                      <div className="text-sm font-semibold text-green-700">💰 {job.salary_range}</div>
-                    )}
-                    <div className="mt-4 pt-4 border-t border-slate-100 flex items-center justify-between">
-                      <span className="text-xs text-slate-400">
-                        {new Date(job.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
-                      </span>
-                      <span className="text-sm font-medium text-emerald-700 group-hover:underline">Apply →</span>
-                    </div>
+                    <span className="text-sm font-medium text-midnight-800 md:text-right">
+                      {job.salary_range || "Competitive"}
+                    </span>
+                    <span className="text-xs text-midnight-900/40 uppercase tracking-[0.15em] md:text-right">
+                      {new Date(job.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                    </span>
+                    <ArrowUpRight
+                      size={22}
+                      weight="regular"
+                      className="hidden md:block text-midnight-900/25 group-hover:text-gold-600 transition-all group-hover:translate-x-1 group-hover:-translate-y-1 justify-self-end"
+                    />
                   </Link>
-                </motion.div>
+                </FadeIn>
               ))}
             </div>
           )}
@@ -287,194 +640,220 @@ export default function HomeClient({ jobs, stats, categories, benefits, requirem
       </section>
 
       {/* ===== Package & Benefits ===== */}
-      <section className="bg-emerald-950 text-white py-16">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <motion.div 
-            initial={{ opacity: 0, y: 30 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            className="text-center mb-12"
-          >
-            <h2 className="text-3xl md:text-4xl font-black text-white mb-3">Package &amp; Benefits</h2>
-            <p className="text-emerald-300">What you get when placed through Vertex International</p>
-          </motion.div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-            {benefits.map((b, idx) => (
-              <motion.div 
-                key={b.label} 
-                initial={{ opacity: 0, scale: 0.8 }}
-                whileInView={{ opacity: 1, scale: 1 }}
-                viewport={{ once: true }}
-                transition={{ type: "spring", damping: 12, delay: idx * 0.1 }}
-                className="bg-white/10 backdrop-blur-sm border border-white/10 rounded-2xl p-6 text-center group hover:bg-white/20 transition-all"
-              >
-                <div className="text-4xl mb-3 group-hover:scale-110 transition-transform">{b.icon}</div>
-                <div className="text-amber-400 font-black text-sm uppercase tracking-wider mb-1">{b.label}</div>
-                <div className="text-white font-semibold text-sm leading-snug">{b.value}</div>
-              </motion.div>
-            ))}
+      <section className="bg-midnight-950 text-ivory-50 py-24 md:py-32">
+        <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8">
+          <FadeIn className="mb-12 max-w-2xl">
+            <p className="eyebrow-dark mb-5">
+              <span className="eyebrow-rule" />
+              Package & benefits
+            </p>
+            <h2 className="text-3xl md:text-4xl font-semibold tracking-tight text-ivory-50">
+              What you get when placed through Vertex.
+            </h2>
+          </FadeIn>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            {BENEFITS.map((benefit, idx) => {
+              const Icon = benefit.icon;
+              return (
+                <FadeIn key={benefit.label} delay={idx * 0.08} className="h-full">
+                  <div className="border border-white/10 rounded-2xl p-8 h-full hover:border-gold-400/50 transition-colors">
+                    <Icon size={28} weight="light" className="text-gold-300 mb-6" />
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.25em] text-ivory-50/40 mb-2">
+                      {benefit.label}
+                    </div>
+                    <div className="text-ivory-50 font-medium leading-snug">{benefit.value}</div>
+                  </div>
+                </FadeIn>
+              );
+            })}
           </div>
         </div>
       </section>
 
-      {/* ===== Eligibility & Requirements ===== */}
-      <section className="bg-white py-16">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
-          <motion.div 
-            initial={{ opacity: 0, y: 30 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            className="text-center mb-10"
-          >
-            <h2 className="section-title">Eligibility &amp; Requirements</h2>
-            <p className="section-subtitle mx-auto">Make sure you meet these requirements before applying.</p>
-          </motion.div>
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {requirements.map((req, idx) => (
-              <motion.div 
-                key={req.text} 
-                initial={{ opacity: 0, x: -20 }}
-                whileInView={{ opacity: 1, x: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.3, delay: idx * 0.05 }}
-                className="flex items-center gap-3 bg-slate-50 border border-slate-100 rounded-xl px-5 py-4 hover:border-emerald-200 hover:bg-emerald-50 transition-all"
-              >
-                <span className="text-2xl flex-shrink-0">{req.icon}</span>
-                <span className="text-slate-700 text-sm font-medium">{req.text}</span>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ===== Contact Strip ===== */}
-      <section className="bg-slate-900 text-white py-12">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-8">
-            <h2 className="text-2xl font-black text-white mb-1">Reach Us Directly</h2>
-            <p className="text-slate-400 text-sm">We&apos;re available via WhatsApp, Telegram, and Email</p>
-          </div>
-          <div className="grid sm:grid-cols-3 gap-6 text-center">
-            <motion.div 
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              className="bg-white/5 border border-white/10 rounded-2xl p-6"
-            >
-              <div className="text-3xl mb-3">💬</div>
-              <div className="font-bold text-white mb-2">WhatsApp</div>
-              <div className="space-y-1">
-                {["+44 7440 167608", "+44 7438 299563", "+44 7405 368405", "+44 7438 613251"].map((n) => (
-                  <a key={n} href={`https://wa.me/${n.replace(/[^0-9]/g, "")}`} target="_blank" rel="noopener noreferrer"
-                    className="block text-emerald-400 hover:text-emerald-300 text-sm font-mono transition-colors">
-                    {n}
-                  </a>
+      {/* ===== Eligibility ===== */}
+      <section className="bg-ivory-50 py-24 md:py-32">
+        <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid lg:grid-cols-2 gap-16 lg:gap-24">
+            <FadeIn>
+              <p className="eyebrow mb-5">
+                <span className="eyebrow-rule" />
+                Before you apply
+              </p>
+              <h2 className="section-title mb-6">Check your eligibility.</h2>
+              <p className="text-midnight-900/60 font-light leading-relaxed mb-10 max-w-md">
+                Make sure you can provide these four essentials — our team helps you prepare everything else.
+              </p>
+              <ul className="space-y-4">
+                {REQUIREMENTS.map((req) => (
+                  <li key={req} className="flex items-center gap-4 text-midnight-900">
+                    <CheckCircle size={22} weight="fill" className="text-midnight-600 shrink-0" />
+                    <span className="font-medium">{req}</span>
+                  </li>
                 ))}
+              </ul>
+            </FadeIn>
+
+            <FadeIn delay={0.15}>
+              <div className="space-y-4">
+                {QUALIFICATION_TIERS.map((tier) => {
+                  const Icon = tier.icon;
+                  return (
+                    <div
+                      key={tier.title}
+                      className="flex items-start gap-5 bg-white border border-midnight-900/10 rounded-2xl p-6 hover:border-gold-500/60 transition-colors"
+                    >
+                      <div className="w-12 h-12 rounded-full border border-midnight-900/15 flex items-center justify-center text-midnight-800 shrink-0">
+                        <Icon size={22} weight="regular" />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-midnight-900">{tier.title}</h3>
+                        <p className="text-sm text-midnight-900/55 mt-1 font-light">{tier.text}</p>
+                      </div>
+                    </div>
+                  );
+                })}
+                <Link
+                  href="/apply"
+                  className="group flex items-center justify-between bg-midnight-900 text-ivory-50 rounded-2xl p-6 hover:bg-midnight-800 transition-colors"
+                >
+                  <span className="font-semibold">Ready? Start your application</span>
+                  <ArrowRight size={20} weight="bold" className="text-gold-300 transition-transform group-hover:translate-x-1" />
+                </Link>
               </div>
-            </motion.div>
-            <motion.div 
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: 0.1 }}
-              className="bg-white/5 border border-white/10 rounded-2xl p-6"
-            >
-              <div className="text-3xl mb-3">✈️</div>
-              <div className="font-bold text-white mb-2">Telegram</div>
-              <a href="https://t.me/Vertexinternational1" target="_blank" rel="noopener noreferrer"
-                className="text-emerald-400 hover:text-emerald-300 text-sm font-mono transition-colors">@Vertexinternational1</a>
-            </motion.div>
-            <motion.div 
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: 0.2 }}
-              className="bg-white/5 border border-white/10 rounded-2xl p-6"
-            >
-              <div className="text-3xl mb-3">📧</div>
-              <div className="font-bold text-white mb-2">Email</div>
-              <a href="mailto:vertex@vertexintern.com"
-                className="text-emerald-400 hover:text-emerald-300 text-sm font-mono transition-colors">vertex@vertexintern.com</a>
-            </motion.div>
+            </FadeIn>
           </div>
         </div>
       </section>
 
-      {/* ===== CTA ===== */}
-      <section className="bg-gradient-to-r from-emerald-800 to-emerald-900 text-white py-20">
-        <div className="max-w-3xl mx-auto px-4 text-center">
-          <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
-            whileInView={{ opacity: 1, scale: 1 }}
-            viewport={{ once: true }}
-          >
-            <h2 className="text-3xl md:text-4xl font-black mb-4">Ready to Start Your Journey?</h2>
-            <p className="text-emerald-200 text-lg mb-8">
+      {/* ===== FAQ ===== */}
+      <section className="bg-ivory-100 py-24 md:py-32">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+          <FadeIn className="mb-14 text-center">
+            <p className="eyebrow mb-5 justify-center">
+              <span className="eyebrow-rule" />
+              Common questions
+            </p>
+            <h2 className="section-title">Answers, upfront.</h2>
+          </FadeIn>
+
+          <FadeIn>
+            <div className="border-t border-midnight-900/10">
+              {FAQS.map((faq) => (
+                <details key={faq.q} className="group border-b border-midnight-900/10">
+                  <summary className="flex items-center justify-between gap-6 py-6 cursor-pointer list-none [&::-webkit-details-marker]:hidden">
+                    <span className="font-semibold text-midnight-900 text-lg tracking-tight">{faq.q}</span>
+                    <Plus
+                      size={20}
+                      weight="bold"
+                      className="text-gold-600 shrink-0 transition-transform duration-300 group-open:rotate-45"
+                    />
+                  </summary>
+                  <p className="pb-6 text-midnight-900/60 font-light leading-relaxed max-w-2xl">{faq.a}</p>
+                </details>
+              ))}
+            </div>
+            <p className="text-center mt-10 text-sm text-midnight-900/50 font-light">
+              More questions?{" "}
+              <Link href="/help" className="font-semibold text-midnight-800 hover:text-gold-600 transition-colors">
+                Visit the Help Center →
+              </Link>
+            </p>
+          </FadeIn>
+        </div>
+      </section>
+
+      {/* ===== Contact strip ===== */}
+      <section className="bg-midnight-900 text-ivory-50 py-20 border-b border-white/10">
+        <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8">
+          <FadeIn className="mb-12">
+            <p className="eyebrow-dark mb-4">
+              <span className="eyebrow-rule" />
+              Reach us directly
+            </p>
+            <h2 className="text-3xl md:text-4xl font-semibold tracking-tight">One message away, always.</h2>
+          </FadeIn>
+
+          <div className="grid md:grid-cols-3 gap-px bg-white/10 border border-white/10 rounded-2xl overflow-hidden">
+            <FadeIn className="h-full">
+              <div className="bg-midnight-900 p-8 h-full">
+                <ChatCircleText size={26} weight="light" className="text-gold-300 mb-5" />
+                <div className="text-[11px] font-semibold uppercase tracking-[0.25em] text-ivory-50/40 mb-4">WhatsApp</div>
+                <div className="space-y-2">
+                  {WHATSAPP_NUMBERS.map((n) => (
+                    <a
+                      key={n}
+                      href={`https://wa.me/${n.replace(/[^0-9]/g, "")}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block text-ivory-50/80 hover:text-gold-300 text-sm font-mono transition-colors"
+                    >
+                      {n}
+                    </a>
+                  ))}
+                </div>
+              </div>
+            </FadeIn>
+            <FadeIn delay={0.08} className="h-full">
+              <div className="bg-midnight-900 p-8 h-full">
+                <PaperPlaneTilt size={26} weight="light" className="text-gold-300 mb-5" />
+                <div className="text-[11px] font-semibold uppercase tracking-[0.25em] text-ivory-50/40 mb-4">Telegram</div>
+                <a
+                  href="https://t.me/Vertexinternational1"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-ivory-50/80 hover:text-gold-300 text-sm font-mono transition-colors"
+                >
+                  @Vertexinternational1
+                </a>
+              </div>
+            </FadeIn>
+            <FadeIn delay={0.16} className="h-full">
+              <div className="bg-midnight-900 p-8 h-full">
+                <EnvelopeSimple size={26} weight="light" className="text-gold-300 mb-5" />
+                <div className="text-[11px] font-semibold uppercase tracking-[0.25em] text-ivory-50/40 mb-4">Email</div>
+                <a
+                  href="mailto:vertex@vertexintern.com"
+                  className="text-ivory-50/80 hover:text-gold-300 text-sm font-mono transition-colors"
+                >
+                  vertex@vertexintern.com
+                </a>
+              </div>
+            </FadeIn>
+          </div>
+        </div>
+      </section>
+
+      {/* ===== Final CTA ===== */}
+      <section className="relative bg-midnight-950 text-ivory-50 py-28 md:py-36 overflow-hidden">
+        <div className="absolute inset-0 pointer-events-none">
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[400px] rounded-full bg-midnight-600/20 blur-[130px]" />
+        </div>
+        <div className="relative max-w-3xl mx-auto px-4 text-center">
+          <FadeIn>
+            <p className="eyebrow-dark mb-6 justify-center">
+              <span className="eyebrow-rule" />
+              Begin today
+            </p>
+            <h2 className="text-4xl md:text-6xl font-semibold tracking-tight leading-[1.02] mb-8">
+              Ready to start
+              <br />
+              your journey?
+            </h2>
+            <p className="text-ivory-50/50 text-lg font-light mb-12 max-w-xl mx-auto">
               Register today and let Vertex International connect you with opportunities across the globe.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Link href="/auth/register" className="btn-gold px-8 py-3.5 text-base shadow-xl shadow-amber-900/20">
+              <Link href="/auth/register" className="btn-gold px-9 py-4">
                 Create Free Account
               </Link>
-              <Link href="/contact" className="btn-secondary border-white/40 text-white hover:bg-white/10 px-8 py-3.5 text-base">
+              <Link href="/contact" className="btn-ghost-dark px-9 py-4">
                 Contact Us
               </Link>
             </div>
-          </motion.div>
+          </FadeIn>
         </div>
       </section>
     </div>
-  );
-}
-
-function TiltCard({ children, idx, disableEntryAnimation = false }: { children: React.ReactNode, idx: number, disableEntryAnimation?: boolean }) {
-  const x = useMotionValue(0);
-  const y = useMotionValue(0);
-
-  const rotateX = useTransform(y, [-100, 100], [10, -10]);
-  const rotateY = useTransform(x, [-100, 100], [-10, 10]);
-
-  function handleMouseMove(event: React.MouseEvent<HTMLDivElement>) {
-    const rect = event.currentTarget.getBoundingClientRect();
-    const centerX = rect.left + rect.width / 2;
-    const centerY = rect.top + rect.height / 2;
-    x.set(event.clientX - centerX);
-    y.set(event.clientY - centerY);
-  }
-
-  function handleMouseLeave() {
-    x.set(0);
-    y.set(0);
-  }
-
-  const InnerCard = (
-    <motion.div
-      onMouseMove={handleMouseMove}
-      onMouseLeave={handleMouseLeave}
-      style={{ rotateX, rotateY, transformStyle: "preserve-3d" }}
-      className="card p-6 flex flex-col hover:border-emerald-400 hover:shadow-2xl transition-shadow group h-full bg-white relative overflow-hidden"
-    >
-      {/* Shine effect */}
-      <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent pointer-events-none" />
-      <div className="relative z-10" style={{ transform: "translateZ(20px)" }}>
-        {children}
-      </div>
-    </motion.div>
-  );
-
-  if (disableEntryAnimation) {
-    return <div style={{ perspective: 1000, height: '100%' }}>{InnerCard}</div>;
-  }
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 30 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true }}
-      transition={{ duration: 0.5, delay: idx * 0.1 }}
-      style={{ perspective: 1000, height: '100%' }}
-    >
-      {InnerCard}
-    </motion.div>
   );
 }

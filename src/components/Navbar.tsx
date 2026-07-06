@@ -14,14 +14,24 @@ const NAV_LINKS = [
 ];
 
 const LANGUAGES = [
+  { code: "en", label: "English" },
   { code: "it", label: "Italiano" },
   { code: "fr", label: "Français" },
   { code: "pt", label: "Português" },
 ];
 
+function getActiveLanguage(): string {
+  const match = document.cookie.match(/(?:^|; )googtrans=([^;]*)/);
+  if (!match) return "en";
+  const value = decodeURIComponent(match[1]);
+  const parts = value.split("/").filter(Boolean); // "/en/it" -> ["en", "it"]
+  return parts[1] || "en";
+}
+
 export default function Navbar() {
   const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const [currentLang, setCurrentLang] = useState("en");
   const pathname = usePathname();
 
   useEffect(() => {
@@ -32,6 +42,10 @@ export default function Navbar() {
 
   useEffect(() => setOpen(false), [pathname]);
 
+  useEffect(() => {
+    setCurrentLang(getActiveLanguage());
+  }, []);
+
   const handleTranslate = (lang: string) => {
     if (lang === "en") {
       document.cookie = "googtrans=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
@@ -40,6 +54,7 @@ export default function Navbar() {
       document.cookie = `googtrans=/en/${lang}; path=/;`;
       document.cookie = `googtrans=/en/${lang}; path=/; domain=${window.location.hostname}`;
     }
+    setCurrentLang(lang);
     window.location.reload();
   };
 
@@ -95,27 +110,25 @@ export default function Navbar() {
             {/* Language dropdown */}
             <div className="relative group py-2">
               <div className="flex items-center gap-1.5 text-[12px] font-semibold text-ivory-50/50 hover:text-ivory-50 cursor-pointer uppercase tracking-[0.2em] transition-colors">
-                <span>EN</span>
+                <span>{currentLang}</span>
                 <CaretDown size={12} weight="bold" className="transition-transform group-hover:rotate-180" />
               </div>
               <div className="absolute top-full right-0 bg-midnight-900 border border-white/10 shadow-2xl rounded-xl py-2 w-40 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 transform origin-top-right group-hover:translate-y-0 translate-y-2 flex flex-col z-50">
-                {LANGUAGES.map((lang) => (
-                  <button
-                    key={lang.code}
-                    onClick={() => handleTranslate(lang.code)}
-                    className="text-left px-4 py-2 hover:bg-white/5 text-sm text-ivory-50/70 hover:text-ivory-50 transition-colors cursor-pointer"
-                  >
-                    {lang.label}
-                  </button>
-                ))}
-                <div className="border-t border-white/10 my-1" />
-                <button
-                  onClick={() => handleTranslate("en")}
-                  className="text-left px-4 py-2 hover:bg-white/5 text-sm font-semibold text-gold-300 transition-colors flex items-center justify-between cursor-pointer"
-                >
-                  English
-                  <Check size={14} weight="bold" />
-                </button>
+                {LANGUAGES.map((lang) => {
+                  const active = lang.code === currentLang;
+                  return (
+                    <button
+                      key={lang.code}
+                      onClick={() => handleTranslate(lang.code)}
+                      className={`text-left px-4 py-2 hover:bg-white/5 text-sm transition-colors cursor-pointer flex items-center justify-between ${
+                        active ? "font-semibold text-gold-300" : "text-ivory-50/70 hover:text-ivory-50"
+                      }`}
+                    >
+                      {lang.label}
+                      {active && <Check size={14} weight="bold" />}
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
@@ -170,10 +183,20 @@ export default function Navbar() {
               <hr className="my-2 border-white/10" />
 
               <div className="px-4 py-1 pb-3 flex items-center gap-2">
-                <button onClick={() => handleTranslate("en")} className="px-3 py-1.5 bg-gold-400 text-midnight-950 text-xs font-bold rounded-md">EN</button>
-                <button onClick={() => handleTranslate("it")} className="px-3 py-1.5 bg-white/10 hover:bg-white/20 text-ivory-50/70 text-xs font-bold rounded-md transition-colors">IT</button>
-                <button onClick={() => handleTranslate("fr")} className="px-3 py-1.5 bg-white/10 hover:bg-white/20 text-ivory-50/70 text-xs font-bold rounded-md transition-colors">FR</button>
-                <button onClick={() => handleTranslate("pt")} className="px-3 py-1.5 bg-white/10 hover:bg-white/20 text-ivory-50/70 text-xs font-bold rounded-md transition-colors">PT</button>
+                {LANGUAGES.map((lang) => {
+                  const active = lang.code === currentLang;
+                  return (
+                    <button
+                      key={lang.code}
+                      onClick={() => handleTranslate(lang.code)}
+                      className={`px-3 py-1.5 text-xs font-bold rounded-md transition-colors ${
+                        active ? "bg-gold-400 text-midnight-950" : "bg-white/10 hover:bg-white/20 text-ivory-50/70"
+                      }`}
+                    >
+                      {lang.code.toUpperCase()}
+                    </button>
+                  );
+                })}
               </div>
 
               <hr className="my-1 border-white/10" />

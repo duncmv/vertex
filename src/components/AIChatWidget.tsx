@@ -159,15 +159,10 @@ export default function AIChatWidget() {
                           : 'bg-white text-slate-800 border border-slate-200 rounded-tl-sm shadow-sm'
                       }`}>
                         {m.role === 'assistant' && !m.content && isLoading ? (
-                          <span className="flex flex-col gap-2 py-1">
-                            <span className="text-xs text-emerald-700 font-medium italic animate-pulse">
-                              Reviewing Vertex International knowledge base and guidelines...
-                            </span>
-                            <span className="flex gap-1 items-center">
-                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-bounce" />
-                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-bounce" style={{ animationDelay: '150ms' }} />
-                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-bounce" style={{ animationDelay: '300ms' }} />
-                            </span>
+                          <span className="flex gap-1 items-center py-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-bounce" />
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-bounce" style={{ animationDelay: '150ms' }} />
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-bounce" style={{ animationDelay: '300ms' }} />
                           </span>
                         ) : (
                           <>

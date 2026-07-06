@@ -53,7 +53,8 @@ export default function PrivacyPolicyPage() {
             <h2>5. Contact Us</h2>
             <p>
               If you have any questions about this privacy policy or our privacy practices, please contact us at: <br />
-              <strong>WhatsApp:</strong> +44 7440 167608 <br />
+              <strong>WhatsApp:</strong> +44 7440 545686 <br />
+              <strong>Office:</strong> +44 20 3026 3403 <br />
               <strong>Email:</strong> vertex@vertexintern.com
             </p>
           </div>

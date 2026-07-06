@@ -7,34 +7,53 @@ export const dynamic = "force-dynamic";
 
 // Hardcoded knowledge base as fallback when DB is unavailable
 const FALLBACK_KB = `
-Vertex International Recruitment Ltd. actively recruits foreign workers for unskilled, semi-skilled, and engineering graduate roles.
+Vertex International Recruitment Ltd. is a UK-incorporated, globally integrated human capital and mobility
+enterprise. We connect talented professionals, employers, agencies, and institutional partners through
+ethical recruitment, compliant mobility solutions, and dedicated end-to-end support — from sourcing to
+settlement.
 
-JOB CATEGORIES:
-- Factory Jobs: Assembly line worker, packaging worker, machine operator, production assistant (automotive, electronics, food industries)
-- Construction Jobs: General laborer, mason helper, steel fixer, painter assistant
-- Technical Jobs: Maintenance technician, electrician assistant, CNC machine operator, HVAC technician
-- Warehouse Jobs: Warehouse picker, packing staff, inventory assistant, forklift operator
-- Food Processing Jobs: Meat processing, chicken factory worker, food packaging
+WORKFORCE CATEGORIES:
+- Unskilled and General Workforce: agriculture, logistics, facilities management, manufacturing, food
+  processing, construction support, large-scale infrastructure support
+- Semi-Skilled and Vocational Trades: plumbers, electricians, welders, machinery operators, hospitality
+  professionals, and other practical trade roles
+- Technical and Engineering Professionals: civil, mechanical, electrical, petroleum, project supervision,
+  and EPC-related technical talent
 
-PACKAGE & BENEFITS:
-- Salary: €1,000 - €1,500 per month
-- Overtime available
-- Accommodation and meals often provided
-- Medical Insurance included
+WHAT WE DO:
+- Global Recruitment Services: sourcing, screening, and coordinating candidates across industries
+- Work Visa & Employment Support: work permit, employment visa, and overseas employment processing
+- Business Invitation Assistance: official business invitation and corporate travel support
+- Agency Support & Expansion: helping recruitment agencies, travel agencies, visa consultancies, and
+  manpower suppliers expand into international recruitment and mobility services
 
-ELIGIBILITY & REQUIREMENTS:
+ELIGIBILITY & DOCUMENTATION:
 - Valid passport required
-- Job offer and contract must be secured
-- Medical certificate required
-- Police clearance required
-- Unskilled workers: High School Diploma only
-- Semi-skilled workers: Certificate needed
-- Engineering/Technical: Higher education degree or diploma required
+- CV, educational records, and professional credentials
+- Experience certificates where applicable
+- Police clearance and medical checks required
+- Unskilled roles: high school diploma
+- Semi-skilled roles: trade certificate
+- Technical/engineering roles: degree or diploma required
+
+GLOBAL PRESENCE:
+- European Command — London, United Kingdom (global headquarters)
+- Middle East & Gulf Operations — UAE Strategic Hub
+- Africa Regional Directorate — multi-city presence
+- Network reach spans Europe, Canada, Australia, UAE, South Korea, New Zealand, USA, and other destinations
+
+COMPLIANCE:
+- Governed by UK corporate governance standards
+- Quality Management aligned with ISO 9001:2015
+- Anti-human trafficking, modern slavery safeguards, and ethical recruitment principles
+- No hidden fees, no opaque processes
 
 CONTACT:
-- WhatsApp: +44 7440 167608 / +44 7438 299563 / +44 7405 368405 / +44 7438 613251
-- Telegram: @Vertexinternational1
-- Email: vertex@vertexintern.com
+- WhatsApp: +44 7440 545686
+- Office: +44 20 3026 3403
+- Email: vertex@vertexintern.com (general), inquiries@vertexintern.com, support@vertexintern.com
+- Address: 5 Brayford Square, London, E1 0SG, United Kingdom / Chester, International House, Kingsfield Court, United Kingdom
+- Company Registration Number: 16943308
 `;
 
 export async function POST(req: Request) {
@@ -75,7 +94,7 @@ Rules:
 - Be polite, professional, and concise.
 - Use the Knowledge Base below for specific process questions.
 - Never invent information not in the Knowledge Base.
-- If unsure, direct users to WhatsApp +44 7440 167608 or email vertex@vertexintern.com.
+- If unsure, direct users to WhatsApp +44 7440 545686 or email vertex@vertexintern.com.
 - Do NOT screen CVs or make hiring decisions.
 
 --- VERTEX KNOWLEDGE BASE ---

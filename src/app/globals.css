@@ -133,23 +133,6 @@
     perspective: 1000px;
   }
 
-  /* ===== Process cards (midnight-style: hovering one dims the others) ===== */
-  .process-card {
-    transition: opacity 0.2s, transform 0.2s;
-    will-change: transform;
-  }
-
-  @media (min-width: 768px) {
-    .process-cards:hover .process-card {
-      opacity: 0.5;
-    }
-
-    .process-cards .process-card:hover {
-      opacity: 1 !important;
-      transform: scale(1.03);
-    }
-  }
-
   /* ===== Marquee (homepage sector strip) ===== */
   .animate-marquee {
     animation: marquee 40s linear infinite;

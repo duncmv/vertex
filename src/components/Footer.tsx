@@ -12,6 +12,10 @@ const FOOTER_LINKS = {
     { href: "/apply", label: "Apply Now" },
     { href: "/auth/register", label: "Create Account" },
   ],
+  Partners: [
+    { href: "/contact", label: "Agencies & Manpower Suppliers" },
+    { href: "/contact", label: "Travel & Visa Partners" },
+  ],
   Legal: [
     { href: "/privacy", label: "Privacy Policy" },
     { href: "/terms", label: "Terms of Service" },
@@ -27,24 +31,24 @@ export default function Footer() {
           <div>
             <p className="eyebrow-dark mb-5">
               <span className="eyebrow-rule" />
-              Vertex International
+              Vertex International Recruitment Ltd.
             </p>
             <h2 className="text-3xl md:text-5xl font-semibold tracking-tight leading-[1.05] max-w-xl">
-              Your next chapter starts abroad.
+              Build across borders. Move with confidence.
             </h2>
           </div>
           <Link
-            href="/auth/register"
+            href="/contact"
             className="group inline-flex items-center gap-3 text-gold-300 hover:text-gold-400 text-sm font-semibold uppercase tracking-[0.2em] transition-colors shrink-0"
           >
-            Create your profile
+            Partner with Vertex
             <ArrowUpRight size={18} weight="bold" className="transition-transform group-hover:translate-x-1 group-hover:-translate-y-1" />
           </Link>
         </div>
 
         {/* Links */}
-        <div className="py-14 grid grid-cols-1 md:grid-cols-4 gap-10">
-          <div className="col-span-1">
+        <div className="py-14 grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-10">
+          <div className="col-span-1 lg:col-span-1">
             <div className="flex items-center gap-3 mb-6">
               <img src="/logo.svg" alt="Vertex" className="h-8 w-auto brightness-0 invert opacity-90" />
               <span className="text-gold-400 font-medium text-[9px] tracking-[0.35em] uppercase leading-none">
@@ -52,7 +56,8 @@ export default function Footer() {
               </span>
             </div>
             <p className="text-sm leading-relaxed text-ivory-50/50 font-light max-w-xs">
-              Connecting talented professionals with world-class employers across Africa, the Middle East, and Europe.
+              A UK-incorporated human capital and mobility enterprise connecting talent, employers, agencies
+              and institutional partners worldwide.
             </p>
           </div>
 
@@ -61,7 +66,7 @@ export default function Footer() {
               <h3 className="text-[11px] font-semibold uppercase tracking-[0.3em] text-ivory-50/40 mb-5">{group}</h3>
               <ul className="space-y-3">
                 {links.map((link) => (
-                  <li key={link.href}>
+                  <li key={link.label}>
                     <Link
                       href={link.href}
                       className="text-sm text-ivory-50/70 hover:text-ivory-50 transition-colors"
@@ -85,7 +90,7 @@ export default function Footer() {
         {/* Bottom bar */}
         <div className="py-8 flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-white/10">
           <p className="text-xs tracking-wide text-ivory-50/40">
-            © {new Date().getFullYear()} Vertex International Recruitment. All rights reserved.
+            © {new Date().getFullYear()} Vertex International Recruitment Ltd. All rights reserved. · Company No. 16943308
           </p>
           <a
             href="mailto:vertex@vertexintern.com"

@@ -5,9 +5,9 @@ import { DUMMY_JOBS } from "@/lib/dummyData";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Global Recruitment Agency | Vertex International Recruitment",
+  title: "Global Recruitment & Mobility | Vertex International Recruitment Ltd.",
   description:
-    "Find your next opportunity abroad with Vertex International — a trusted recruitment agency placing professionals across Africa, the Middle East and Europe.",
+    "Vertex International Recruitment Ltd. connects talented professionals, employers, agencies and institutional partners through ethical recruitment, compliant mobility solutions, and dedicated end-to-end support.",
 };
 
 async function getFeaturedJobs() {

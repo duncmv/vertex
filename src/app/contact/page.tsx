@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ChatCircleText, PaperPlaneTilt, EnvelopeSimple, Clock, CheckCircle } from "@phosphor-icons/react";
+import { ChatCircleText, Phone, EnvelopeSimple, MapPin, CheckCircle } from "@phosphor-icons/react";
 
 export default function ContactPage() {
   const [form, setForm] = useState({ name: "", email: "", subject: "", message: "" });
@@ -34,7 +34,7 @@ export default function ContactPage() {
             We&apos;d love to hear from you.
           </h1>
           <p className="text-ivory-50/50 text-lg font-light">
-            Questions about a role, a destination, or your application — we answer them all.
+            Employers, agencies, partners, or candidates — reach the Vertex team directly.
           </p>
         </div>
       </section>
@@ -51,31 +51,27 @@ export default function ContactPage() {
               </p>
               <h2 className="section-title text-3xl md:text-4xl mb-10">Direct lines, real people.</h2>
               <div className="space-y-8">
-                {/* WhatsApp Numbers */}
+                {/* WhatsApp */}
                 <div className="flex gap-5">
                   <div className="w-12 h-12 rounded-full border border-midnight-900/15 flex items-center justify-center text-midnight-800 shrink-0">
                     <ChatCircleText size={22} weight="regular" />
                   </div>
                   <div>
                     <h3 className="font-semibold text-midnight-900 tracking-tight">WhatsApp</h3>
-                    <div className="space-y-1 mt-2">
-                      {["+44 7440 167608", "+44 7438 299563", "+44 7405 368405", "+44 7438 613251"].map((n) => (
-                        <a key={n} href={`https://wa.me/${n.replace(/[^0-9]/g, "")}`} target="_blank" rel="noopener noreferrer"
-                          className="block text-midnight-700 hover:text-gold-600 text-sm font-mono transition-colors">{n}</a>
-                      ))}
-                    </div>
+                    <a href="https://wa.me/447440545686" target="_blank" rel="noopener noreferrer"
+                      className="block text-midnight-700 hover:text-gold-600 text-sm font-mono mt-2 transition-colors">+44 7440 545686</a>
                   </div>
                 </div>
 
-                {/* Telegram */}
+                {/* Office */}
                 <div className="flex gap-5">
                   <div className="w-12 h-12 rounded-full border border-midnight-900/15 flex items-center justify-center text-midnight-800 shrink-0">
-                    <PaperPlaneTilt size={22} weight="regular" />
+                    <Phone size={22} weight="regular" />
                   </div>
                   <div>
-                    <h3 className="font-semibold text-midnight-900 tracking-tight">Telegram</h3>
-                    <a href="https://t.me/Vertexinternational1" target="_blank" rel="noopener noreferrer"
-                      className="text-midnight-700 hover:text-gold-600 text-sm font-mono mt-2 block transition-colors">@Vertexinternational1</a>
+                    <h3 className="font-semibold text-midnight-900 tracking-tight">Office</h3>
+                    <a href="tel:+442030263403"
+                      className="text-midnight-700 hover:text-gold-600 text-sm font-mono mt-2 block transition-colors">+44 20 3026 3403</a>
                   </div>
                 </div>
 
@@ -86,19 +82,28 @@ export default function ContactPage() {
                   </div>
                   <div>
                     <h3 className="font-semibold text-midnight-900 tracking-tight">Email</h3>
-                    <a href="mailto:vertex@vertexintern.com" className="text-midnight-700 hover:text-gold-600 text-sm font-mono mt-2 block transition-colors">vertex@vertexintern.com</a>
+                    <div className="space-y-1 mt-2">
+                      <a href="mailto:vertex@vertexintern.com" className="block text-midnight-700 hover:text-gold-600 text-sm font-mono transition-colors">vertex@vertexintern.com</a>
+                      <a href="mailto:inquiries@vertexintern.com" className="block text-midnight-700 hover:text-gold-600 text-sm font-mono transition-colors">inquiries@vertexintern.com</a>
+                      <a href="mailto:support@vertexintern.com" className="block text-midnight-700 hover:text-gold-600 text-sm font-mono transition-colors">support@vertexintern.com</a>
+                    </div>
                   </div>
                 </div>
 
-                {/* Hours */}
+                {/* Address */}
                 <div className="flex gap-5">
                   <div className="w-12 h-12 rounded-full border border-midnight-900/15 flex items-center justify-center text-midnight-800 shrink-0">
-                    <Clock size={22} weight="regular" />
+                    <MapPin size={22} weight="regular" />
                   </div>
                   <div>
-                    <h3 className="font-semibold text-midnight-900 tracking-tight">Response Time</h3>
-                    <p className="text-midnight-900/55 text-sm font-light mt-2 leading-relaxed max-w-sm">
-                      WhatsApp messages answered within a few hours. Email responses within 1–2 business days.
+                    <h3 className="font-semibold text-midnight-900 tracking-tight">Registered Offices</h3>
+                    <p className="text-midnight-900/60 text-sm mt-2 leading-relaxed max-w-sm">
+                      5 Brayford Square, London, E1 0SG, United Kingdom
+                      <br />
+                      International House, Kingsfield Court, Chester, United Kingdom
+                    </p>
+                    <p className="text-midnight-900/40 text-xs mt-2 uppercase tracking-[0.1em]">
+                      Company No. 16943308
                     </p>
                   </div>
                 </div>

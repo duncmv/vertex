@@ -16,13 +16,13 @@ const font = Outfit({
 export const metadata: Metadata = {
   title: {
     template: "%s | Vertex International Recruitment",
-    default: "Vertex International Recruitment",
+    default: "Vertex International Recruitment Ltd.",
   },
   description:
-    "Vertex International Recruitment — connecting talented professionals with world-class employers across the globe.",
-  keywords: ["recruitment", "jobs", "international", "careers", "employment"],
+    "Vertex International Recruitment Ltd. — a UK-incorporated human capital and mobility enterprise connecting talent, employers, agencies and institutional partners worldwide.",
+  keywords: ["recruitment", "jobs", "international", "careers", "employment", "work visa", "mobility"],
   openGraph: {
-    siteName: "Vertex International Recruitment",
+    siteName: "Vertex International Recruitment Ltd.",
     type: "website",
   },
 };

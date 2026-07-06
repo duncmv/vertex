@@ -1,7 +1,7 @@
 "use client";
 
 export default function WhatsAppButton() {
-  const phoneNumber = "447440167608"; // +447440167608 formatted for wa.me API
+  const phoneNumber = "447440545686"; // +447440545686 formatted for wa.me API
   const defaultMessage = encodeURIComponent("Hi Vertex Recruitment, I need some assistance.");
   
   return (

@@ -24,6 +24,7 @@ Sequential, phase-by-phase — not parallelized across phases (confirmed with th
 - `main` — production.
 - `staging` — pre-production sign-off environment. Every phase branch (`phase-N-*`) is merged into `staging` first; a phase is only merged from `staging` into `main` after it's been verified there against the SRS exit criteria and signed off.
 - `phase-N-*` — one branch per phase, branched off `main`.
+- **On completing a phase**: push the `phase-N-*` branch, then merge it into `staging` **locally** (`git checkout staging && git merge phase-N-* --no-edit`) and push `staging` — do this automatically for every completed phase without being asked. Don't merge to `main` without explicit confirmation.
 - Action item (not doable from the CLI): confirm the cPanel Node hosting is set up to run separate `staging` and `main` deployments (matching the SRS §2.3 environment requirement), not just a single production instance.
 
 ## Infrastructure (confirmed 2026-07-08)

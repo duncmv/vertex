@@ -3,13 +3,14 @@
 import { Suspense, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import { EnvelopeSimple } from "@phosphor-icons/react";
 
 function GoogleButton() {
   return (
     <a
       href="/api/auth/google?redirect=/dashboard"
       id="google-register-btn"
-      className="flex w-full items-center justify-center gap-3 rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm transition-all hover:bg-slate-50 hover:shadow-md active:scale-[0.98]"
+      className="flex w-full items-center justify-center gap-3 rounded-lg border border-midnight-900/15 bg-white px-4 py-3 text-sm font-semibold text-midnight-900 shadow-sm transition-all hover:bg-ivory-100 hover:shadow-md active:scale-[0.98]"
     >
       <svg className="h-5 w-5 flex-shrink-0" viewBox="0 0 24 24">
         <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
@@ -82,25 +83,27 @@ function RegisterForm() {
   const COUNTRIES = ["Ethiopia", "Kenya", "Nigeria", "Ghana", "Uganda", "Tanzania", "Sudan", "Somalia", "South Africa", "Saudi Arabia", "UAE", "Qatar", "Kuwait", "Bahrain", "Oman", "Other"];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-800 flex items-center justify-center py-12 px-4">
+    <div className="min-h-screen bg-gradient-to-br from-midnight-950 via-midnight-900 to-midnight-800 flex items-center justify-center py-12 px-4">
       <div className="w-full max-w-lg">
         <div className="text-center mb-8">
           <Link href="/" className="inline-block mb-6">
             <img src="/logo.svg" alt="Vertex" className="h-10 w-auto brightness-0 invert mx-auto" />
-            <span className="block text-amber-400 text-xs font-semibold tracking-widest uppercase mt-1">International</span>
+            <span className="block text-gold-400 text-xs font-semibold tracking-widest uppercase mt-1">International</span>
           </Link>
-          <h1 className="text-3xl font-black text-white">Create Your Account</h1>
-          <p className="text-emerald-200 mt-2">
+          <h1 className="section-title-dark text-3xl">Create Your Account</h1>
+          <p className="text-ivory-50/60 font-light mt-2">
             {invite ? "Your recruiter says you're ready — finish setting up your account." : "Start your international career journey"}
           </p>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-2xl p-8">
+        <div className="bg-white rounded-2xl shadow-2xl border border-midnight-900/10 p-8">
           {status === "success" ? (
             <div className="text-center py-6">
-              <div className="text-5xl mb-4">📧</div>
-              <h2 className="font-black text-slate-800 text-2xl mb-2">Check Your Email</h2>
-              <p className="text-slate-500 mb-6">{message}</p>
+              <div className="w-16 h-16 bg-midnight-950/5 rounded-full flex items-center justify-center mb-5 mx-auto">
+                <EnvelopeSimple size={32} weight="duotone" className="text-midnight-700" />
+              </div>
+              <h2 className="font-semibold text-midnight-900 text-2xl tracking-tight mb-2">Check Your Email</h2>
+              <p className="text-midnight-900/55 font-light mb-6">{message}</p>
               <Link href="/auth/login" className="btn-primary">Go to Login</Link>
             </div>
           ) : (
@@ -110,29 +113,29 @@ function RegisterForm() {
 
               {/* Divider */}
               <div className="flex items-center gap-3">
-                <div className="flex-1 h-px bg-slate-200" />
-                <span className="text-xs font-medium text-slate-400 uppercase tracking-wider">or register with email</span>
-                <div className="flex-1 h-px bg-slate-200" />
+                <div className="flex-1 h-px bg-midnight-900/10" />
+                <span className="text-xs font-medium text-midnight-900/35 uppercase tracking-wider">or register with email</span>
+                <div className="flex-1 h-px bg-midnight-900/10" />
               </div>
 
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1.5">Full Name *</label>
+                  <label className="block text-sm font-medium text-midnight-900/70 mb-1.5">Full Name *</label>
                   <input id="reg-fullname" name="full_name" value={form.full_name} onChange={handleChange} required className="input-field" placeholder="John Doe" />
                   {errors.full_name && <p className="text-red-500 text-xs mt-1">{errors.full_name[0]}</p>}
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1.5">Email Address *</label>
+                  <label className="block text-sm font-medium text-midnight-900/70 mb-1.5">Email Address *</label>
                   <input id="reg-email" name="email" type="email" value={form.email} onChange={handleChange} required className="input-field" placeholder="john@example.com" />
                   {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email[0]}</p>}
                 </div>
                 <div className="grid sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1.5">Phone</label>
+                    <label className="block text-sm font-medium text-midnight-900/70 mb-1.5">Phone</label>
                     <input id="reg-phone" name="phone" value={form.phone} onChange={handleChange} className="input-field" placeholder="+251 9..." />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1.5">Country</label>
+                    <label className="block text-sm font-medium text-midnight-900/70 mb-1.5">Country</label>
                     <select id="reg-country" name="country" value={form.country} onChange={handleChange} className="input-field">
                       <option value="">Select country</option>
                       {COUNTRIES.map((c) => <option key={c} value={c}>{c}</option>)}
@@ -140,12 +143,12 @@ function RegisterForm() {
                   </div>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1.5">Password *</label>
+                  <label className="block text-sm font-medium text-midnight-900/70 mb-1.5">Password *</label>
                   <input id="reg-password" name="password" type="password" value={form.password} onChange={handleChange} required className="input-field" placeholder="Min 8 chars, 1 uppercase, 1 number" />
                   {errors.password && <p className="text-red-500 text-xs mt-1">{errors.password[0]}</p>}
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1.5">Confirm Password *</label>
+                  <label className="block text-sm font-medium text-midnight-900/70 mb-1.5">Confirm Password *</label>
                   <input id="reg-confirm-password" name="confirmPassword" type="password" value={form.confirmPassword} onChange={handleChange} required className="input-field" placeholder="Repeat password" />
                   {errors.confirmPassword && <p className="text-red-500 text-xs mt-1">{errors.confirmPassword[0]}</p>}
                 </div>
@@ -158,9 +161,9 @@ function RegisterForm() {
                   {status === "loading" ? "Creating Account..." : "Create Account"}
                 </button>
 
-                <p className="text-center text-sm text-slate-500 mt-4">
+                <p className="text-center text-sm text-midnight-900/50 mt-4">
                   Already have an account?{" "}
-                  <Link href="/auth/login" className="text-emerald-700 font-semibold hover:underline">Sign In</Link>
+                  <Link href="/auth/login" className="text-gold-600 font-semibold hover:underline">Sign In</Link>
                 </p>
               </form>
             </div>

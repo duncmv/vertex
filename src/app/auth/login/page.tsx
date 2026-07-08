@@ -9,7 +9,7 @@ function GoogleButton({ redirect }: { redirect: string }) {
     <a
       href={`/api/auth/google?redirect=${encodeURIComponent(redirect)}`}
       id="google-login-btn"
-      className="flex w-full items-center justify-center gap-3 rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm transition-all hover:bg-slate-50 hover:shadow-md active:scale-[0.98]"
+      className="flex w-full items-center justify-center gap-3 rounded-lg border border-midnight-900/15 bg-white px-4 py-3 text-sm font-semibold text-midnight-900 shadow-sm transition-all hover:bg-ivory-100 hover:shadow-md active:scale-[0.98]"
     >
       {/* Google "G" SVG */}
       <svg className="h-5 w-5 flex-shrink-0" viewBox="0 0 24 24">
@@ -90,18 +90,18 @@ function LoginForm() {
 
       {/* Divider */}
       <div className="flex items-center gap-3">
-        <div className="flex-1 h-px bg-slate-200" />
-        <span className="text-xs font-medium text-slate-400 uppercase tracking-wider">or</span>
-        <div className="flex-1 h-px bg-slate-200" />
+        <div className="flex-1 h-px bg-midnight-900/10" />
+        <span className="text-xs font-medium text-midnight-900/35 uppercase tracking-wider">or</span>
+        <div className="flex-1 h-px bg-midnight-900/10" />
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1.5">Email Address *</label>
+          <label className="block text-sm font-medium text-midnight-900/70 mb-1.5">Email Address *</label>
           <input id="login-email" name="email" type="email" value={form.email} onChange={handleChange} required className="input-field" placeholder="john@example.com" />
         </div>
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1.5">Password *</label>
+          <label className="block text-sm font-medium text-midnight-900/70 mb-1.5">Password *</label>
           <input id="login-password" name="password" type="password" value={form.password} onChange={handleChange} required className="input-field" placeholder="••••••••" />
         </div>
 
@@ -113,9 +113,9 @@ function LoginForm() {
           {status === "loading" ? "Signing In..." : "Sign In"}
         </button>
 
-        <p className="text-center text-sm text-slate-500 mt-4">
+        <p className="text-center text-sm text-midnight-900/50 mt-4">
           Don&apos;t have an account?{" "}
-          <Link href="/auth/register" className="text-emerald-700 font-semibold hover:underline">Create Account</Link>
+          <Link href="/auth/register" className="text-gold-600 font-semibold hover:underline">Create Account</Link>
         </p>
       </form>
     </div>
@@ -124,19 +124,19 @@ function LoginForm() {
 
 export default function LoginPage() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-800 flex items-center justify-center py-12 px-4">
+    <div className="min-h-screen bg-gradient-to-br from-midnight-950 via-midnight-900 to-midnight-800 flex items-center justify-center py-12 px-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <Link href="/" className="inline-block mb-6">
             <img src="/logo.svg" alt="Vertex" className="h-10 w-auto brightness-0 invert mx-auto" />
-            <span className="block text-amber-400 text-xs font-semibold tracking-widest uppercase mt-1">International</span>
+            <span className="block text-gold-400 text-xs font-semibold tracking-widest uppercase mt-1">International</span>
           </Link>
-          <h1 className="text-3xl font-black text-white">Welcome Back</h1>
-          <p className="text-emerald-200 mt-2">Sign in to your account</p>
+          <h1 className="section-title-dark text-3xl">Welcome Back</h1>
+          <p className="text-ivory-50/60 font-light mt-2">Sign in to your account</p>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-2xl p-8">
-          <Suspense fallback={<div className="text-slate-400 text-center py-4">Loading...</div>}>
+        <div className="bg-white rounded-2xl shadow-2xl border border-midnight-900/10 p-8">
+          <Suspense fallback={<div className="text-midnight-900/40 text-center py-4">Loading...</div>}>
             <LoginForm />
           </Suspense>
         </div>

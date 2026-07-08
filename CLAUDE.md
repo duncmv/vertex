@@ -19,6 +19,13 @@ Do not start the next phase until the current one's exit criteria are met.
 
 Sequential, phase-by-phase — not parallelized across phases (confirmed with the business).
 
+## Git / environment workflow
+
+- `main` — production.
+- `staging` — pre-production sign-off environment. Every phase branch (`phase-N-*`) is merged into `staging` first; a phase is only merged from `staging` into `main` after it's been verified there against the SRS exit criteria and signed off.
+- `phase-N-*` — one branch per phase, branched off `main`.
+- Action item (not doable from the CLI): confirm in the Vercel dashboard that the `staging` branch auto-deploys to its own stable preview URL, separate from the `main` production deployment.
+
 ## Key resolved decisions (do not re-litigate without cause)
 
 - Candidate-fee policy (SRS FR-4.5): admin-configurable `FeePolicy` model, defaults disabled — not a leadership-blocking dependency.

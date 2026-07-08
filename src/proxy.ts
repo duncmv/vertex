@@ -4,7 +4,7 @@ import { canAccessPortal, homeFor } from "@/lib/rbac";
 
 const PROTECTED_PATHS = ["/dashboard", "/admin", "/recruiter", "/supervisor", "/management"];
 
-export function middleware(req: NextRequest) {
+export function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
   const isProtected = PROTECTED_PATHS.some((p) => pathname.startsWith(p));
 
@@ -35,5 +35,4 @@ export function middleware(req: NextRequest) {
 
 export const config = {
   matcher: ["/dashboard/:path*", "/admin/:path*", "/recruiter/:path*", "/supervisor/:path*", "/management/:path*"],
-  runtime: "nodejs",
 };

@@ -1,5 +1,9 @@
+"use client";
+
 import Link from "next/link";
-import { ArrowUpRight } from "@phosphor-icons/react/dist/ssr";
+import { usePathname } from "next/navigation";
+import { ArrowUpRight } from "@phosphor-icons/react";
+import { isInternalPortalPath } from "@/lib/rbac";
 
 const FOOTER_LINKS = {
   Company: [
@@ -23,6 +27,9 @@ const FOOTER_LINKS = {
 };
 
 export default function Footer() {
+  const pathname = usePathname();
+  if (isInternalPortalPath(pathname)) return null;
+
   return (
     <footer className="bg-midnight-950 text-ivory-50">
       <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8">

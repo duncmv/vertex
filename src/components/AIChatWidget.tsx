@@ -1,7 +1,9 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { usePathname } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
+import { isInternalPortalPath } from "@/lib/rbac";
 
 function VertexMark({ className }: { className?: string }) {
   return (
@@ -13,6 +15,7 @@ function VertexMark({ className }: { className?: string }) {
 }
 
 export default function AIChatWidget() {
+  const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [hasSpeechSupport, setHasSpeechSupport] = useState(false);
@@ -110,6 +113,8 @@ export default function AIChatWidget() {
       }
     }
   };
+
+  if (isInternalPortalPath(pathname)) return null;
 
   return (
     <>

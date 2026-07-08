@@ -23,7 +23,7 @@ export async function GET(req: NextRequest) {
           select: {
             id: true,
             nationality: true,
-            documents: { select: { id: true, type: true } },
+            documents: { select: { id: true, type: true, verification_status: true } },
             _count: {
               select: { applications: true }
             }

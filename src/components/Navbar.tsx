@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { CaretDown, Check } from "@phosphor-icons/react";
+import { isInternalPortalPath } from "@/lib/rbac";
 
 const NAV_LINKS = [
   { href: "/", label: "Home" },
@@ -57,6 +58,8 @@ export default function Navbar() {
     setCurrentLang(lang);
     window.location.reload();
   };
+
+  if (isInternalPortalPath(pathname)) return null;
 
   return (
     <header

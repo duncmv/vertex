@@ -1,10 +1,13 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { usePathname } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
+import { isInternalPortalPath } from "@/lib/rbac";
 
 export default function WelcomePopup() {
+  const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
 
@@ -25,7 +28,7 @@ export default function WelcomePopup() {
   };
 
   // Don't render anything during SSR to prevent hydration mismatch
-  if (!isMounted) return null;
+  if (!isMounted || isInternalPortalPath(pathname)) return null;
 
   return (
     <AnimatePresence>

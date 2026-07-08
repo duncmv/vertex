@@ -367,6 +367,8 @@ Resolved / not applicable, confirmed with the business:
 
 **Delivery approach:** phase-by-phase, sequentially — not parallelized. Each phase is fully built, tested on staging, and signed off (System Administrator + a Director) before the next begins, per SRS §8.
 
+**Open follow-up — admin-scope ownership of legacy ATS screens:** during Phase 1's admin-panel migration onto `PortalShell`, Jobs, Applications (status review), Candidates pool, and Finances were kept under System Administrator, matching exactly what the old binary `candidate/admin` role model already allowed — no access was widened or narrowed. The SRS's §2.2 role definitions don't assign these screens to a specific role; they predate the phase-based RBAC model and are explicitly "retained, not re-specified" per the SRS's constraints. Once Phase 2 delivers the Regional Recruiter's own candidate/application tracking (FR-2.1) and Phase 3 delivers the In-House Supervisor's campaign-control dashboard (FR-3.1), expect real overlap with these admin screens — Applications review in particular will likely need re-scoping away from pure admin rather than being left duplicated across two places.
+
 ## 8. Complexity estimate
 
 | Phase | Complexity | Primary risk driver |

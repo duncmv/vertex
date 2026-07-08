@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
       include: {
         candidate: {
           select: {
-            documents: { select: { id: true, type: true } },
+            documents: { select: { id: true, type: true, verification_status: true } },
             user: { select: { full_name: true, email: true } },
           },
         },

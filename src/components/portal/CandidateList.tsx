@@ -2,6 +2,9 @@
 
 import { useEffect, useState } from "react";
 import DocumentLink from "@/components/DocumentLink";
+import CandidateStatusControls from "./CandidateStatusControls";
+import CandidateDocumentUpload from "./CandidateDocumentUpload";
+import CandidateEditDetails from "./CandidateEditDetails";
 
 const STATUS_STYLES: Record<string, string> = {
   identified: "bg-slate-100 text-slate-700",
@@ -18,6 +21,14 @@ interface CandidateRow {
   source: string;
   lifecycle_status: string;
   nationality: string | null;
+  date_of_birth: string | null;
+  passport_number: string | null;
+  full_name: string | null;
+  phone: string | null;
+  email: string | null;
+  desired_role: string | null;
+  consent_given: boolean;
+  return_reason: string | null;
   created_at: string;
   user: { full_name: string; email: string } | null;
   recruiter: { id: string; full_name: string } | null;
@@ -25,19 +36,53 @@ interface CandidateRow {
   documents: { id: string; type: string; verification_status: string }[];
 }
 
-/** Shared candidate table for the recruiter/supervisor/management portals — each scoped server-side by role. */
-export default function CandidateList({ emptyLabel }: { emptyLabel: string }) {
+/**
+ * Shared candidate table for the recruiter/supervisor/management portals —
+ * each scoped server-side by role. `canVerify` controls whether the status
+ * widget offers verify/return (supervisor-tier) or just advance
+ * (recruiter-tier) actions; the API is the real authorization boundary.
+ */
+export default function CandidateList({
+  emptyLabel,
+  canVerify = false,
+  showStatusControls = true,
+  refreshKey = 0,
+}: {
+  emptyLabel: string;
+  canVerify?: boolean;
+  showStatusControls?: boolean;
+  refreshKey?: number;
+}) {
   const [candidates, setCandidates] = useState<CandidateRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   useEffect(() => {
+    setLoading(true);
     fetch("/api/candidates")
       .then((r) => r.json())
       .then((res) => setCandidates(res.data ?? []))
       .catch(() => setError("Failed to load candidates."))
       .finally(() => setLoading(false));
-  }, []);
+  }, [refreshKey]);
+
+  const recordConsent = async (id: string) => {
+    const res = await fetch(`/api/candidates/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ consent_given: true }),
+    });
+    if (res.ok) {
+      setCandidates((prev) => prev.map((row) => (row.id === id ? { ...row, consent_given: true } : row)));
+    }
+  };
+
+  const refetchDocuments = async (id: string) => {
+    const res = await fetch(`/api/candidates/${id}`);
+    if (!res.ok) return;
+    const body = await res.json();
+    setCandidates((prev) => prev.map((row) => (row.id === id ? { ...row, documents: body.data.documents } : row)));
+  };
 
   if (loading) return <p className="text-midnight-900/50">Loading…</p>;
   if (error) return <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg p-4 text-sm">{error}</div>;
@@ -49,6 +94,7 @@ export default function CandidateList({ emptyLabel }: { emptyLabel: string }) {
         <thead>
           <tr className="border-b border-midnight-900/10 text-left text-midnight-900/40 text-xs uppercase tracking-wider">
             <th className="px-5 py-3 font-semibold">Candidate</th>
+            <th className="px-5 py-3 font-semibold">Role</th>
             <th className="px-5 py-3 font-semibold">Country</th>
             <th className="px-5 py-3 font-semibold">Recruiter</th>
             <th className="px-5 py-3 font-semibold">Status</th>
@@ -56,29 +102,83 @@ export default function CandidateList({ emptyLabel }: { emptyLabel: string }) {
           </tr>
         </thead>
         <tbody>
-          {candidates.map((c) => (
-            <tr key={c.id} className="border-b border-midnight-900/5 last:border-0">
-              <td className="px-5 py-4">
-                <div className="font-medium text-midnight-900">{c.user?.full_name ?? "— not yet registered —"}</div>
-                <div className="text-xs text-midnight-900/45">{c.user?.email ?? c.nationality ?? ""}</div>
-              </td>
-              <td className="px-5 py-4 text-midnight-900/70">{c.country?.name ?? "—"}</td>
-              <td className="px-5 py-4 text-midnight-900/70">{c.recruiter?.full_name ?? "—"}</td>
-              <td className="px-5 py-4">
-                <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${STATUS_STYLES[c.lifecycle_status] ?? "bg-slate-100 text-slate-700"}`}>
-                  {c.lifecycle_status.replace(/_/g, " ")}
-                </span>
-              </td>
-              <td className="px-5 py-4">
-                <div className="flex flex-col gap-1 items-start">
-                  {c.documents.length === 0 && <span className="text-xs text-midnight-900/35">None</span>}
-                  {c.documents.map((d) => (
-                    <DocumentLink key={d.id} documentId={d.id} label={d.type} className="text-xs text-gold-600 hover:underline capitalize" />
-                  ))}
-                </div>
-              </td>
-            </tr>
-          ))}
+          {candidates.map((c) => {
+            const name = c.user?.full_name ?? c.full_name ?? "— unnamed lead —";
+            const contact = c.user?.email ?? c.email ?? c.phone ?? "";
+            return (
+              <tr key={c.id} className="border-b border-midnight-900/5 last:border-0 align-top">
+                <td className="px-5 py-4">
+                  <div className="font-medium text-midnight-900">{name}</div>
+                  <div className="text-xs text-midnight-900/45">{contact || c.nationality || ""}</div>
+                  {!c.consent_given && (
+                    <button
+                      type="button"
+                      onClick={() => recordConsent(c.id)}
+                      className="text-[10px] text-red-500 uppercase tracking-wide mt-1 hover:underline"
+                    >
+                      No consent on file — record it
+                    </button>
+                  )}
+                  {showStatusControls && (
+                    <div className="mt-1">
+                      <CandidateEditDetails
+                        candidateId={c.id}
+                        initial={{ date_of_birth: c.date_of_birth, passport_number: c.passport_number, email: c.email, desired_role: c.desired_role }}
+                        onSaved={(data) =>
+                          setCandidates((prev) => prev.map((row) => (row.id === c.id ? { ...row, ...data } : row)))
+                        }
+                      />
+                    </div>
+                  )}
+                </td>
+                <td className="px-5 py-4 text-midnight-900/70">{c.desired_role ?? "—"}</td>
+                <td className="px-5 py-4 text-midnight-900/70">{c.country?.name ?? "—"}</td>
+                <td className="px-5 py-4 text-midnight-900/70">{c.recruiter?.full_name ?? "—"}</td>
+                <td className="px-5 py-4">
+                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${STATUS_STYLES[c.lifecycle_status] ?? "bg-slate-100 text-slate-700"}`}>
+                    {c.lifecycle_status.replace(/_/g, " ")}
+                  </span>
+                  {c.return_reason && (
+                    <div className="text-xs text-red-500 mt-1.5 max-w-[220px]">
+                      <span className="font-semibold">Returned:</span> {c.return_reason}
+                    </div>
+                  )}
+                  {showStatusControls && (
+                    <div className="mt-2">
+                      <CandidateStatusControls
+                        candidateId={c.id}
+                        status={c.lifecycle_status as never}
+                        canVerify={canVerify}
+                        onChanged={(next) =>
+                          setCandidates((prev) =>
+                            prev.map((row) =>
+                              row.id === c.id
+                                ? { ...row, lifecycle_status: next.lifecycle_status, return_reason: next.return_reason }
+                                : row
+                            )
+                          )
+                        }
+                      />
+                    </div>
+                  )}
+                </td>
+                <td className="px-5 py-4">
+                  <div className="flex flex-col gap-1.5 items-start">
+                    {c.documents.length === 0 && <span className="text-xs text-midnight-900/35">None</span>}
+                    {c.documents.map((d) => (
+                      <DocumentLink key={d.id} documentId={d.id} label={d.type} className="text-xs text-gold-600 hover:underline capitalize" />
+                    ))}
+                    {showStatusControls && (
+                      <div className="flex flex-col gap-1 mt-1">
+                        <CandidateDocumentUpload candidateId={c.id} type="cv" onUploaded={() => refetchDocuments(c.id)} />
+                        <CandidateDocumentUpload candidateId={c.id} type="passport" onUploaded={() => refetchDocuments(c.id)} />
+                      </div>
+                    )}
+                  </div>
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>

@@ -1,5 +1,10 @@
 import { z } from "zod";
 
+// Treats an empty string as "not provided" before validating an optional
+// field's format — otherwise z.string().email().optional() rejects "" from
+// an untouched form input, since .optional() only short-circuits undefined.
+const optionalEmail = z.preprocess((val) => (val === "" ? undefined : val), z.string().email().optional());
+
 // Auth
 export const registerSchema = z.object({
   full_name: z.string().min(2, "Full name must be at least 2 characters").max(100),
@@ -11,6 +16,10 @@ export const registerSchema = z.object({
     .regex(/[0-9]/, "Password must contain at least one number"),
   phone: z.string().optional(),
   country: z.string().optional(),
+  // Present when arriving via a recruiter's candidate-invite email (SRS
+  // FR-2.1) — links this new account to the existing recruiter-sourced
+  // Candidate record instead of creating a fresh, empty one.
+  invite: z.string().optional(),
 });
 
 export const loginSchema = z.object({
@@ -40,6 +49,10 @@ export const createJobSchema = z.object({
 export const submitApplicationSchema = z.object({
   job_id: z.string().cuid("Invalid job ID"),
   cover_letter: z.string().optional(),
+  // Present when a recruiter/supervisor submits on behalf of a candidate
+  // who has no account of their own yet (SRS FR-2.1) — otherwise the
+  // authenticated candidate's own profile is used.
+  candidate_id: z.string().cuid().optional(),
 });
 
 export const updateApplicationStatusSchema = z.object({
@@ -76,6 +89,48 @@ export const createStaffUserSchema = z.object({
 // verification_status/verified_by/verified_at added in Phase 1)
 export const verifyDocumentSchema = z.object({
   verification_status: z.enum(["verified", "rejected"]),
+});
+
+// Candidate registration by a recruiter (SRS FR-2.1) — pre-registration
+// identity, since the person may not have their own account yet.
+export const registerCandidateSchema = z.object({
+  full_name: z.string().min(2).max(100),
+  nationality: z.string().min(2).max(100),
+  date_of_birth: z.string().optional(),
+  passport_number: z.string().optional(),
+  phone: z.string().optional(),
+  email: optionalEmail,
+  desired_role: z.string().max(150).optional(),
+  country_id: z.string().cuid().optional(),
+});
+
+// Progressive candidate detail edits + consent (SRS FR-2.5, FR-2.8) — a
+// recruiter fills in a lead's profile over time, not necessarily all at
+// registration.
+export const updateCandidateDetailsSchema = z.object({
+  full_name: z.string().min(2).max(100).optional(),
+  nationality: z.string().min(2).max(100).optional(),
+  date_of_birth: z.string().optional(),
+  passport_number: z.string().optional(),
+  phone: z.string().optional(),
+  email: optionalEmail,
+  desired_role: z.string().max(150).optional(),
+  consent_given: z.boolean().optional(),
+});
+
+// Candidate lifecycle status transitions (SRS FR-2.4, FR-2.5, FR-2.7)
+const CANDIDATE_LIFECYCLE_STATUSES = [
+  "identified",
+  "screened",
+  "guided_to_apply",
+  "submitted",
+  "reported",
+  "verified",
+  "approved",
+] as const;
+export const updateCandidateStatusSchema = z.object({
+  lifecycle_status: z.enum(CANDIDATE_LIFECYCLE_STATUSES),
+  return_reason: z.string().min(5).max(1000).optional(),
 });
 
 // Contact form

@@ -1,5 +1,5 @@
 import nodemailer from "nodemailer";
-import { signEmailToken } from "./jwt";
+import { signEmailToken, signCandidateInviteToken } from "./jwt";
 import { prisma } from "./prisma";
 
 const transporter = nodemailer.createTransport({
@@ -93,6 +93,40 @@ export async function sendPasswordResetEmail(userId: string, email: string, full
     .replace(/\{\{resetUrl\}\}/g, resetUrl);
 
   await transporter.sendMail({ from: FROM, to: email, subject: config.subject, html: finalHtml });
+}
+
+// Invites a recruiter-sourced candidate lead (SRS FR-2.1) to create their
+// own account once a recruiter has screened them — linking to their
+// existing Candidate record so they can browse real jobs and submit a
+// genuine application themselves, rather than the recruiter's manual
+// status change being the only record of "submitted."
+export async function sendCandidateInviteEmail(candidateId: string, to: string, name: string) {
+  const token = signCandidateInviteToken(candidateId);
+  const registerUrl = `${APP_URL}/auth/register?invite=${token}`;
+
+  const defaultHtml = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;">
+      <div style="background-color: #0f172a; padding: 24px; text-align: center;">
+        <h1 style="color: #ffffff; margin: 0; font-size: 24px;">You're a Step Closer</h1>
+      </div>
+      <div style="padding: 32px; background-color: #ffffff;">
+        <p style="font-size: 16px; color: #334155; margin-bottom: 24px;">Hello {{name}},</p>
+        <p style="font-size: 16px; color: #334155; margin-bottom: 24px;">
+          Your Vertex International recruiter has reviewed your details and confirmed you're ready for the next
+          step. Create your own free account to browse available positions and submit your application directly.
+        </p>
+        <div style="text-align: center; margin: 32px 0;">
+          <a href="${registerUrl}" style="background-color: #2563eb; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">Create My Account</a>
+        </div>
+        <p style="font-size: 13px; color: #94a3b8;">This link expires in 7 days. If you're not ready yet, your recruiter can still submit an application on your behalf.</p>
+      </div>
+    </div>
+  `;
+
+  const config = await getEmailConfig("candidate_invite", "You're ready to apply — create your Vertex account", defaultHtml);
+  const finalHtml = config.html.replace(/\{\{name\}\}/g, name).replace(/\{\{registerUrl\}\}/g, registerUrl);
+
+  await transporter.sendMail({ from: FROM, to, subject: config.subject, html: finalHtml });
 }
 
 export async function sendApplicationConfirmationEmail(to: string, name: string, jobTitle: string) {

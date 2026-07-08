@@ -21,6 +21,11 @@ export interface DocumentTokenPayload {
   storagePath: string;
 }
 
+export interface CandidateInviteTokenPayload {
+  candidateId: string;
+  type: "candidate_invite";
+}
+
 export function signToken(payload: JwtPayload): string {
   return jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN } as jwt.SignOptions);
 }
@@ -45,4 +50,16 @@ export function verifyEmailToken(token: string): EmailTokenPayload {
 
 export function verifyDocumentToken(token: string): DocumentTokenPayload {
   return jwt.verify(token, JWT_SECRET) as DocumentTokenPayload;
+}
+
+// Invites a recruiter-sourced lead to create their own account and link it
+// to the Candidate record already gathered about them (SRS FR-2.1/FR-2.4 —
+// self-service application submission). 7 days: field candidates may not
+// have reliable connectivity the moment this is sent.
+export function signCandidateInviteToken(candidateId: string): string {
+  return jwt.sign({ candidateId, type: "candidate_invite" }, JWT_SECRET, { expiresIn: "7d" });
+}
+
+export function verifyCandidateInviteToken(token: string): CandidateInviteTokenPayload {
+  return jwt.verify(token, JWT_SECRET) as CandidateInviteTokenPayload;
 }

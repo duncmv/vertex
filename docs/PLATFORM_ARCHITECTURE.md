@@ -324,15 +324,18 @@ Mirrors SRS §8 exit criteria exactly, sequenced so each phase is independently 
 6. Audit-log Prisma extension wired to the models named in §1.6.
 7. **Exit:** roles, RBAC, region/country model, secure storage, and environments live; placeholder jobs gone. Signed off on staging by System Administrator + a Director.
 
-### Phase 2 — Agent-Network Core
+### Phase 2 — Agent-Network Core — delivered 2026-07-08
 _(Recruiter CRUD, reassignment, and country assignment already shipped in Phase 1 — see the "Superseded" note in §2.)_
-1. Candidate schema additions: pre-registration identity (full_name/phone/email) + consent + return_reason.
-2. Screening-gate rule engine (`src/server/services/screening.ts`): data completeness, documentation present and not rejected, consent given, minimum-age eligibility — blocks the `guided_to_apply` transition until all pass. ("Role suitability" from FR-2.5 has no dedicated matching model yet — that's Phase 4's Case/stage territory — so it's folded into data completeness for now, noted explicitly rather than inventing an unspec'd field.)
-3. `POST /api/candidates`: a recruiter registers a new lead (name/nationality/DOB/passport/contact), defaulting country to their own assigned country.
+1. Candidate schema additions: pre-registration identity (full_name/phone/email/desired_role) + consent + return_reason.
+2. Screening-gate rule engine (`src/server/services/screening.ts`): data completeness (name, nationality, DOB, passport, phone, **and email specifically** — phone alone is enough to register a lead, but email becomes mandatory by the time they're guided to apply, since status-update emails, receipts, and their eventual account login all depend on it — and desired_role, satisfying FR-2.8's "role" data point), documentation present and not rejected, consent given, minimum-age eligibility — blocks the `guided_to_apply` transition until all pass. ("Role suitability" from FR-2.5 has no dedicated matching model yet — that's Phase 4's Case/stage territory — represented here as just requiring desired_role be on file, not an actual suitability judgment.)
+3. `POST /api/candidates`: a recruiter registers a new lead (name/nationality/DOB/passport/contact/desired_role), defaulting country to their own assigned country. `PATCH /api/candidates/[id]` fills in the rest progressively, and `POST /api/upload?candidate_id=` lets a recruiter/supervisor upload documents on a lead's behalf (added mid-phase — the original self-upload-only endpoint made the screening gate unreachable for any recruiter-sourced candidate, since they have no account to log in and upload with themselves).
 4. `PATCH /api/candidates/[id]/status`: role-gated lifecycle transitions — recruiter drives identified → screened → guided_to_apply (screening-gated) → submitted → reported for their own candidates; supervisor (excluded from verifying their own sourced candidates, same conflict-of-interest rule as document verification) drives reported → verified → approved, or returns a candidate to an earlier stage with a required reason (FR-2.7), for candidates in their country. All transitions audited.
-5. Regional Recruiter portal (`/recruiter`): register-candidate form, status controls, screening-gate failure reasons surfaced inline.
+5. Regional Recruiter portal (`/recruiter`): register-candidate form, status controls, screening-gate failure reasons surfaced inline, document upload, progressive detail editing.
 6. Country Supervisor portal (`/supervisor`): verify/return controls with a reason field.
-7. **Exit:** Recruiter/Supervisor sections operational; screening gate enforced; every candidate attributed to a recruiter/country.
+7. Real, automated coverage: `screening.test.ts` (10 cases), `candidateLifecycle.test.ts` (10 cases, the role-gating rules), and `e2e/candidate-lifecycle.spec.ts` (full recruiter→supervisor journey through a real browser against a real DB).
+8. **Exit:** Recruiter/Supervisor sections operational; screening gate enforced; every candidate attributed to a recruiter/country — all verified against a live database, not just built.
+
+**Known, disclosed gap against the SRS's Phase 2 FRs:** FR-2.1's "submit regional reports and candidate lists" and FR-2.2's "consolidate regional submissions and submit finalised country reports to In-House" are only partially covered — a supervisor sees their whole country's candidates live and can act on them individually, but there's no formal Report/consolidation artifact. That's explicitly Phase 3's `Report` model (§2, §5) — building it now would duplicate work once Phase 3 introduces reporting cycles. Everything else in FR-2.1 through FR-2.9 is fully built and verified.
 
 ### Phase 3 — Control, Reporting & Governance
 1. `Report`, `Campaign`, `CampaignTarget` models + submission/verification/consolidation API.

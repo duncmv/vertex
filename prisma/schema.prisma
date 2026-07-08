@@ -103,6 +103,17 @@ model Candidate {
   created_at      DateTime  @default(now())
   updated_at      DateTime  @updatedAt
 
+  // Pre-registration identity (SRS FR-2.1, FR-2.8) — only meaningful when
+  // user_id is null. Once a User is linked, that record's full_name/
+  // phone/email become authoritative instead.
+  full_name String?
+  phone     String?
+  email     String?
+
+  // Target role/position (SRS FR-2.8 candidate-list data point). Free text
+  // for now — no formal job/case-matching model exists yet (Phase 4).
+  desired_role String?
+
   // Agent-network attribution (SRS FR-1.4, FR-2.3)
   source           CandidateSource          @default(self_registered)
   recruiter_id     String?
@@ -110,6 +121,11 @@ model Candidate {
   country_id       String?
   country          Country?                 @relation(fields: [country_id], references: [id], onDelete: SetNull)
   lifecycle_status CandidateLifecycleStatus @default(identified)
+
+  // Screening gate (SRS FR-2.5) + verification-return workflow (FR-2.7)
+  consent_given Boolean   @default(false)
+  consent_at    DateTime?
+  return_reason String?   @db.Text
 
   user         User?         @relation(fields: [user_id], references: [id], onDelete: Cascade)
   applications Application[]

@@ -58,7 +58,7 @@ export default function ManagementPortalPage() {
         </div>
       )}
 
-      <CandidateList emptyLabel="No candidates in the system yet." />
+      <CandidateList emptyLabel="No candidates in the system yet." showStatusControls={false} />
     </PortalShell>
   );
 }

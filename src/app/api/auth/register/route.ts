@@ -5,6 +5,7 @@ import { hashPassword } from "@/lib/auth";
 import { sendVerificationEmail } from "@/lib/email";
 import { registerSchema } from "@/lib/validations";
 import { rateLimit } from "@/lib/rate-limit";
+import { verifyCandidateInviteToken } from "@/lib/jwt";
 
 export async function POST(req: NextRequest) {
   // Rate limit: 5 registrations per minute per IP
@@ -32,7 +33,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const { full_name, email, password, phone, country } = parsed.data;
+  const { full_name, email, password, phone, country, invite } = parsed.data;
 
   const existing = await prisma.user.findUnique({ where: { email } });
   if (existing) {
@@ -44,18 +45,40 @@ export async function POST(req: NextRequest) {
 
   const password_hash = await hashPassword(password);
 
+  // A candidate-invite link (SRS FR-2.1) means this account should link to
+  // the Candidate record a recruiter already built up, not create a blank
+  // one. An invalid, expired, or already-claimed invite falls back to
+  // normal self-registration rather than blocking the person entirely.
+  let linkedCandidateId: string | null = null;
+  if (invite) {
+    try {
+      const { candidateId } = verifyCandidateInviteToken(invite);
+      const candidate = await prisma.candidate.findUnique({ where: { id: candidateId }, select: { id: true, user_id: true } });
+      if (candidate && !candidate.user_id) {
+        linkedCandidateId = candidate.id;
+      }
+    } catch {
+      // Ignore — treat as a normal self-registration.
+    }
+  }
+
   // Self-service creation — no authenticated actor, so actor_id is null.
-  const user = await auditedPrisma(null).user.create({
+  const db = auditedPrisma(null);
+  const user = await db.user.create({
     data: {
       full_name,
       email,
       password_hash,
       phone,
       country,
-      candidate: { create: {} },
+      ...(linkedCandidateId ? {} : { candidate: { create: {} } }),
     },
     select: { id: true, full_name: true, email: true, role: true },
   });
+
+  if (linkedCandidateId) {
+    await db.candidate.update({ where: { id: linkedCandidateId }, data: { user_id: user.id } });
+  }
 
   // Send verification email (non-blocking)
   sendVerificationEmail(user.id, user.email, user.full_name).catch(console.error);

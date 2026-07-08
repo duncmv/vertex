@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { auditedPrisma } from "@/lib/audit";
 import { submitApplicationSchema } from "@/lib/validations";
 import { getAuthUser, requireAuth } from "@/lib/api-auth";
+import { isStaffRole } from "@/lib/rbac";
+import { canAccessCandidate } from "@/server/scope";
 
 // GET /api/applications — candidate sees their own, admin sees all
 export async function GET(req: NextRequest) {
@@ -38,7 +41,12 @@ export async function GET(req: NextRequest) {
   return NextResponse.json(applications);
 }
 
-// POST /api/applications — authenticated candidate
+// POST /api/applications — an authenticated candidate submits for
+// themselves, or a recruiter/supervisor submits on behalf of a
+// recruiter-sourced lead who has no account yet (SRS FR-2.1). Either path
+// creates a real Application record, which is what actually advances a
+// candidate's lifecycle_status to "submitted" — that status is no longer
+// something a recruiter can just flip manually (see candidateLifecycle.ts).
 export async function POST(req: NextRequest) {
   const user = await getAuthUser(req);
   const guardRes = requireAuth(user);
@@ -52,17 +60,32 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Validation failed", details: parsed.error.flatten().fieldErrors }, { status: 422 });
   }
 
-  const candidate = await prisma.candidate.findUnique({
-    where: { user_id: user!.userId },
-    include: { user: true, documents: { select: { type: true } } },
-  });
-  if (!candidate) return NextResponse.json({ error: "Candidate profile not found." }, { status: 404 });
+  let candidate;
+  if (parsed.data.candidate_id) {
+    if (!isStaffRole(user!.role)) {
+      return NextResponse.json({ error: "Only staff can submit an application on behalf of a candidate." }, { status: 403 });
+    }
+    candidate = await prisma.candidate.findUnique({
+      where: { id: parsed.data.candidate_id },
+      include: { user: true, documents: { select: { type: true } } },
+    });
+    if (!candidate) return NextResponse.json({ error: "Candidate not found." }, { status: 404 });
+    if (!(await canAccessCandidate(user!, candidate))) {
+      return NextResponse.json({ error: "Forbidden." }, { status: 403 });
+    }
+  } else {
+    candidate = await prisma.candidate.findUnique({
+      where: { user_id: user!.userId },
+      include: { user: true, documents: { select: { type: true } } },
+    });
+    if (!candidate) return NextResponse.json({ error: "Candidate profile not found." }, { status: 404 });
+  }
 
   const hasCv = candidate.documents.some((d: { type: string }) => d.type === "cv");
   const hasPassport = candidate.documents.some((d: { type: string }) => d.type === "passport");
   if (!hasCv || !hasPassport) {
     return NextResponse.json(
-      { error: "You must upload both your CV and Passport scan before applying." },
+      { error: "A CV and Passport scan must be uploaded before applying." },
       { status: 400 }
     );
   }
@@ -76,21 +99,28 @@ export async function POST(req: NextRequest) {
     where: { candidate_id_job_id: { candidate_id: candidate.id, job_id: parsed.data.job_id } },
   });
   if (existing) {
-    return NextResponse.json({ error: "You have already applied to this job." }, { status: 409 });
+    return NextResponse.json({ error: "This candidate has already applied to this job." }, { status: 409 });
   }
 
-  // Ensure payment is completed if fee required
+  // Ensure payment is completed if fee required. A recruiter-sourced
+  // candidate with no linked account has no way to have paid themselves —
+  // block rather than silently skip the fee requirement.
   if (job.application_fee && job.application_fee > 0) {
+    if (!candidate.user_id) {
+      return NextResponse.json({
+        error: "This position requires a paid application fee, which only the candidate can pay from their own account. Ask them to create an account first.",
+      }, { status: 402 });
+    }
     const payment = await prisma.payment.findFirst({
       where: {
-        user_id: user!.userId,
+        user_id: candidate.user_id,
         job_id: job.id,
         payment_status: "completed"
       }
     });
 
     if (!payment) {
-      return NextResponse.json({ 
+      return NextResponse.json({
         error: "An application fee is required for this position. Please complete the payment first.",
         requiresPayment: true,
         jobId: job.id
@@ -98,7 +128,9 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  const application = await prisma.application.create({
+  const db = auditedPrisma(user!.userId);
+
+  const application = await db.application.create({
     data: {
       candidate_id: candidate.id,
       job_id: parsed.data.job_id,
@@ -106,12 +138,22 @@ export async function POST(req: NextRequest) {
     },
   });
 
-  // Import dynamically if needed or just let it fire and forget
-  try {
-    const { sendApplicationConfirmationEmail } = await import("@/lib/email");
-    await sendApplicationConfirmationEmail(candidate.user.email, candidate.user.full_name, job.title);
-  } catch (err) {
-    console.error("Failed to trigger confirmation email.", err);
+  // Auto-advance the pre-application lifecycle now that a real submission
+  // exists (SRS FR-2.4) — only from guided_to_apply, so this doesn't
+  // clobber a candidate a supervisor has already moved further along.
+  if (candidate.lifecycle_status === "guided_to_apply") {
+    await db.candidate.update({ where: { id: candidate.id }, data: { lifecycle_status: "submitted" } });
+  }
+
+  const recipientEmail = candidate.user?.email ?? candidate.email;
+  const recipientName = candidate.user?.full_name ?? candidate.full_name;
+  if (recipientEmail && recipientName) {
+    try {
+      const { sendApplicationConfirmationEmail } = await import("@/lib/email");
+      await sendApplicationConfirmationEmail(recipientEmail, recipientName, job.title);
+    } catch (err) {
+      console.error("Failed to trigger confirmation email.", err);
+    }
   }
 
   return NextResponse.json(application, { status: 201 });

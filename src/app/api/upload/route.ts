@@ -3,11 +3,18 @@ import { prisma } from "@/lib/prisma";
 import { auditedPrisma } from "@/lib/audit";
 import { saveUploadedFile, deleteUploadedFile } from "@/lib/upload";
 import { getAuthUser, requireAuth } from "@/lib/api-auth";
+import { canAccessCandidate } from "@/server/scope";
+import { isStaffRole } from "@/lib/rbac";
 import type { DocumentType } from "@prisma/client";
 
 const ALLOWED_TYPES: DocumentType[] = ["cv", "passport"];
 
-// POST /api/upload?type=cv|passport
+// POST /api/upload?type=cv|passport[&candidate_id=...]
+// Self-upload (no candidate_id) covers a candidate managing their own
+// account. A recruiter/supervisor/admin passing candidate_id uploads on
+// behalf of a recruiter-sourced lead who has no account yet (SRS FR-2.1,
+// FR-2.5) — common in the field, where the recruiter is the one who
+// physically collects and scans the candidate's documents.
 export async function POST(req: NextRequest) {
   const user = await getAuthUser(req);
   const guardRes = requireAuth(user);
@@ -33,10 +40,31 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "No file uploaded." }, { status: 400 });
   }
 
-  const candidate = await prisma.candidate.findUnique({
-    where: { user_id: user!.userId },
-    select: { id: true },
-  });
+  const targetCandidateId = req.nextUrl.searchParams.get("candidate_id");
+
+  let candidate: { id: string } | null;
+  if (targetCandidateId) {
+    if (!isStaffRole(user!.role)) {
+      return NextResponse.json({ error: "Only staff can upload on behalf of a candidate." }, { status: 403 });
+    }
+    const full = await prisma.candidate.findUnique({
+      where: { id: targetCandidateId },
+      select: { id: true, user_id: true, recruiter_id: true, country_id: true },
+    });
+    if (!full) {
+      return NextResponse.json({ error: "Candidate not found." }, { status: 404 });
+    }
+    if (!(await canAccessCandidate(user!, full))) {
+      return NextResponse.json({ error: "Forbidden." }, { status: 403 });
+    }
+    candidate = full;
+  } else {
+    candidate = await prisma.candidate.findUnique({
+      where: { user_id: user!.userId },
+      select: { id: true },
+    });
+  }
+
   if (!candidate) {
     return NextResponse.json({ error: "Candidate profile not found." }, { status: 404 });
   }

@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 function GoogleButton() {
   return (
@@ -22,8 +22,10 @@ function GoogleButton() {
   );
 }
 
-export default function RegisterPage() {
+function RegisterForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const invite = searchParams.get("invite");
   const [form, setForm] = useState({
     full_name: "", email: "", password: "", confirmPassword: "", phone: "", country: "",
   });
@@ -52,6 +54,7 @@ export default function RegisterPage() {
         body: JSON.stringify({
           full_name: form.full_name, email: form.email, password: form.password,
           phone: form.phone || undefined, country: form.country || undefined,
+          invite: invite || undefined,
         }),
       });
 
@@ -87,7 +90,9 @@ export default function RegisterPage() {
             <span className="block text-amber-400 text-xs font-semibold tracking-widest uppercase mt-1">International</span>
           </Link>
           <h1 className="text-3xl font-black text-white">Create Your Account</h1>
-          <p className="text-emerald-200 mt-2">Start your international career journey</p>
+          <p className="text-emerald-200 mt-2">
+            {invite ? "Your recruiter says you're ready — finish setting up your account." : "Start your international career journey"}
+          </p>
         </div>
 
         <div className="bg-white rounded-2xl shadow-2xl p-8">
@@ -163,5 +168,13 @@ export default function RegisterPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function RegisterPage() {
+  return (
+    <Suspense>
+      <RegisterForm />
+    </Suspense>
   );
 }

@@ -6,7 +6,7 @@ import { prisma } from "./prisma";
  * use auditedPrisma(actorId) instead of the raw prisma import for these
  * models, rather than remembering to make a separate logging call.
  */
-const AUDITED_MODELS = new Set(["Candidate", "Application", "Document", "User"]);
+const AUDITED_MODELS = new Set(["Candidate", "Application", "Document", "User", "Report", "Campaign"]);
 const AUDITED_OPERATIONS = new Set(["create", "update", "delete"]);
 
 function modelDelegateName(model: string): string {

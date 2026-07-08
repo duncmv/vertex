@@ -55,6 +55,8 @@ model User {
   candidate          Candidate?
   payments           Payment[]
   sourced_candidates Candidate[] @relation("RecruiterCandidates")
+  submitted_reports  Report[]    @relation("SubmittedReports")
+  campaigns_created  Campaign[]  @relation("CampaignCreator")
 
   @@index([email])
   @@index([supervisor_id])
@@ -65,6 +67,8 @@ model Region {
   id        String    @id @default(cuid())
   name      String    @unique
   countries Country[]
+
+  campaign_targets CampaignTarget[]
 }
 
 model Country {
@@ -73,8 +77,10 @@ model Country {
   region_id String
   region    Region @relation(fields: [region_id], references: [id], onDelete: Restrict)
 
-  users      User[]
-  candidates Candidate[]
+  users            User[]
+  candidates       Candidate[]
+  reports          Report[]
+  campaign_targets CampaignTarget[]
 
   @@index([region_id])
 }
@@ -182,6 +188,115 @@ model AuditLog {
 
   @@index([entity_type, entity_id])
   @@index([actor_id])
+}
+
+// ── Phase 3: Control, Reporting & Governance ────────────────────────────
+
+enum ReportCycle {
+  daily
+  weekly
+  monthly
+}
+
+enum ScopeLevel {
+  recruiter
+  country
+}
+
+enum ReportStatus {
+  draft
+  submitted
+  verified
+  consolidated
+  returned
+}
+
+// A recruiter's daily/weekly submission (scope_level: recruiter) rolls up
+// via parent_report_id into their supervisor's country-level report
+// (scope_level: country) — the escalation path (SRS FR-3.7) made concrete
+// as data, not just a permission chain. `content` snapshots the candidate
+// list / KPI summary at submission time (SRS FR-3.4) — a deliberate,
+// disclosed duplication of data computable from Candidate/Application,
+// since a report is a point-in-time record, not a live view: it must not
+// silently change after submission just because the underlying candidates
+// move on to new statuses.
+model Report {
+  id               String       @id @default(cuid())
+  type             ReportCycle
+  scope_level      ScopeLevel
+  country_id       String?
+  country          Country?     @relation(fields: [country_id], references: [id], onDelete: SetNull)
+  submitted_by     String
+  submitter        User         @relation("SubmittedReports", fields: [submitted_by], references: [id], onDelete: Cascade)
+  period_start     DateTime
+  period_end       DateTime
+  status           ReportStatus @default(draft)
+  content          Json
+  return_reason    String?      @db.Text
+  parent_report_id String?
+  parent_report    Report?      @relation("ReportRollup", fields: [parent_report_id], references: [id], onDelete: SetNull)
+  child_reports    Report[]     @relation("ReportRollup")
+  created_at       DateTime     @default(now())
+  updated_at       DateTime     @updatedAt
+
+  @@index([submitted_by])
+  @@index([country_id])
+  @@index([status])
+  @@index([type, period_start])
+}
+
+enum CampaignStatus {
+  draft
+  active
+  closed
+}
+
+// Criteria/requirements are free-form per campaign (roles, quotas,
+// eligibility rules) — modeled as Json rather than a rigid schema since
+// the SRS doesn't specify a fixed shape and campaigns vary widely by
+// destination market (SRS FR-3.3).
+model Campaign {
+  id         String         @id @default(cuid())
+  name       String
+  criteria   Json
+  status     CampaignStatus @default(draft)
+  created_by String
+  creator    User           @relation("CampaignCreator", fields: [created_by], references: [id], onDelete: Cascade)
+  start_date DateTime
+  end_date   DateTime // a campaign has a bounded timeline (SRS FR-3.3), not an open-ended one
+  created_at DateTime       @default(now())
+  updated_at DateTime       @updatedAt
+
+  targets CampaignTarget[]
+
+  @@index([status])
+  @@index([created_by])
+}
+
+enum CampaignMetric {
+  agent_signups
+  applicant_flow
+  conversion_rate
+}
+
+// A target cascades to exactly one country, one region, or neither
+// (campaign-wide) — never more than one scope per row, so "actuals"
+// aggregation always has an unambiguous target to compare against.
+model CampaignTarget {
+  id           String         @id @default(cuid())
+  campaign_id  String
+  campaign     Campaign       @relation(fields: [campaign_id], references: [id], onDelete: Cascade)
+  metric       CampaignMetric
+  country_id   String?
+  country      Country?       @relation(fields: [country_id], references: [id], onDelete: SetNull)
+  region_id    String?
+  region       Region?        @relation(fields: [region_id], references: [id], onDelete: SetNull)
+  target_value Float
+  created_at   DateTime       @default(now())
+
+  @@index([campaign_id])
+  @@index([country_id])
+  @@index([region_id])
 }
 
 model Job {

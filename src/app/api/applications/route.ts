@@ -4,21 +4,30 @@ import { auditedPrisma } from "@/lib/audit";
 import { submitApplicationSchema } from "@/lib/validations";
 import { getAuthUser, requireAuth } from "@/lib/api-auth";
 import { isStaffRole } from "@/lib/rbac";
-import { canAccessCandidate } from "@/server/scope";
+import { canAccessCandidate, scopeCandidatesToRequester } from "@/server/scope";
 
-// GET /api/applications — candidate sees their own, admin sees all
+// GET /api/applications — a candidate sees their own; every staff role
+// sees applications scoped exactly like the candidate list itself (SRS
+// FR-2.1 "guide and track applications" — a recruiter needs this for
+// their own sourced candidates, not just admin). Reuses
+// scopeCandidatesToRequester so the two views can never drift apart.
 export async function GET(req: NextRequest) {
   const user = await getAuthUser(req);
   const guardRes = requireAuth(user);
   if (guardRes) return guardRes;
 
-  if (user!.role === "admin") {
+  if (isStaffRole(user!.role)) {
+    const candidateScope = await scopeCandidatesToRequester(user!);
     const applications = await prisma.application.findMany({
+      where: { candidate: candidateScope },
       include: {
         candidate: {
           select: {
+            full_name: true,
             documents: { select: { id: true, type: true, verification_status: true } },
             user: { select: { full_name: true, email: true } },
+            recruiter: { select: { id: true, full_name: true } },
+            country: { select: { id: true, name: true } },
           },
         },
         job: { select: { title: true, country: true, city: true } },

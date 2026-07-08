@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getAuthUser, requireAdmin } from "@/lib/api-auth";
+import { getAuthUser, requireAdmin, requireRole } from "@/lib/api-auth";
 import { createRegionSchema } from "@/lib/validations";
 
-// GET /api/admin/regions — list regions with their countries (SRS FR-1.4)
+// GET /api/admin/regions — list regions with their countries (SRS FR-1.4).
+// Read-only reference data — any staff role can read it (Phase 3 dashboard
+// filters, campaign targets); only admin can write.
 export async function GET(req: NextRequest) {
   const user = await getAuthUser(req);
-  const guardRes = requireAdmin(user);
+  const guardRes = requireRole(user, ["regional_recruiter", "country_supervisor", "inhouse_supervisor", "director", "admin"]);
   if (guardRes) return guardRes;
 
   const regions = await prisma.region.findMany({

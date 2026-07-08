@@ -133,6 +133,57 @@ export const updateCandidateStatusSchema = z.object({
   return_reason: z.string().min(5).max(1000).optional(),
 });
 
+// Campaign set-up (SRS FR-3.3) — criteria is free-form (roles, quotas,
+// eligibility rules vary by destination market), so it's validated as a
+// generic JSON-serializable record rather than a fixed shape.
+export const createCampaignSchema = z
+  .object({
+    name: z.string().min(3).max(150),
+    criteria: z.record(z.string(), z.unknown()).default({}),
+    start_date: z.string(),
+    end_date: z.string(), // a campaign has a bounded timeline (SRS FR-3.3), not an open-ended one
+  })
+  .refine((data) => new Date(data.end_date) > new Date(data.start_date), {
+    message: "End date must be after the start date.",
+    path: ["end_date"],
+  });
+
+export const updateCampaignSchema = z.object({
+  name: z.string().min(3).max(150).optional(),
+  criteria: z.record(z.string(), z.unknown()).optional(),
+  status: z.enum(["draft", "active", "closed"]).optional(),
+  start_date: z.string().optional(),
+  end_date: z.string().optional(),
+});
+
+export const createCampaignTargetSchema = z
+  .object({
+    metric: z.enum(["agent_signups", "applicant_flow", "conversion_rate"]),
+    country_id: z.string().cuid().optional(),
+    region_id: z.string().cuid().optional(),
+    target_value: z.number().positive(),
+  })
+  .refine((data) => !(data.country_id && data.region_id), {
+    message: "A target can be scoped to a country or a region, not both.",
+  });
+
+// Reporting cycle (SRS FR-3.4) — a recruiter submits daily/weekly reports;
+// a supervisor consolidates verified recruiter reports (child_report_ids)
+// into a country report. `content` is free-form JSON since it snapshots
+// whatever the submitter reports at the time (candidate list, notes,
+// KPI summary) rather than a fixed schema.
+export const submitReportSchema = z.object({
+  type: z.enum(["daily", "weekly", "monthly"]),
+  period_start: z.string(),
+  period_end: z.string(),
+  content: z.record(z.string(), z.unknown()).default({}),
+  child_report_ids: z.array(z.string().cuid()).optional(),
+});
+
+export const returnReportSchema = z.object({
+  return_reason: z.string().min(5).max(1000),
+});
+
 // Contact form
 export const contactFormSchema = z.object({
   name: z.string().min(2).max(100),

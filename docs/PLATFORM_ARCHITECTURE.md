@@ -335,15 +335,23 @@ _(Recruiter CRUD, reassignment, and country assignment already shipped in Phase 
 7. Real, automated coverage: `screening.test.ts` (10 cases), `candidateLifecycle.test.ts` (10 cases, the role-gating rules), and `e2e/candidate-lifecycle.spec.ts` (full recruiter→supervisor journey through a real browser against a real DB).
 8. **Exit:** Recruiter/Supervisor sections operational; screening gate enforced; every candidate attributed to a recruiter/country — all verified against a live database, not just built.
 
-**Known, disclosed gap against the SRS's Phase 2 FRs:** FR-2.1's "submit regional reports and candidate lists" and FR-2.2's "consolidate regional submissions and submit finalised country reports to In-House" are only partially covered — a supervisor sees their whole country's candidates live and can act on them individually, but there's no formal Report/consolidation artifact. That's explicitly Phase 3's `Report` model (§2, §5) — building it now would duplicate work once Phase 3 introduces reporting cycles. Everything else in FR-2.1 through FR-2.9 is fully built and verified.
+**Resolved 2026-07-08:** FR-2.1's "submit regional reports and candidate lists" and FR-2.2's "consolidate regional submissions and submit finalised country reports to In-House" were flagged here as a gap, deferred to Phase 3's `Report` model. Phase 3 has since shipped that model plus the full submission/verification/consolidation workflow (`src/server/services/reportWorkflow.ts`, `/recruiter/reports`, `/supervisor/reports`, `/management/reports`) — this closes the gap. All of FR-2.1 through FR-2.9 is now fully built and verified.
 
-### Phase 3 — Control, Reporting & Governance
-1. `Report`, `Campaign`, `CampaignTarget` models + submission/verification/consolidation API.
-2. Management/Control dashboard (`/management`): KPI tiles + funnel + targets-vs-actuals, filterable, per §1.10.
-3. Reporting cadence: daily/weekly/monthly submission workflow and reminders.
-4. Escalation path (recruiter → country supervisor → in-house → management) surfaced as a visible status trail, not just a permission chain.
-5. Export (PDF/CSV) for dashboards/reports (FR-3.8).
-6. **Exit:** dashboard, KPIs, reporting cycles, approval workflow, and audit trail in active use.
+### Phase 3 — Control, Reporting & Governance — delivered 2026-07-08
+1. `Report` (draft/submitted/verified/returned/consolidated, `parent_report_id` rollup), `Campaign`, `CampaignTarget` models. Campaign requires a bounded `start_date`/`end_date` — a campaign is a timeline, not open-ended (caught by the user before shipping).
+2. KPI aggregation service (`src/server/services/kpi.ts`): agent sign-ups, recruiter response rate (FR-3.2's "agency response rate" has no Agency/Partner entity yet — Phase 5 — interpreted as % of identified candidates a recruiter actually screened, disclosed in the code comment), applicant flow funnel, overall + stage-to-stage conversion rates, targets vs actuals — all live aggregation over Candidate/Application/Campaign, never a stored, driftable copy.
+3. Role-gated report workflow (`src/server/services/reportWorkflow.ts`): exactly one controlling position per scope — a country_supervisor reviews recruiter-scope reports, in-house/director review country-scope reports (FR-3.5). A recruiter submits; a supervisor verifies/returns recruiter reports and consolidates verified ones into a country report; in-house verifies/returns that. Escalation trail (FR-3.7) surfaced as real data (`parent_report_id`) and a visible UI trail, not just a permission chain.
+4. Campaign set-up UI (`/management/campaigns`, FR-3.3) and Management/Control dashboard (`/management`, FR-3.1/3.2/3.8) — KPI stat tiles, applicant-flow funnel and stage-conversion charts (dataviz skill: validated ordinal green ramp for the funnel, gold accent + reserved status icons for targets-vs-actuals — never mixing the two encodings), filterable by region/country/campaign/date-range preset, plus a table view underneath (accessibility requirement — every chart's data is also reachable without it).
+5. Reporting-cycle UI on `/recruiter/reports`, `/supervisor/reports`, `/management/reports` (FR-3.4).
+6. CSV export (`/api/candidates/export`, FR-3.8) — reuses the same role-scoping as every other candidate query, so an export can never contain more than the viewer could already see in the app.
+7. Real, automated coverage: `kpi.test.ts` (8 cases, integration-style against real seeded candidates), `reportWorkflow.test.ts` (7 cases), and `e2e/report-workflow.spec.ts` (the full recruiter → supervisor → management escalation through a real browser against a real DB).
+8. Cross-phase gap closure (see §7's Phase 1/2 follow-ups below): `/recruiter/applications` and `/supervisor/applications` (FR-2.1) and DB-level audit-log immutability (FR-3.6).
+
+**Resolved 2026-07-08:** FR-3.6 — the audit trail is now immutable at the database level, not just by app discipline. `prisma/audit-log-immutability.sql` adds `BEFORE UPDATE`/`BEFORE DELETE` triggers on `AuditLog` that reject the operation outright (verified: both a manual `UPDATE` and `DELETE` against a real row were rejected with a Postgres error). Required one-time step per database, documented in `CLAUDE.md`, since `prisma db push` doesn't track raw SQL.
+
+**Confirmed with the business 2026-07-08 — deliberately deferred, not oversights:**
+- FR-3.4 ("Should" via this doc's own original phrasing, not literal SRS text): no automated reminders for overdue reports. Deferred to Phase 4/5 — not literally required by the SRS's FR-3.4 wording (asks for cycles to be *supported*, not reminded about), and needs a background scheduler + a "due date" concept that don't exist yet.
+- FR-3.8 (Should): CSV export is done; PDF export was explicitly skipped. CSV substantially satisfies the exportability requirement without adding a new PDF-generation dependency.
 
 ### Phase 4 — Extended Mobility Lifecycle
 1. `Case`/`CaseStageEvent` models; case auto-created on application approval.
@@ -381,7 +389,7 @@ Resolved / not applicable, confirmed with the business:
 
 **Delivery approach:** phase-by-phase, sequentially — not parallelized. Each phase is fully built, tested on staging, and signed off (System Administrator + a Director) before the next begins, per SRS §8.
 
-**Open follow-up — admin-scope ownership of legacy ATS screens:** during Phase 1's admin-panel migration onto `PortalShell`, Jobs, Applications (status review), Candidates pool, and Finances were kept under System Administrator, matching exactly what the old binary `candidate/admin` role model already allowed — no access was widened or narrowed. The SRS's §2.2 role definitions don't assign these screens to a specific role; they predate the phase-based RBAC model and are explicitly "retained, not re-specified" per the SRS's constraints. Once Phase 2 delivers the Regional Recruiter's own candidate/application tracking (FR-2.1) and Phase 3 delivers the In-House Supervisor's campaign-control dashboard (FR-3.1), expect real overlap with these admin screens — Applications review in particular will likely need re-scoping away from pure admin rather than being left duplicated across two places.
+**Resolved 2026-07-08:** this follow-up predicted that once Phase 2/3 landed, Applications review would need re-scoping away from pure admin — confirmed and fixed. `GET /api/applications` now scopes every staff role through `scopeCandidatesToRequester` (the same function the candidate list uses), not just `admin`, and read-only Applications views were added at `/recruiter/applications` and `/supervisor/applications` (FR-2.1's "guide and track applications" — recruiters previously had no application visibility at all, only candidate-pipeline visibility). `/admin/applications` is untouched and still the only place application *status* (interview/approved/rejected) is changed — this closes visibility, not editing rights, matching Phase 1's original decision to keep hiring-decision screens under System Administrator.
 
 ## 8. Complexity estimate
 

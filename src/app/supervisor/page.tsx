@@ -1,14 +1,12 @@
 "use client";
 
-import PortalShell, { type PortalNavItem } from "@/components/portal/PortalShell";
+import PortalShell from "@/components/portal/PortalShell";
 import CandidateList from "@/components/portal/CandidateList";
-import { Gauge } from "@phosphor-icons/react";
-
-const NAV_ITEMS: PortalNavItem[] = [{ href: "/supervisor", label: "Country Overview", icon: Gauge }];
+import { SUPERVISOR_NAV_ITEMS } from "@/components/portal/supervisorNav";
 
 export default function SupervisorPortalPage() {
   return (
-    <PortalShell roleLabel="Country Supervisor" navItems={NAV_ITEMS}>
+    <PortalShell roleLabel="Country Supervisor" navItems={SUPERVISOR_NAV_ITEMS}>
       <p className="eyebrow mb-3">
         <span className="eyebrow-rule" />
         Agent network

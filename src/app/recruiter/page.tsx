@@ -1,18 +1,16 @@
 "use client";
 
 import { useState } from "react";
-import PortalShell, { type PortalNavItem } from "@/components/portal/PortalShell";
+import PortalShell from "@/components/portal/PortalShell";
 import CandidateList from "@/components/portal/CandidateList";
 import RegisterCandidateForm from "@/components/portal/RegisterCandidateForm";
-import { Gauge } from "@phosphor-icons/react";
-
-const NAV_ITEMS: PortalNavItem[] = [{ href: "/recruiter", label: "My Candidates", icon: Gauge }];
+import { RECRUITER_NAV_ITEMS } from "@/components/portal/recruiterNav";
 
 export default function RecruiterPortalPage() {
   const [refreshKey, setRefreshKey] = useState(0);
 
   return (
-    <PortalShell roleLabel="Regional Recruiter" navItems={NAV_ITEMS}>
+    <PortalShell roleLabel="Regional Recruiter" navItems={RECRUITER_NAV_ITEMS}>
       <p className="eyebrow mb-3">
         <span className="eyebrow-rule" />
         Agent network

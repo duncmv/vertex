@@ -1,12 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getAuthUser, requireAdmin } from "@/lib/api-auth";
+import { getAuthUser, requireAdmin, requireRole } from "@/lib/api-auth";
 import { createCountrySchema } from "@/lib/validations";
 
-// GET /api/admin/countries — flat list, used by assignment dropdowns
+// GET /api/admin/countries — flat list, used by assignment dropdowns and
+// (Phase 3) campaign-target/dashboard-filter country pickers. Read-only
+// reference data, not sensitive — every staff role can read it; only
+// admin can write.
 export async function GET(req: NextRequest) {
   const user = await getAuthUser(req);
-  const guardRes = requireAdmin(user);
+  const guardRes = requireRole(user, ["regional_recruiter", "country_supervisor", "inhouse_supervisor", "director", "admin"]);
   if (guardRes) return guardRes;
 
   const countries = await prisma.country.findMany({

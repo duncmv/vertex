@@ -1,0 +1,45 @@
+import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
+import { auditedPrisma } from "@/lib/audit";
+import { getAuthUser, requireRole } from "@/lib/api-auth";
+import { canReviewReport } from "@/server/services/reportWorkflow";
+
+const REVIEWER_ROLES = ["country_supervisor", "inhouse_supervisor", "director", "admin"] as const;
+
+// PATCH /api/reports/:id/verify — the report's one controlling position
+// (SRS FR-3.5) approves it as submitted, no changes needed.
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const user = await getAuthUser(req);
+  const guardRes = requireRole(user, [...REVIEWER_ROLES]);
+  if (guardRes) return guardRes;
+
+  const { id } = await params;
+
+  const report = await prisma.report.findUnique({ where: { id } });
+  if (!report) {
+    return NextResponse.json({ error: { code: "not_found", message: "Report not found." } }, { status: 404 });
+  }
+
+  if (!canReviewReport(user!.role, report.scope_level)) {
+    return NextResponse.json({ error: { code: "forbidden", message: "You are not the controlling position for this report." } }, { status: 403 });
+  }
+
+  if (report.scope_level === "recruiter" && user!.role === "country_supervisor") {
+    const supervisor = await prisma.user.findUnique({ where: { id: user!.userId }, select: { assigned_country_id: true } });
+    if (supervisor?.assigned_country_id !== report.country_id) {
+      return NextResponse.json({ error: { code: "forbidden", message: "This report is not in your assigned country." } }, { status: 403 });
+    }
+  }
+
+  if (report.status !== "submitted") {
+    return NextResponse.json({ error: { code: "invalid_transition", message: `A report in '${report.status}' status cannot be verified.` } }, { status: 422 });
+  }
+
+  const updated = await auditedPrisma(user!.userId).report.update({
+    where: { id },
+    data: { status: "verified", return_reason: null },
+    select: { id: true, status: true },
+  });
+
+  return NextResponse.json({ data: updated });
+}

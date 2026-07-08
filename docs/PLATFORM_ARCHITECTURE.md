@@ -136,15 +136,24 @@ model AuditLog {
 }
 ```
 
-**Phase 2**
+**Phase 2 (revised — see note below)**
 ```
-model RecruiterProfile {
-  user_id             String @id
-  country_id          String
-  country_supervisor_id String   // denormalized for fast "my ~20 recruiters" queries
+// Pre-registration identity (used only when user_id is null — a
+// recruiter-sourced lead who hasn't created an account yet). Once linked
+// to a User, the User's fields become authoritative.
+model Candidate {
+  ...
+  full_name String?
+  phone     String?
+  email     String?
+
+  // Screening gate (FR-2.5) + verification-return workflow (FR-2.7)
+  consent_given Boolean   @default(false)
+  consent_at    DateTime?
+  return_reason String?   @db.Text
 }
 ```
-(Candidate attribution and pre-application statuses are already covered by the Phase 1 additions above — Phase 2 is primarily service/UI work on top of them, plus the screening-gate rule engine.)
+**Superseded:** the `RecruiterProfile` model and "recruiter CRUD + reassignment API" originally planned here are no longer needed — Phase 1's `User.supervisor_id`/`assigned_country_id` plus the Staff & Roles admin page already deliver exactly this (create staff, assign supervisor, assign country), built ahead of schedule when Phase 1 was extended to include real UI. Candidate attribution and pre-application lifecycle statuses are also already covered by Phase 1. Phase 2's actual remaining scope is: capturing a pre-registration lead's identity (above), the screening-gate rule engine, and the recruiter/supervisor portal workflows built on top of it.
 
 **Phase 3**
 ```
@@ -316,12 +325,14 @@ Mirrors SRS §8 exit criteria exactly, sequenced so each phase is independently 
 7. **Exit:** roles, RBAC, region/country model, secure storage, and environments live; placeholder jobs gone. Signed off on staging by System Administrator + a Director.
 
 ### Phase 2 — Agent-Network Core
-1. `RecruiterProfile`, recruiter CRUD + reassignment API.
-2. Regional Recruiter portal (`/recruiter`): register/guide candidates, update lifecycle status, submit lists/reports.
-3. Country Supervisor portal (`/supervisor`): review/verify/consolidate submissions, manage ~20 recruiters, reassignment.
-4. Screening-gate rule engine (`src/server/services/screening.ts`): eligibility, documentation, role suitability, availability/consent, data completeness — blocks `guided_to_apply` transition until all pass.
-5. Verification-return workflow: supervisor can bounce a record back with a reason (FR-2.7), logged to `AuditLog`.
-6. **Exit:** Recruiter/Supervisor sections operational; screening gate enforced; every candidate attributed to a recruiter/country.
+_(Recruiter CRUD, reassignment, and country assignment already shipped in Phase 1 — see the "Superseded" note in §2.)_
+1. Candidate schema additions: pre-registration identity (full_name/phone/email) + consent + return_reason.
+2. Screening-gate rule engine (`src/server/services/screening.ts`): data completeness, documentation present and not rejected, consent given, minimum-age eligibility — blocks the `guided_to_apply` transition until all pass. ("Role suitability" from FR-2.5 has no dedicated matching model yet — that's Phase 4's Case/stage territory — so it's folded into data completeness for now, noted explicitly rather than inventing an unspec'd field.)
+3. `POST /api/candidates`: a recruiter registers a new lead (name/nationality/DOB/passport/contact), defaulting country to their own assigned country.
+4. `PATCH /api/candidates/[id]/status`: role-gated lifecycle transitions — recruiter drives identified → screened → guided_to_apply (screening-gated) → submitted → reported for their own candidates; supervisor (excluded from verifying their own sourced candidates, same conflict-of-interest rule as document verification) drives reported → verified → approved, or returns a candidate to an earlier stage with a required reason (FR-2.7), for candidates in their country. All transitions audited.
+5. Regional Recruiter portal (`/recruiter`): register-candidate form, status controls, screening-gate failure reasons surfaced inline.
+6. Country Supervisor portal (`/supervisor`): verify/return controls with a reason field.
+7. **Exit:** Recruiter/Supervisor sections operational; screening gate enforced; every candidate attributed to a recruiter/country.
 
 ### Phase 3 — Control, Reporting & Governance
 1. `Report`, `Campaign`, `CampaignTarget` models + submission/verification/consolidation API.

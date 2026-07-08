@@ -4,15 +4,18 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import AdminSettings from "@/components/AdminSettings";
+import DocumentLink from "@/components/DocumentLink";
 
 interface Job {
   id: string; title: string; status: string; created_at: string;
   _count: { applications: number };
 }
 
+interface CandidateDocument { id: string; type: string; }
+
 interface Application {
   id: string; application_status: string; submitted_at: string;
-  candidate: { cv_file?: string; passport_scan?: string; user: { full_name: string; email: string } };
+  candidate: { documents: CandidateDocument[]; user: { full_name: string; email: string } };
   job: { title: string };
 }
 
@@ -199,12 +202,20 @@ export default function AdminDashboardPage() {
                       <td className="px-5 py-4 text-slate-700">{cand.candidate?.nationality || cand.country || 'N/A'}</td>
                       <td className="px-5 py-4 font-medium text-slate-600">{cand.candidate?._count?.applications || 0}</td>
                       <td className="px-5 py-4">
-                        <div className="flex flex-col gap-1">
-                          {cand.candidate?.cv_file ? (
-                            <a href={cand.candidate.cv_file} target="_blank" rel="noopener noreferrer" className="text-emerald-600 hover:underline text-xs">📄 CV</a>
+                        <div className="flex flex-col gap-1 items-start">
+                          {cand.candidate?.documents?.find((d: CandidateDocument) => d.type === "cv") ? (
+                            <DocumentLink
+                              documentId={cand.candidate.documents.find((d: CandidateDocument) => d.type === "cv").id}
+                              label="📄 CV"
+                              className="text-emerald-600 hover:underline text-xs"
+                            />
                           ) : <span className="text-slate-400 text-xs">📄 No CV</span>}
-                          {cand.candidate?.passport_scan ? (
-                            <a href={cand.candidate.passport_scan} target="_blank" rel="noopener noreferrer" className="text-emerald-600 hover:underline text-xs">🛂 Passport</a>
+                          {cand.candidate?.documents?.find((d: CandidateDocument) => d.type === "passport") ? (
+                            <DocumentLink
+                              documentId={cand.candidate.documents.find((d: CandidateDocument) => d.type === "passport").id}
+                              label="🛂 Passport"
+                              className="text-emerald-600 hover:underline text-xs"
+                            />
                           ) : <span className="text-slate-400 text-xs">🛂 No Passport</span>}
                         </div>
                       </td>
@@ -294,17 +305,21 @@ export default function AdminDashboardPage() {
                     </td>
                     <td className="px-5 py-4 text-slate-800 font-medium">{app.job.title}</td>
                     <td className="px-5 py-4">
-                      <div className="flex flex-col gap-2">
-                        {app.candidate.cv_file ? (
-                          <a href={app.candidate.cv_file} target="_blank" rel="noopener noreferrer" className="text-emerald-600 hover:underline text-xs flex items-center gap-1">
-                            📄 View CV
-                          </a>
+                      <div className="flex flex-col gap-2 items-start">
+                        {app.candidate.documents.find((d) => d.type === "cv") ? (
+                          <DocumentLink
+                            documentId={app.candidate.documents.find((d) => d.type === "cv")!.id}
+                            label="📄 View CV"
+                            className="text-emerald-600 hover:underline text-xs flex items-center gap-1"
+                          />
                         ) : <span className="text-slate-400 text-xs group-hover:text-red-500 transition-colors">📄 No CV</span>}
-                        
-                        {app.candidate.passport_scan ? (
-                          <a href={app.candidate.passport_scan} target="_blank" rel="noopener noreferrer" className="text-emerald-600 hover:underline text-xs flex items-center gap-1">
-                            🛂 View Passport
-                          </a>
+
+                        {app.candidate.documents.find((d) => d.type === "passport") ? (
+                          <DocumentLink
+                            documentId={app.candidate.documents.find((d) => d.type === "passport")!.id}
+                            label="🛂 View Passport"
+                            className="text-emerald-600 hover:underline text-xs flex items-center gap-1"
+                          />
                         ) : <span className="text-slate-400 text-xs group-hover:text-red-500 transition-colors">🛂 No Passport</span>}
                       </div>
                     </td>

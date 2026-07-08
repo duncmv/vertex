@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { auditedPrisma } from "@/lib/audit";
 import { getAuthUser, requireAdmin } from "@/lib/api-auth";
 import { sendStatusUpdateEmail, sendInterviewInvitationEmail } from "@/lib/email";
 
@@ -16,7 +17,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       include: {
         candidate: {
           include: {
-            user: { select: { full_name: true, email: true, phone: true, country: true } }
+            user: { select: { full_name: true, email: true, phone: true, country: true } },
+            documents: { select: { id: true, type: true, verification_status: true } },
           }
         },
         job: true,
@@ -64,7 +66,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     if (body.internal_notes !== undefined) updateData.internal_notes = body.internal_notes;
     if (body.interview_date !== undefined) updateData.interview_date = body.interview_date ? new Date(body.interview_date) : null;
 
-    const updated = await prisma.application.update({
+    const updated = await auditedPrisma(user!.userId).application.update({
       where: { id },
       data: updateData,
     });

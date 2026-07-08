@@ -100,7 +100,7 @@ export async function GET(req: NextRequest) {
   const token = signToken({
     userId: user.id,
     email: user.email,
-    role: user.role as "candidate" | "admin",
+    role: user.role,
   });
 
   const response = NextResponse.redirect(`${appUrl}${redirectTo}`);

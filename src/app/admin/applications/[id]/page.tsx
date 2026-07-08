@@ -3,6 +3,7 @@
 import { useState, useEffect, use } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import DocumentLink from "@/components/DocumentLink";
 
 export default function ApplicationDetailedPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
@@ -111,16 +112,20 @@ export default function ApplicationDetailedPage({ params }: { params: Promise<{ 
               </div>
 
               <div className="mt-6 flex flex-wrap gap-4">
-                {appData.candidate.cv_file ? (
-                  <a href={appData.candidate.cv_file} target="_blank" rel="noopener noreferrer" className="btn-secondary py-2 px-4 text-sm flex items-center gap-2">
-                    📄 View CV
-                  </a>
+                {appData.candidate.documents?.find((d: { type: string }) => d.type === "cv") ? (
+                  <DocumentLink
+                    documentId={appData.candidate.documents.find((d: { type: string }) => d.type === "cv").id}
+                    label="📄 View CV"
+                    className="btn-secondary py-2 px-4 text-sm flex items-center gap-2"
+                  />
                 ) : <span className="py-2 px-4 text-sm bg-slate-100 text-slate-400 rounded-md">No CV</span>}
-                
-                {appData.candidate.passport_scan ? (
-                  <a href={appData.candidate.passport_scan} target="_blank" rel="noopener noreferrer" className="btn-secondary py-2 px-4 text-sm flex items-center gap-2">
-                    🛂 View Passport
-                  </a>
+
+                {appData.candidate.documents?.find((d: { type: string }) => d.type === "passport") ? (
+                  <DocumentLink
+                    documentId={appData.candidate.documents.find((d: { type: string }) => d.type === "passport").id}
+                    label="🛂 View Passport"
+                    className="btn-secondary py-2 px-4 text-sm flex items-center gap-2"
+                  />
                 ) : <span className="py-2 px-4 text-sm bg-slate-100 text-slate-400 rounded-md">No Passport</span>}
               </div>
             </div>

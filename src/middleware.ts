@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyToken } from "@/lib/jwt";
+import { canAccessPortal, homeFor } from "@/lib/rbac";
 
-const PROTECTED_PATHS = ["/dashboard", "/admin"];
+const PROTECTED_PATHS = ["/dashboard", "/admin", "/recruiter", "/supervisor", "/management"];
 
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
@@ -20,9 +21,8 @@ export function middleware(req: NextRequest) {
   try {
     const payload = verifyToken(token);
 
-    // Admin-only routes
-    if (pathname.startsWith("/admin") && payload.role !== "admin") {
-      return NextResponse.redirect(new URL("/dashboard", req.url));
+    if (!canAccessPortal(payload.role, pathname)) {
+      return NextResponse.redirect(new URL(homeFor(payload.role), req.url));
     }
 
     return NextResponse.next();
@@ -34,5 +34,5 @@ export function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/dashboard/:path*", "/admin/:path*"],
+  matcher: ["/dashboard/:path*", "/admin/:path*", "/recruiter/:path*", "/supervisor/:path*", "/management/:path*"],
 };

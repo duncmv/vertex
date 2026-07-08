@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { DUMMY_JOBS } from "@/lib/dummyData";
 import { MapPin, Tag, CurrencyCircleDollar, Users, ArrowRight, MagnifyingGlass } from "@phosphor-icons/react/dist/ssr";
 export const dynamic = "force-dynamic";
 
@@ -35,11 +34,11 @@ async function getJobs(searchParams: { page?: string; country?: string; category
     const res = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/jobs?${params}`, {
       cache: "no-store",
     });
-    if (!res.ok) return { jobs: DUMMY_JOBS, total: DUMMY_JOBS.length, pages: 1 };
+    if (!res.ok) return { jobs: [], total: 0, pages: 1 };
     const data = await res.json();
-    return data && data.jobs && data.jobs.length > 0 ? data : { jobs: DUMMY_JOBS, total: DUMMY_JOBS.length, pages: 1 };
+    return data?.jobs ? data : { jobs: [], total: 0, pages: 1 };
   } catch {
-    return { jobs: DUMMY_JOBS, total: DUMMY_JOBS.length, pages: 1 };
+    return { jobs: [], total: 0, pages: 1 };
   }
 }
 

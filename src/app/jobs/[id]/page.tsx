@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { DUMMY_JOBS } from "@/lib/dummyData";
 export const dynamic = "force-dynamic";
 
 interface Job {
@@ -23,11 +22,11 @@ async function getJob(id: string): Promise<Job | null> {
     const res = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/jobs/${id}`, {
       cache: "no-store",
     });
-    if (!res.ok) return DUMMY_JOBS.find(j => j.id === id) || DUMMY_JOBS[0];
+    if (!res.ok) return null;
     const data = await res.json();
-    return data && data.id ? data : (DUMMY_JOBS.find(j => j.id === id) || DUMMY_JOBS[0]);
+    return data?.id ? data : null;
   } catch {
-    return DUMMY_JOBS.find(j => j.id === id) || DUMMY_JOBS[0];
+    return null;
   }
 }
 

@@ -12,7 +12,12 @@ export async function GET(req: NextRequest) {
   if (user!.role === "admin") {
     const applications = await prisma.application.findMany({
       include: {
-        candidate: { select: { cv_file: true, passport_scan: true, user: { select: { full_name: true, email: true } } } },
+        candidate: {
+          select: {
+            documents: { select: { id: true, type: true } },
+            user: { select: { full_name: true, email: true } },
+          },
+        },
         job: { select: { title: true, country: true, city: true } },
       },
       orderBy: { submitted_at: "desc" },
@@ -49,11 +54,13 @@ export async function POST(req: NextRequest) {
 
   const candidate = await prisma.candidate.findUnique({
     where: { user_id: user!.userId },
-    include: { user: true }
+    include: { user: true, documents: { select: { type: true } } },
   });
   if (!candidate) return NextResponse.json({ error: "Candidate profile not found." }, { status: 404 });
 
-  if (!candidate.cv_file || !candidate.passport_scan) {
+  const hasCv = candidate.documents.some((d: { type: string }) => d.type === "cv");
+  const hasPassport = candidate.documents.some((d: { type: string }) => d.type === "passport");
+  if (!hasCv || !hasPassport) {
     return NextResponse.json(
       { error: "You must upload both your CV and Passport scan before applying." },
       { status: 400 }

@@ -60,7 +60,7 @@ export async function POST(req: NextRequest) {
   const token = signToken({
     userId: user.id,
     email: user.email,
-    role: user.role as "candidate" | "admin",
+    role: user.role,
   });
 
   const res = NextResponse.json({

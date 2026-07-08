@@ -24,7 +24,14 @@ Sequential, phase-by-phase — not parallelized across phases (confirmed with th
 - `main` — production.
 - `staging` — pre-production sign-off environment. Every phase branch (`phase-N-*`) is merged into `staging` first; a phase is only merged from `staging` into `main` after it's been verified there against the SRS exit criteria and signed off.
 - `phase-N-*` — one branch per phase, branched off `main`.
-- Action item (not doable from the CLI): confirm in the Vercel dashboard that the `staging` branch auto-deploys to its own stable preview URL, separate from the `main` production deployment.
+- Action item (not doable from the CLI): confirm the cPanel Node hosting is set up to run separate `staging` and `main` deployments (matching the SRS §2.3 environment requirement), not just a single production instance.
+
+## Infrastructure (confirmed 2026-07-08)
+
+- **Hosting**: cPanel Node hosting is the real production target (matches SRS §2.3 and the existing `output: 'standalone'` in `next.config.ts`). The `vertex-omega-kohl.vercel.app` deployment used earlier for the redesign work is a separate, interim thing — not the system of record.
+- **Database**: PostgreSQL, provisioned via cPanel — no Prisma provider change needed. The Supabase project referenced in `.env`/`.env.example` historically is **not accessible/owned by us**; `DATABASE_URL` needs the real cPanel connection string before `prisma db push` can run.
+- **Document storage**: local disk on the cPanel server, under `UPLOAD_DIR` (private, outside `/public`), served only through the signed-URL API route (`/api/documents/[id]/signed-url` → `/api/documents/file`). Supabase Storage is no longer used — `@supabase/supabase-js` was removed as a dependency.
+- **Document backup**: Cloudflare R2 (S3-compatible, `lib/backup.ts`), best-effort backup on save/delete, self-heals the local copy on read if it's ever missing. Local disk stays primary; R2 is degraded-gracefully optional until `R2_*` env vars are filled in.
 
 ## Key resolved decisions (do not re-litigate without cause)
 

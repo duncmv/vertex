@@ -11,6 +11,10 @@ datasource db {
 
 enum Role {
   candidate
+  regional_recruiter
+  country_supervisor
+  inhouse_supervisor
+  director
   admin
 }
 
@@ -29,39 +33,139 @@ enum JobStatus {
 }
 
 model User {
-  id             String    @id @default(cuid())
+  id             String   @id @default(cuid())
   full_name      String
-  email          String    @unique
+  email          String   @unique
   password_hash  String?
-  google_id      String?   @unique
+  google_id      String?  @unique
   phone          String?
   country        String?
-  role           Role      @default(candidate)
-  email_verified Boolean   @default(false)
-  created_at     DateTime  @default(now())
-  updated_at     DateTime  @updatedAt
+  role           Role     @default(candidate)
+  email_verified Boolean  @default(false)
+  created_at     DateTime @default(now())
+  updated_at     DateTime @updatedAt
 
-  candidate      Candidate?
-  payments       Payment[]
+  // Agent-network structure (SRS FR-1.1, FR-1.3, FR-1.4)
+  supervisor_id       String?
+  supervisor          User?    @relation("Supervision", fields: [supervisor_id], references: [id], onDelete: SetNull)
+  reports             User[]   @relation("Supervision")
+  assigned_country_id String?
+  assigned_country    Country? @relation(fields: [assigned_country_id], references: [id], onDelete: SetNull)
+
+  candidate          Candidate?
+  payments           Payment[]
+  sourced_candidates Candidate[] @relation("RecruiterCandidates")
 
   @@index([email])
+  @@index([supervisor_id])
+  @@index([assigned_country_id])
+}
+
+model Region {
+  id        String    @id @default(cuid())
+  name      String    @unique
+  countries Country[]
+}
+
+model Country {
+  id        String @id @default(cuid())
+  name      String @unique
+  region_id String
+  region    Region @relation(fields: [region_id], references: [id], onDelete: Restrict)
+
+  users      User[]
+  candidates Candidate[]
+
+  @@index([region_id])
+}
+
+enum CandidateSource {
+  self_registered
+  recruiter_sourced
+}
+
+enum CandidateLifecycleStatus {
+  identified
+  screened
+  guided_to_apply
+  submitted
+  reported
+  verified
+  approved
 }
 
 model Candidate {
-  id              String   @id @default(cuid())
-  user_id         String   @unique
+  id              String    @id @default(cuid())
+  user_id         String?   @unique // nullable: a recruiter-sourced lead may not have an account yet (SRS FR-2.1)
   passport_number String?
   date_of_birth   DateTime?
   nationality     String?
-  cv_file         String?   // stored file path / URL
-  passport_scan   String?   // stored file path / URL
-  created_at      DateTime @default(now())
-  updated_at      DateTime @updatedAt
+  created_at      DateTime  @default(now())
+  updated_at      DateTime  @updatedAt
 
-  user            User         @relation(fields: [user_id], references: [id], onDelete: Cascade)
-  applications    Application[]
+  // Agent-network attribution (SRS FR-1.4, FR-2.3)
+  source           CandidateSource          @default(self_registered)
+  recruiter_id     String?
+  recruiter        User?                    @relation("RecruiterCandidates", fields: [recruiter_id], references: [id], onDelete: SetNull)
+  country_id       String?
+  country          Country?                 @relation(fields: [country_id], references: [id], onDelete: SetNull)
+  lifecycle_status CandidateLifecycleStatus @default(identified)
+
+  user         User?         @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  applications Application[]
+  documents    Document[]
 
   @@index([user_id])
+  @@index([recruiter_id])
+  @@index([country_id])
+}
+
+enum DocumentType {
+  cv
+  passport
+  transcript
+  certificate
+  medical
+  police_clearance
+  contract
+  visa
+  other
+}
+
+enum VerificationStatus {
+  pending
+  verified
+  rejected
+}
+
+model Document {
+  id                  String             @id @default(cuid())
+  candidate_id        String
+  type                DocumentType
+  storage_path        String // private-bucket path; never a public URL (SRS FR-1.6)
+  verification_status VerificationStatus @default(pending)
+  verified_by         String?
+  verified_at         DateTime?
+  uploaded_at         DateTime           @default(now())
+
+  candidate Candidate @relation(fields: [candidate_id], references: [id], onDelete: Cascade)
+
+  @@index([candidate_id])
+  @@index([type])
+}
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  entity_type String
+  entity_id   String
+  action      String // create | update | delete | verify | approve
+  actor_id    String?
+  before      Json?
+  after       Json?
+  created_at  DateTime @default(now())
+
+  @@index([entity_type, entity_id])
+  @@index([actor_id])
 }
 
 model Job {
@@ -78,8 +182,8 @@ model Job {
   created_at      DateTime  @default(now())
   updated_at      DateTime  @updatedAt
 
-  applications    Application[]
-  payments        Payment[]
+  applications Application[]
+  payments     Payment[]
 
   @@index([status])
   @@index([country])
@@ -96,8 +200,8 @@ model Application {
   submitted_at       DateTime          @default(now())
   updated_at         DateTime          @updatedAt
 
-  candidate          Candidate @relation(fields: [candidate_id], references: [id], onDelete: Cascade)
-  job                Job       @relation(fields: [job_id], references: [id], onDelete: Cascade)
+  candidate Candidate @relation(fields: [candidate_id], references: [id], onDelete: Cascade)
+  job       Job       @relation(fields: [job_id], references: [id], onDelete: Cascade)
 
   @@unique([candidate_id, job_id])
   @@index([candidate_id])
@@ -105,18 +209,18 @@ model Application {
 }
 
 model Payment {
-  id              String        @id @default(cuid())
-  user_id         String
-  job_id          String
-  amount          Float
-  currency        String        @default("USD")
-  payment_method  String        // "stripe" or "paypal"
-  payment_status  PaymentStatus @default(pending)
-  transaction_id  String?       @unique
-  created_at      DateTime      @default(now())
+  id             String        @id @default(cuid())
+  user_id        String
+  job_id         String
+  amount         Float
+  currency       String        @default("USD")
+  payment_method String // "stripe" or "paypal"
+  payment_status PaymentStatus @default(pending)
+  transaction_id String?       @unique
+  created_at     DateTime      @default(now())
 
-  user            User          @relation(fields: [user_id], references: [id], onDelete: Cascade)
-  job             Job           @relation(fields: [job_id], references: [id], onDelete: Cascade)
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  job  Job  @relation(fields: [job_id], references: [id], onDelete: Cascade)
 
   @@index([user_id])
   @@index([job_id])
@@ -137,17 +241,17 @@ model SystemSetting {
 }
 
 model KnowledgeArticle {
-  id          String   @id @default(cuid())
-  title       String
-  category    String   @default("General")
-  content     String   @db.Text
-  created_at  DateTime @default(now())
-  updated_at  DateTime @updatedAt
+  id         String   @id @default(cuid())
+  title      String
+  category   String   @default("General")
+  content    String   @db.Text
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
 }
 
 model EmailTemplate {
-  event       String   @id // e.g., "job_applied", "payment_receipt", "status_update"
-  subject     String
-  body_html   String   @db.Text
-  updated_at  DateTime @default(now()) @updatedAt
+  event      String   @id // e.g., "job_applied", "payment_receipt", "status_update"
+  subject    String
+  body_html  String   @db.Text
+  updated_at DateTime @default(now()) @updatedAt
 }

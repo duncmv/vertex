@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { auditedPrisma } from "@/lib/audit";
 import { candidateProfileSchema } from "@/lib/validations";
 import { getAuthUser, requireAuth } from "@/lib/api-auth";
 
@@ -13,6 +14,7 @@ export async function GET(req: NextRequest) {
     where: { user_id: user!.userId },
     include: {
       user: { select: { full_name: true, email: true, phone: true, country: true } },
+      documents: { select: { id: true, type: true, verification_status: true } },
       _count: { select: { applications: true } },
     },
   });
@@ -40,7 +42,7 @@ export async function PUT(req: NextRequest) {
     data.date_of_birth = new Date(parsed.data.date_of_birth);
   }
 
-  const profile = await prisma.candidate.update({
+  const profile = await auditedPrisma(user!.userId).candidate.update({
     where: { user_id: user!.userId },
     data,
   });

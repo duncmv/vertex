@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { auditedPrisma } from "@/lib/audit";
 import { updateApplicationStatusSchema } from "@/lib/validations";
 import { getAuthUser, requireAdmin } from "@/lib/api-auth";
 
@@ -18,7 +19,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     return NextResponse.json({ error: "Validation failed", details: parsed.error.flatten().fieldErrors }, { status: 422 });
   }
 
-  const application = await prisma.application.update({
+  const application = await auditedPrisma(user!.userId).application.update({
     where: { id },
     data: { application_status: parsed.data.application_status },
     include: {

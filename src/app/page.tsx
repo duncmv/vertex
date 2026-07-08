@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import HomeClient from "@/components/HomeClient";
-import { DUMMY_JOBS } from "@/lib/dummyData";
 
 export const dynamic = "force-dynamic";
 
@@ -10,16 +9,18 @@ export const metadata: Metadata = {
     "Vertex International Recruitment Ltd. connects talented professionals, employers, agencies and institutional partners through ethical recruitment, compliant mobility solutions, and dedicated end-to-end support.",
 };
 
+// SRS FR-1.5: real database jobs only — no placeholder fallback. An empty
+// result renders HomeClient's built-in "No jobs available yet" state.
 async function getFeaturedJobs() {
   try {
     const res = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/jobs?limit=6`, {
       cache: "no-store",
     });
-    if (!res.ok) return DUMMY_JOBS.slice(0, 6);
+    if (!res.ok) return [];
     const data = await res.json();
-    return data.jobs && data.jobs.length > 0 ? data.jobs : DUMMY_JOBS.slice(0, 6);
+    return data.jobs ?? [];
   } catch {
-    return DUMMY_JOBS.slice(0, 6);
+    return [];
   }
 }
 

@@ -23,8 +23,7 @@ export async function GET(req: NextRequest) {
           select: {
             id: true,
             nationality: true,
-            cv_file: true,
-            passport_scan: true,
+            documents: { select: { id: true, type: true } },
             _count: {
               select: { applications: true }
             }

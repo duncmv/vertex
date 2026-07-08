@@ -1,4 +1,5 @@
 import jwt from "jsonwebtoken";
+import type { Role } from "@prisma/client";
 
 const JWT_SECRET = process.env.JWT_SECRET!;
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || "7d";
@@ -7,13 +8,17 @@ const EMAIL_TOKEN_EXPIRES_IN = process.env.EMAIL_TOKEN_EXPIRES_IN || "24h";
 export interface JwtPayload {
   userId: string;
   email: string;
-  role: "candidate" | "admin";
+  role: Role;
 }
 
 export interface EmailTokenPayload {
   userId: string;
   email: string;
   type: "email_verification" | "password_reset";
+}
+
+export interface DocumentTokenPayload {
+  storagePath: string;
 }
 
 export function signToken(payload: JwtPayload): string {
@@ -24,10 +29,20 @@ export function signEmailToken(payload: EmailTokenPayload): string {
   return jwt.sign(payload, JWT_SECRET, { expiresIn: EMAIL_TOKEN_EXPIRES_IN } as jwt.SignOptions);
 }
 
+// Short-lived, single-purpose token granting access to exactly one document
+// storage path (SRS FR-1.6 "signed, time-limited access URLs").
+export function signDocumentToken(payload: DocumentTokenPayload, expiresInSeconds: number): string {
+  return jwt.sign(payload, JWT_SECRET, { expiresIn: expiresInSeconds } as jwt.SignOptions);
+}
+
 export function verifyToken(token: string): JwtPayload {
   return jwt.verify(token, JWT_SECRET) as JwtPayload;
 }
 
 export function verifyEmailToken(token: string): EmailTokenPayload {
   return jwt.verify(token, JWT_SECRET) as EmailTokenPayload;
+}
+
+export function verifyDocumentToken(token: string): DocumentTokenPayload {
+  return jwt.verify(token, JWT_SECRET) as DocumentTokenPayload;
 }

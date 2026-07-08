@@ -13,8 +13,7 @@ interface Application {
 
 interface Profile {
   id: string;
-  cv_file?: string;
-  passport_scan?: string;
+  documents: { id: string; type: string; verification_status: string }[];
   passport_number?: string;
   nationality?: string;
   _count: { applications: number };
@@ -93,8 +92,8 @@ export default function DashboardPage() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {[
             { label: "Applications", value: profile?._count.applications ?? 0, icon: "📋" },
-            { label: "CV Uploaded", value: profile?.cv_file ? "✅ Yes" : "❌ No", icon: "📄" },
-            { label: "Passport Scan", value: profile?.passport_scan ? "✅ Yes" : "❌ No", icon: "🛂" },
+            { label: "CV Uploaded", value: profile?.documents.some((d) => d.type === "cv") ? "✅ Yes" : "❌ No", icon: "📄" },
+            { label: "Passport Scan", value: profile?.documents.some((d) => d.type === "passport") ? "✅ Yes" : "❌ No", icon: "🛂" },
           ].map((stat) => (
             <div key={stat.label} className="card p-6 flex items-center gap-4">
               <div className="text-3xl">{stat.icon}</div>

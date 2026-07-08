@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyToken, JwtPayload } from "@/lib/jwt";
 import { cookies } from "next/headers";
+import type { Role } from "@prisma/client";
 
 export async function getAuthUser(req: NextRequest): Promise<JwtPayload | null> {
   try {
@@ -24,11 +25,16 @@ export function requireAuth(user: JwtPayload | null): NextResponse | null {
 }
 
 export function requireAdmin(user: JwtPayload | null): NextResponse | null {
+  return requireRole(user, ["admin"]);
+}
+
+// SRS FR-1.2: least-privilege RBAC enforced on every API route.
+export function requireRole(user: JwtPayload | null, roles: Role[]): NextResponse | null {
   const authError = requireAuth(user);
   if (authError) return authError;
-  if (user!.role !== "admin") {
+  if (!roles.includes(user!.role)) {
     return NextResponse.json(
-      { error: "Forbidden. Admin access required." },
+      { error: "Forbidden. Insufficient role." },
       { status: 403 }
     );
   }

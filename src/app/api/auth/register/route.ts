@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { auditedPrisma } from "@/lib/audit";
 import { hashPassword } from "@/lib/auth";
 import { sendVerificationEmail } from "@/lib/email";
 import { registerSchema } from "@/lib/validations";
@@ -23,8 +24,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  console.log("Registration request received", body);
-
   const parsed = registerSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(
@@ -35,9 +34,7 @@ export async function POST(req: NextRequest) {
 
   const { full_name, email, password, phone, country } = parsed.data;
 
-  console.log("Searching for existing user", email);
   const existing = await prisma.user.findUnique({ where: { email } });
-  console.log("Existing user check done", existing);
   if (existing) {
     return NextResponse.json(
       { error: "An account with this email already exists." },
@@ -45,12 +42,10 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  console.log("Hashing password...");
   const password_hash = await hashPassword(password);
-  console.log("Password hashed.");
 
-  console.log("Creating user in DB...");
-  const user = await prisma.user.create({
+  // Self-service creation — no authenticated actor, so actor_id is null.
+  const user = await auditedPrisma(null).user.create({
     data: {
       full_name,
       email,
@@ -61,7 +56,6 @@ export async function POST(req: NextRequest) {
     },
     select: { id: true, full_name: true, email: true, role: true },
   });
-  console.log("User created in DB", user.id);
 
   // Send verification email (non-blocking)
   sendVerificationEmail(user.id, user.email, user.full_name).catch(console.error);

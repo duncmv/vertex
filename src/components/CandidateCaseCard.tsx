@@ -8,7 +8,11 @@ interface CandidateCase {
   id: string;
   current_stage: CaseStageKey;
   contract: { status: string; content: string; signed_by_name: string | null; signed_at: string | null } | null;
-  application: { job: { title: string; country: string; city: string } };
+  application: {
+    job: { title: string; country: string; city: string } | null;
+    preferred_country_1: { name: string } | null;
+    preferred_sector: { name: string } | null;
+  };
 }
 
 /**
@@ -59,7 +63,11 @@ export default function CandidateCaseCard() {
       <div className="space-y-6">
         {cases.map((c) => (
           <div key={c.id}>
-            <p className="text-sm text-midnight-900/50 mb-3">{c.application.job.title} · {c.application.job.city}, {c.application.job.country}</p>
+            <p className="text-sm text-midnight-900/50 mb-3">
+              {c.application.job
+                ? <>{c.application.job.title} · {c.application.job.city}, {c.application.job.country}</>
+                : <>{c.application.preferred_sector?.name ?? "General Programme"}{c.application.preferred_country_1 && <> · {c.application.preferred_country_1.name}</>}</>}
+            </p>
             <CaseStageProgress stage={c.current_stage} />
 
             {c.contract && (

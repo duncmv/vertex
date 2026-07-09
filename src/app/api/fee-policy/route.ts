@@ -2,10 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { auditedPrisma } from "@/lib/audit";
 import { updateFeePolicySchema } from "@/lib/validations";
-import { getAuthUser, requireAdmin, requireRole } from "@/lib/api-auth";
+import { getAuthUser, requireRole } from "@/lib/api-auth";
+
+const FEE_POLICY_MANAGER_ROLES = ["inhouse_supervisor", "director", "admin"] as const;
 
 // GET /api/fee-policy — readable by any staff role (a recruiter recording
-// a payment needs to know whether it's enabled), editable by admin only.
+// a payment needs to know whether it's enabled), editable by In-House
+// Supervisor/Director (admin retains override) — "sets policy & criteria"
+// is In-House's mandate (Regional Supervisory Operational Workflow p.3).
 export async function GET(req: NextRequest) {
   const user = await getAuthUser(req);
   const guardRes = requireRole(user, ["regional_recruiter", "country_supervisor", "inhouse_supervisor", "director", "admin"]);
@@ -15,12 +19,12 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ data: policies });
 }
 
-// POST /api/fee-policy — SRS FR-4.5: admin-configurable milestone-payment
-// policy, defaults disabled. Upserts by country_id (null = global default)
-// rather than creating duplicate rows on every save.
+// POST /api/fee-policy — SRS FR-4.5: milestone-payment policy, defaults
+// disabled. Upserts by country_id (null = global default) rather than
+// creating duplicate rows on every save.
 export async function POST(req: NextRequest) {
   const user = await getAuthUser(req);
-  const guardRes = requireAdmin(user);
+  const guardRes = requireRole(user, [...FEE_POLICY_MANAGER_ROLES]);
   if (guardRes) return guardRes;
 
   let body: unknown;
@@ -38,8 +42,9 @@ export async function POST(req: NextRequest) {
   const data = {
     country_id: countryId,
     enabled: parsed.data.enabled,
-    initial_amount: parsed.data.initial_amount ?? null,
-    final_amount: parsed.data.final_amount ?? null,
+    documentation_amount: parsed.data.documentation_amount ?? null,
+    permit_amount: parsed.data.permit_amount ?? null,
+    visa_amount: parsed.data.visa_amount ?? null,
     currency: parsed.data.currency,
     updated_by: user!.userId,
   };

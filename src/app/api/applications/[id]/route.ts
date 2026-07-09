@@ -2,14 +2,18 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { auditedPrisma } from "@/lib/audit";
 import { updateApplicationStatusSchema } from "@/lib/validations";
-import { getAuthUser, requireAdmin } from "@/lib/api-auth";
-import { createCaseForApprovedApplication } from "@/server/services/caseLifecycle";
+import { getAuthUser, requireRole } from "@/lib/api-auth";
 
-// PUT /api/applications/[id] — admin updates status
+// "Approved by In-House" is the framework's controlling position for this
+// decision (Regional Supervisory Operational Workflow p.5) — admin
+// retains override access, not primary ownership.
+const APPLICATION_REVIEWER_ROLES = ["inhouse_supervisor", "director", "admin"] as const;
+
+// PUT /api/applications/[id] — In-House Supervisor/Director updates status
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const user = await getAuthUser(req);
-  const guardRes = requireAdmin(user);
+  const guardRes = requireRole(user, [...APPLICATION_REVIEWER_ROLES]);
   if (guardRes) return guardRes;
 
   let body: unknown;
@@ -25,31 +29,37 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     data: { application_status: parsed.data.application_status },
     include: {
       candidate: { include: { user: true } },
-      job: true
+      job: true,
+      preferred_sector: true,
     }
   });
 
-  // A Case is the start of the Phase 4 mobility lifecycle (SRS FR-4.1/4.2).
-  if (parsed.data.application_status === "approved") {
-    await createCaseForApprovedApplication(id, user!.userId);
-  }
+  // This legacy hiring-status field is distinct from the candidate's own
+  // lifecycle_status — Case creation (SRS FR-4.1/4.2) is now triggered by
+  // Candidate.lifecycle_status reaching "approved" (see
+  // /api/candidates/[id]/status), the real framework-defined trigger
+  // ("Approved by In-House"), not this field.
 
-  try {
-    const { sendStatusUpdateEmail } = await import("@/lib/email");
-    await sendStatusUpdateEmail(
-      application.candidate.user.email,
-      application.candidate.user.full_name,
-      application.job.title,
-      parsed.data.application_status
-    );
-  } catch (err) {
-    console.error("Failed to send status update email.", err);
+  // A recruiter-sourced candidate with no linked account yet has no email
+  // to send to (SRS FR-2.1) — skip rather than crash.
+  if (application.candidate.user) {
+    try {
+      const { sendStatusUpdateEmail } = await import("@/lib/email");
+      await sendStatusUpdateEmail(
+        application.candidate.user.email,
+        application.candidate.user.full_name,
+        application.job?.title ?? application.preferred_sector?.name ?? "your Vertex programme",
+        parsed.data.application_status
+      );
+    } catch (err) {
+      console.error("Failed to send status update email.", err);
+    }
   }
 
   return NextResponse.json(application);
 }
 
-// GET /api/applications/[id] — admin or owner
+// GET /api/applications/[id] — In-House/Director/admin, or the owning candidate
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const user = await getAuthUser(req);
@@ -65,7 +75,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
   if (!application) return NextResponse.json({ error: "Application not found." }, { status: 404 });
 
-  if (user.role !== "admin" && application.candidate.user_id !== user.userId) {
+  const isReviewer = (APPLICATION_REVIEWER_ROLES as readonly string[]).includes(user.role);
+  if (!isReviewer && application.candidate.user_id !== user.userId) {
     return NextResponse.json({ error: "Forbidden." }, { status: 403 });
   }
 

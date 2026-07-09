@@ -35,6 +35,13 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       user_id: true,
       recruiter_id: true,
       country_id: true,
+      second_nationality: true,
+      passport_expiry: true,
+      current_occupation: true,
+      highest_education: true,
+      home_address: true,
+      whatsapp_number: true,
+      marital_status: true,
       user: { select: { full_name: true, email: true, phone: true } },
       recruiter: { select: { id: true, full_name: true } },
       country: { select: { id: true, name: true } },
@@ -91,13 +98,14 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     return NextResponse.json({ error: { code: "forbidden", message: "Forbidden." } }, { status: 403 });
   }
 
-  const { date_of_birth, consent_given, ...rest } = parsed.data;
+  const { date_of_birth, passport_expiry, consent_given, ...rest } = parsed.data;
 
   const updated = await auditedPrisma(user!.userId).candidate.update({
     where: { id },
     data: {
       ...rest,
       ...(date_of_birth ? { date_of_birth: new Date(date_of_birth) } : {}),
+      ...(passport_expiry ? { passport_expiry: new Date(passport_expiry) } : {}),
       ...(consent_given !== undefined
         ? { consent_given, consent_at: consent_given ? new Date() : null }
         : {}),
@@ -113,6 +121,13 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       desired_role: true,
       consent_given: true,
       consent_at: true,
+      second_nationality: true,
+      passport_expiry: true,
+      current_occupation: true,
+      highest_education: true,
+      home_address: true,
+      whatsapp_number: true,
+      marital_status: true,
     },
   });
 

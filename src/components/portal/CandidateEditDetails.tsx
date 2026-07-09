@@ -8,6 +8,13 @@ interface CandidateEditableDetails {
   passport_number: string | null;
   email: string | null;
   desired_role: string | null;
+  second_nationality?: string | null;
+  passport_expiry?: string | null;
+  current_occupation?: string | null;
+  highest_education?: string | null;
+  home_address?: string | null;
+  whatsapp_number?: string | null;
+  marital_status?: string | null;
 }
 
 interface Props {
@@ -16,7 +23,12 @@ interface Props {
   onSaved: (data: CandidateEditableDetails) => void;
 }
 
-/** Fills in the rest of a lead's profile progressively (SRS FR-2.5, FR-2.8) — a recruiter's first contact may not have every field. */
+/**
+ * Fills in the rest of a lead's profile progressively (SRS FR-2.5, FR-2.8) —
+ * a recruiter's first contact may not have every field. Covers Section 2 of
+ * the Candidate Information Form for a lead with no account of their own to
+ * complete it from their own dashboard.
+ */
 export default function CandidateEditDetails({ candidateId, initial, onSaved }: Props) {
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -26,6 +38,13 @@ export default function CandidateEditDetails({ candidateId, initial, onSaved }: 
     passport_number: initial.passport_number ?? "",
     email: initial.email ?? "",
     desired_role: initial.desired_role ?? "",
+    second_nationality: initial.second_nationality ?? "",
+    passport_expiry: initial.passport_expiry ? initial.passport_expiry.slice(0, 10) : "",
+    current_occupation: initial.current_occupation ?? "",
+    highest_education: initial.highest_education ?? "",
+    home_address: initial.home_address ?? "",
+    whatsapp_number: initial.whatsapp_number ?? "",
+    marital_status: initial.marital_status ?? "",
   });
 
   const submit = async (e: React.FormEvent) => {
@@ -85,6 +104,49 @@ export default function CandidateEditDetails({ candidateId, initial, onSaved }: 
         placeholder="Desired role"
         value={form.desired_role}
         onChange={(e) => setForm({ ...form, desired_role: e.target.value })}
+        className="input-field py-1.5 text-xs w-full"
+      />
+      <input
+        placeholder="Second nationality (if any)"
+        value={form.second_nationality}
+        onChange={(e) => setForm({ ...form, second_nationality: e.target.value })}
+        className="input-field py-1.5 text-xs w-full"
+      />
+      <label className="block text-[10px] text-midnight-900/40 -mb-1">Passport expiry (min. 6 months validity)</label>
+      <input
+        type="date"
+        value={form.passport_expiry}
+        onChange={(e) => setForm({ ...form, passport_expiry: e.target.value })}
+        className="input-field py-1.5 text-xs w-full"
+      />
+      <input
+        placeholder="Current occupation"
+        value={form.current_occupation}
+        onChange={(e) => setForm({ ...form, current_occupation: e.target.value })}
+        className="input-field py-1.5 text-xs w-full"
+      />
+      <input
+        placeholder="Highest education / qualification"
+        value={form.highest_education}
+        onChange={(e) => setForm({ ...form, highest_education: e.target.value })}
+        className="input-field py-1.5 text-xs w-full"
+      />
+      <input
+        placeholder="Complete home address"
+        value={form.home_address}
+        onChange={(e) => setForm({ ...form, home_address: e.target.value })}
+        className="input-field py-1.5 text-xs w-full"
+      />
+      <input
+        placeholder="WhatsApp number"
+        value={form.whatsapp_number}
+        onChange={(e) => setForm({ ...form, whatsapp_number: e.target.value })}
+        className="input-field py-1.5 text-xs w-full"
+      />
+      <input
+        placeholder="Marital status"
+        value={form.marital_status}
+        onChange={(e) => setForm({ ...form, marital_status: e.target.value })}
         className="input-field py-1.5 text-xs w-full"
       />
       <div className="flex gap-2">

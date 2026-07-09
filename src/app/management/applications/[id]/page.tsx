@@ -3,7 +3,7 @@
 import { useState, useEffect, use } from "react";
 import Link from "next/link";
 import PortalShell from "@/components/portal/PortalShell";
-import { ADMIN_NAV_ITEMS } from "@/components/portal/adminNav";
+import { MANAGEMENT_NAV_ITEMS } from "@/components/portal/managementNav";
 import DocumentLink from "@/components/DocumentLink";
 import DocumentVerifyControls from "@/components/DocumentVerifyControls";
 
@@ -72,7 +72,7 @@ export default function ApplicationDetailedPage({ params }: { params: Promise<{ 
   };
 
   return (
-    <PortalShell roleLabel="System Administrator" navItems={ADMIN_NAV_ITEMS}>
+    <PortalShell roleLabel="Management" navItems={MANAGEMENT_NAV_ITEMS}>
       {loading ? (
         <p className="text-midnight-900/50">Loading application…</p>
       ) : error || !appData ? (
@@ -86,9 +86,12 @@ export default function ApplicationDetailedPage({ params }: { params: Promise<{ 
                 Recruitment
               </p>
               <h1 className="section-title text-3xl md:text-4xl">Application Overview.</h1>
-              <p className="text-sm text-midnight-900/50 mt-2">For {appData.job.title}</p>
+              <p className="text-sm text-midnight-900/50 mt-2">
+                For {appData.job?.title ?? appData.preferred_sector?.name ?? "General Programme"}
+                {!appData.job && appData.preferred_country_1 && ` — ${appData.preferred_country_1.name}`}
+              </p>
             </div>
-            <Link href="/admin/applications" className="text-sm font-medium text-midnight-900/50 hover:text-gold-600">
+            <Link href="/management/applications" className="text-sm font-medium text-midnight-900/50 hover:text-gold-600">
               ← Back to Applications
             </Link>
           </div>

@@ -22,6 +22,14 @@ interface Props {
   status: Status;
   /** Whether this viewer's role can act as a supervisor (verify/return) rather than just advance forward. */
   canVerify: boolean;
+  /**
+   * Whether this viewer can push a candidate all the way to "approved" —
+   * In-House Supervisor/Director/admin only (Regional Supervisory
+   * Operational Workflow p.5: "Approved by In-House" is a distinct,
+   * higher-tier stage from Country Supervisor's "Verified" ceiling).
+   * Ignored unless canVerify is also true.
+   */
+  canApprove?: boolean;
   onChanged: (next: { lifecycle_status: string; return_reason: string | null }) => void;
 }
 
@@ -31,7 +39,7 @@ interface Props {
  * boundary — this only avoids showing obviously-wrong actions for the
  * viewer's portal context.
  */
-export default function CandidateStatusControls({ candidateId, status, canVerify, onChanged }: Props) {
+export default function CandidateStatusControls({ candidateId, status, canVerify, canApprove = false, onChanged }: Props) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string[] | string | null>(null);
   const [showReturnForm, setShowReturnForm] = useState(false);
@@ -40,7 +48,11 @@ export default function CandidateStatusControls({ candidateId, status, canVerify
 
   const currentIdx = STATUS_ORDER.indexOf(status);
   const nextStatus = STATUS_ORDER[currentIdx + 1] as Status | undefined;
-  const earlierStatuses = STATUS_ORDER.slice(0, currentIdx);
+  // A Country Supervisor's reach stops at "Verified" — they can neither
+  // advance a candidate into "approved" nor touch one that's already
+  // there (no un-approving either); only In-House/admin can.
+  const atOrPastApproval = status === "approved";
+  const earlierStatuses = canVerify && !canApprove && atOrPastApproval ? [] : STATUS_ORDER.slice(0, currentIdx);
   const reportedIdx = STATUS_ORDER.indexOf("reported");
   // A recruiter's own actions stop at "reported" — the hand-off point to
   // their supervisor (SRS FR-2.1). A supervisor's forward action only
@@ -50,7 +62,8 @@ export default function CandidateStatusControls({ candidateId, status, canVerify
   // "submitted" is a special case: it's not a manual recruiter action at
   // all anymore — only a real Application record can set it.
   const recruiterCanAdvance = !canVerify && currentIdx < reportedIdx && status !== "guided_to_apply";
-  const supervisorCanAdvance = canVerify && currentIdx >= reportedIdx;
+  const supervisorCanAdvance =
+    canVerify && currentIdx >= reportedIdx && !atOrPastApproval && (canApprove || nextStatus !== "approved");
 
   const submit = async (lifecycle_status: string, return_reason?: string) => {
     setSaving(true);
@@ -110,7 +123,11 @@ export default function CandidateStatusControls({ candidateId, status, canVerify
         )}
 
         {canVerify && nextStatus && !supervisorCanAdvance && (
-          <span className="text-xs text-midnight-900/40 italic">Awaiting recruiter to report</span>
+          <span className="text-xs text-midnight-900/40 italic">
+            {!canApprove && (status === "verified" || atOrPastApproval)
+              ? "Awaiting In-House approval"
+              : "Awaiting recruiter to report"}
+          </span>
         )}
 
         {canVerify && earlierStatuses.length > 0 && (

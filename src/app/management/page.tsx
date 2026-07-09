@@ -115,12 +115,12 @@ export default function ManagementPortalPage() {
       )}
 
       <div className="flex items-center justify-between mt-10 mb-3">
-        <h2 className="text-sm font-semibold text-midnight-900/50 uppercase tracking-wider">All candidates (table view)</h2>
+        <h2 className="text-sm font-semibold text-midnight-900/50 uppercase tracking-wider">All candidates — approve or return</h2>
         <a href="/api/candidates/export" download className="inline-flex items-center gap-1.5 text-xs font-semibold text-gold-600 hover:underline">
           <DownloadSimple size={14} weight="bold" /> Export CSV
         </a>
       </div>
-      <CandidateList emptyLabel="No candidates in the system yet." showStatusControls={false} />
+      <CandidateList emptyLabel="No candidates in the system yet." canVerify canApprove />
     </PortalShell>
   );
 }

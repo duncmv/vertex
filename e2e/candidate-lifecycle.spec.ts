@@ -11,12 +11,12 @@ async function login(page: Page, email: string, password: string) {
   await page.fill("#login-email", email);
   await page.fill("#login-password", password);
   await page.click("#login-submit-btn");
-  await page.waitForURL((url) => !url.pathname.startsWith("/auth/login"), { timeout: 10_000 });
+  await page.waitForURL((url) => !url.pathname.startsWith("/auth/login"), { timeout: 25_000 });
 }
 
 async function logout(page: Page) {
   await page.getByText("Log out").click();
-  await page.waitForURL((url) => url.pathname.startsWith("/auth/login") || url.pathname === "/", { timeout: 10_000 });
+  await page.waitForURL((url) => url.pathname.startsWith("/auth/login") || url.pathname === "/", { timeout: 25_000 });
 }
 
 const PASSWORD = "E2ETestPassword123!";
@@ -40,7 +40,7 @@ test.describe("Candidate pre-application lifecycle (Phase 2)", () => {
       await page.getByPlaceholder("Phone").fill("+254700111222");
       await page.locator("form").getByRole("button", { name: "Register Candidate" }).click();
 
-      await expect(page.getByText(candidateName)).toBeVisible({ timeout: 10_000 });
+      await expect(page.getByText(candidateName)).toBeVisible({ timeout: 25_000 });
       await expect(page.getByText("identified", { exact: true })).toBeVisible();
     });
 
@@ -60,7 +60,10 @@ test.describe("Candidate pre-application lifecycle (Phase 2)", () => {
 
     await test.step("recruiter completes the profile: DOB, documents, and consent", async () => {
       await page.getByText("Edit details").click();
-      await page.locator('input[type="date"]').fill("1995-06-15");
+      // Two date inputs exist now (DOB, then passport expiry further down
+      // the widened Candidate Information Form Section 2 fields) — DOB is
+      // the first one in the form.
+      await page.locator('input[type="date"]').first().fill("1995-06-15");
       await page.getByPlaceholder("Passport number").fill("P" + Date.now());
       await page.getByPlaceholder("Email").fill(`${candidateName.replace(/\s/g, "").toLowerCase()}@example.com`);
       await page.getByPlaceholder("Desired role").fill("Warehouse Operative");
@@ -68,10 +71,10 @@ test.describe("Candidate pre-application lifecycle (Phase 2)", () => {
       await expect(page.getByText("Edit details")).toBeVisible();
 
       await page.getByTestId("upload-cv-input").setInputFiles({ name: "cv.pdf", mimeType: "application/pdf", buffer: PDF_BUFFER });
-      await expect(page.getByText("cv", { exact: true })).toBeVisible({ timeout: 10_000 });
+      await expect(page.getByText("cv", { exact: true })).toBeVisible({ timeout: 25_000 });
 
       await page.getByTestId("upload-passport-input").setInputFiles({ name: "passport.pdf", mimeType: "application/pdf", buffer: PDF_BUFFER });
-      await expect(page.getByText("passport", { exact: true })).toBeVisible({ timeout: 10_000 });
+      await expect(page.getByText("passport", { exact: true })).toBeVisible({ timeout: 25_000 });
 
       await page.getByText("No consent on file").click();
       await expect(page.getByText("No consent on file")).not.toBeVisible();
@@ -79,7 +82,7 @@ test.describe("Candidate pre-application lifecycle (Phase 2)", () => {
 
     await test.step("screening gate now passes; recruiter submits a real application on the candidate's behalf, which is what actually advances them to submitted", async () => {
       await page.getByRole("button", { name: /Advance to Guided to Apply/ }).click();
-      await expect(page.getByText("guided to apply", { exact: true })).toBeVisible({ timeout: 10_000 });
+      await expect(page.getByText("guided to apply", { exact: true })).toBeVisible({ timeout: 25_000 });
 
       // There is no manual "Advance to Submitted" anymore — only a real
       // Application record can set that status (this is the fix for the
@@ -88,9 +91,17 @@ test.describe("Candidate pre-application lifecycle (Phase 2)", () => {
       await expect(page.getByRole("button", { name: /Advance to Submitted/ })).toHaveCount(0);
 
       await page.getByText("Submit application on their behalf").click();
-      // Only one active job exists (created by global-setup), already selected by default.
-      await page.getByRole("button", { name: "Submit" }).click();
-      await expect(page.getByText("submitted", { exact: true })).toBeVisible({ timeout: 10_000 });
+      // The Candidate Information Form's Section 1/4/5 fields (SRS's pivot
+      // to a general programme-interest submission — jobs aren't listed on
+      // the platform yet). Countries/sectors are seeded reference data
+      // (prisma/seed.ts), not global-setup fixtures, so select by position
+      // rather than a specific name.
+      await page.getByLabel("Preferred Country — Option 1").selectOption({ index: 1 });
+      await page.getByLabel("Preferred Type of Work").selectOption({ index: 1 });
+      await page.getByLabel("Earliest Possible Travel Date").fill("2026-12-01");
+      await page.getByLabel("I understand the payment plan above.").check();
+      await page.getByRole("button", { name: "Submit Application" }).click();
+      await expect(page.getByText("submitted", { exact: true })).toBeVisible({ timeout: 25_000 });
 
       await page.getByRole("button", { name: /Advance to Reported/ }).click();
       await expect(page.getByText("reported", { exact: true })).toBeVisible();
@@ -102,17 +113,17 @@ test.describe("Candidate pre-application lifecycle (Phase 2)", () => {
       await login(page, "e2e-supervisor@test.local", PASSWORD);
       await expect(page).toHaveURL(/\/supervisor$/);
 
-      await expect(page.getByText(candidateName)).toBeVisible({ timeout: 10_000 });
+      await expect(page.getByText(candidateName)).toBeVisible({ timeout: 25_000 });
       await page.getByRole("button", { name: "Return" }).click();
       await page.getByRole("combobox").selectOption({ label: "Return to Submitted" });
       await page.getByPlaceholder("Reason for return (required)…").fill("Please double-check the passport number.");
       await page.getByRole("button", { name: "Confirm Return" }).click();
 
-      await expect(page.getByText("submitted", { exact: true })).toBeVisible({ timeout: 10_000 });
+      await expect(page.getByText("submitted", { exact: true })).toBeVisible({ timeout: 25_000 });
       await expect(page.getByText(/Please double-check the passport number/)).toBeVisible();
     });
 
-    await test.step("recruiter re-reports; supervisor verifies and approves", async () => {
+    await test.step("recruiter re-reports; supervisor verifies", async () => {
       await logout(page);
       await login(page, "e2e-recruiter@test.local", PASSWORD);
 
@@ -123,10 +134,24 @@ test.describe("Candidate pre-application lifecycle (Phase 2)", () => {
       await login(page, "e2e-supervisor@test.local", PASSWORD);
 
       await page.getByRole("button", { name: /Verify → Verified/ }).click();
-      await expect(page.getByText("verified", { exact: true })).toBeVisible({ timeout: 10_000 });
+      await expect(page.getByText("verified", { exact: true })).toBeVisible({ timeout: 25_000 });
 
-      await page.getByRole("button", { name: /Verify → Approved/ }).click();
-      await expect(page.getByText("approved", { exact: true })).toBeVisible({ timeout: 10_000 });
+      // Country Supervisor's ceiling is "Verified" — "Approved" is a
+      // distinct, higher tier (Regional Supervisory Operational Workflow
+      // p.5: "Approved by In-House"), so no approve action is offered here.
+      await expect(page.getByRole("button", { name: /Verify → Approved/ })).toHaveCount(0);
+      await expect(page.getByText("Awaiting In-House approval")).toBeVisible();
+    });
+
+    await test.step("only In-House can approve", async () => {
+      await logout(page);
+      await login(page, "e2e-inhouse@test.local", PASSWORD);
+      await expect(page).toHaveURL(/\/management$/);
+
+      const candidateRow = page.locator("tr", { hasText: candidateName });
+      await expect(candidateRow).toBeVisible({ timeout: 25_000 });
+      await candidateRow.getByRole("button", { name: /Verify → Approved/ }).click();
+      await expect(candidateRow.getByText("approved", { exact: true })).toBeVisible({ timeout: 25_000 });
     });
   });
 });

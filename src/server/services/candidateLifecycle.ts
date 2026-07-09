@@ -26,7 +26,11 @@ export const STATUS_ORDER: LifecycleStatus[] = [
 const RECRUITER_MAX_STATUS: LifecycleStatus = "reported";
 const SUPERVISOR_MIN_STATUS: LifecycleStatus = "reported";
 
-const SUPERVISOR_ROLES: Role[] = ["country_supervisor", "inhouse_supervisor", "director"];
+// Country Supervisor's ceiling is "Verified" (Candidate Status Lifecycle
+// stage 6, Regional Supervisory Operational Workflow p.5) — "Approved"
+// (stage 7) is explicitly In-House Supervisor's controlling position
+// ("Approved by In-House"), not a country-tier action.
+const IN_HOUSE_ROLES: Role[] = ["inhouse_supervisor", "director"];
 
 export interface TransitionCheck {
   allowed: boolean;
@@ -70,7 +74,17 @@ export function canSetLifecycleStatus(role: Role, from: LifecycleStatus, to: Lif
     return { allowed: true, isReturn };
   }
 
-  if (SUPERVISOR_ROLES.includes(role)) {
+  if (IN_HOUSE_ROLES.includes(role)) {
+    if (!isReturn && fromIdx < STATUS_ORDER.indexOf(SUPERVISOR_MIN_STATUS)) {
+      return { allowed: false, reason: "A candidate must be reported by a recruiter before a supervisor can act on it.", isReturn };
+    }
+    return { allowed: true, isReturn };
+  }
+
+  if (role === "country_supervisor") {
+    if (from === "approved" || to === "approved") {
+      return { allowed: false, reason: "Only In-House can approve a candidate, or reverse an approval.", isReturn };
+    }
     if (!isReturn && fromIdx < STATUS_ORDER.indexOf(SUPERVISOR_MIN_STATUS)) {
       return { allowed: false, reason: "A candidate must be reported by a recruiter before a supervisor can act on it.", isReturn };
     }

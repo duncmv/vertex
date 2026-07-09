@@ -26,6 +26,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
             },
           },
           job: true,
+          preferred_country_1: { select: { name: true } },
+          preferred_sector: { select: { name: true } },
         },
       },
       stage_events: { include: { owner: { select: { full_name: true } } }, orderBy: { entered_at: "asc" } },

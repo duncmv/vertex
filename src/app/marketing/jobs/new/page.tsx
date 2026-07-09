@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import PortalShell from "@/components/portal/PortalShell";
-import { ADMIN_NAV_ITEMS } from "@/components/portal/adminNav";
+import { MARKETING_NAV_ITEMS } from "@/components/portal/marketingNav";
 
 export default function CreateJobPage() {
   const router = useRouter();
@@ -39,7 +39,7 @@ export default function CreateJobPage() {
       });
 
       if (res.ok) {
-        router.push("/admin/jobs");
+        router.push("/marketing/jobs");
       } else {
         const data = await res.json();
         setError(data.error || "Failed to create job.");
@@ -56,7 +56,7 @@ export default function CreateJobPage() {
   };
 
   return (
-    <PortalShell roleLabel="System Administrator" navItems={ADMIN_NAV_ITEMS}>
+    <PortalShell roleLabel="Marketing" navItems={MARKETING_NAV_ITEMS}>
       <div className="flex items-center justify-between mb-8">
         <div>
           <p className="eyebrow mb-3">
@@ -65,7 +65,7 @@ export default function CreateJobPage() {
           </p>
           <h1 className="section-title text-3xl md:text-4xl">Post New Job.</h1>
         </div>
-        <Link href="/admin/jobs" className="text-sm font-medium text-midnight-900/50 hover:text-gold-600">
+        <Link href="/marketing/jobs" className="text-sm font-medium text-midnight-900/50 hover:text-gold-600">
           ← Back to Jobs
         </Link>
       </div>
@@ -116,7 +116,7 @@ export default function CreateJobPage() {
             </div>
 
             <div className="col-span-1 md:col-span-2 border-t border-midnight-900/10 pt-6 mt-2 flex justify-end gap-4">
-              <Link href="/admin/jobs" className="btn-secondary py-2.5 px-6">Cancel</Link>
+              <Link href="/marketing/jobs" className="btn-secondary py-2.5 px-6">Cancel</Link>
               <button type="submit" disabled={loading} className="btn-primary py-2.5 px-8 disabled:opacity-70">
                 {loading ? "Posting..." : "Post Job"}
               </button>

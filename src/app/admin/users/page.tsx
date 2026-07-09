@@ -11,6 +11,7 @@ const ROLES = [
   { value: "country_supervisor", label: "Country Supervisor" },
   { value: "inhouse_supervisor", label: "In-House Supervisor" },
   { value: "director", label: "Director" },
+  { value: "marketing", label: "Marketing" },
   { value: "admin", label: "System Administrator" },
 ];
 

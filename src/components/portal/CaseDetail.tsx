@@ -57,11 +57,22 @@ interface CaseData {
       recruiter: { full_name: string } | null;
       documents: Document[];
     };
-    job: { title: string; country: string; city: string };
+    job: { title: string; country: string; city: string } | null;
+    preferred_country_1: { name: string } | null;
+    preferred_sector: { name: string } | null;
   };
 }
 
-const DOC_TYPES = ["transcript", "certificate", "medical", "police_clearance", "contract", "visa"];
+// Beyond the screening-gate's cv/passport (handled separately, earlier in
+// the pipeline): the general mobility-lifecycle set plus the Candidate
+// Information Form's Section 3 per-programme extras (all_passport_pages,
+// national_id, etc.) — which extras actually apply is configured per
+// country under Admin → Sectors & Requirements.
+const DOC_TYPES = [
+  "transcript", "certificate", "medical", "police_clearance", "contract", "visa",
+  "all_passport_pages", "passport_photo", "national_id", "cv_europass", "education_diploma",
+  "driving_licence", "tachograph_card", "professional_training_certificate", "e_apostille", "zab_recognition_letter",
+];
 
 export default function CaseDetail({ caseId }: { caseId: string }) {
   const [data, setData] = useState<CaseData | null>(null);
@@ -76,7 +87,7 @@ export default function CaseDetail({ caseId }: { caseId: string }) {
   const [contractContent, setContractContent] = useState("");
   const [signName, setSignName] = useState("");
 
-  const [payType, setPayType] = useState<"initial" | "final">("initial");
+  const [payType, setPayType] = useState<"documentation" | "permit" | "visa">("documentation");
   const [payAmount, setPayAmount] = useState("");
   const [payReceipt, setPayReceipt] = useState("");
 
@@ -178,7 +189,9 @@ export default function CaseDetail({ caseId }: { caseId: string }) {
           <div>
             <h2 className="text-xl font-semibold text-midnight-900">{candidateName}</h2>
             <p className="text-sm text-midnight-900/50">
-              {data.application.job.title} · {data.application.job.city}, {data.application.job.country}
+              {data.application.job
+                ? <>{data.application.job.title} · {data.application.job.city}, {data.application.job.country}</>
+                : <>{data.application.preferred_sector?.name ?? "General Programme"}{data.application.preferred_country_1 && <> · {data.application.preferred_country_1.name}</>}</>}
               {data.application.candidate.recruiter && <> · {data.application.candidate.recruiter.full_name}</>}
             </p>
           </div>
@@ -253,7 +266,7 @@ export default function CaseDetail({ caseId }: { caseId: string }) {
               onChange={(e) => setContractContent(e.target.value)}
               rows={5}
               className="input-field text-sm resize-none"
-              placeholder={`Offer of employment for ${data.application.job.title}...`}
+              placeholder={`Offer of employment for ${data.application.job?.title ?? data.application.preferred_sector?.name ?? "the candidate's programme"}...`}
             />
             <button onClick={generateContract} disabled={!contractContent.trim()} className="btn-primary text-xs disabled:opacity-40">Issue Contract</button>
           </div>
@@ -263,7 +276,7 @@ export default function CaseDetail({ caseId }: { caseId: string }) {
       <div className="card p-6">
         <h3 className="text-sm font-semibold text-midnight-900/70 uppercase tracking-wider mb-4">Milestone Payments (SRS FR-4.5)</h3>
         {!feeEnabled ? (
-          <p className="text-xs text-midnight-900/45">Milestone payments are not enabled for this destination. An admin can enable this under Fee Policy.</p>
+          <p className="text-xs text-midnight-900/45">Milestone payments are not enabled for this destination. In-House can enable this under Fee Policy.</p>
         ) : (
           <>
             <div className="space-y-2 mb-4">
@@ -276,9 +289,10 @@ export default function CaseDetail({ caseId }: { caseId: string }) {
               ))}
             </div>
             <div className="flex items-center gap-2 pt-3 border-t border-midnight-900/10">
-              <select value={payType} onChange={(e) => setPayType(e.target.value as "initial" | "final")} className="input-field text-sm w-auto">
-                <option value="initial">Initial</option>
-                <option value="final">Final</option>
+              <select value={payType} onChange={(e) => setPayType(e.target.value as "documentation" | "permit" | "visa")} className="input-field text-sm w-auto">
+                <option value="documentation">Documentation (Stage 1 · 20%)</option>
+                <option value="permit">Work Permit (Stage 2 · 40%)</option>
+                <option value="visa">Visa (Stage 3 · 40%)</option>
               </select>
               <input type="number" min="0" value={payAmount} onChange={(e) => setPayAmount(e.target.value)} className="input-field text-sm w-28" placeholder="Amount" />
               <input value={payReceipt} onChange={(e) => setPayReceipt(e.target.value)} className="input-field text-sm" placeholder="Receipt reference" />

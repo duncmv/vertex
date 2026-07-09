@@ -27,25 +27,30 @@ export async function GET(req: NextRequest) {
       nationality: true,
       desired_role: true,
       lifecycle_status: true,
+      screening_result: true,
       phone: true,
       email: true,
       created_at: true,
       user: { select: { full_name: true, email: true } },
       recruiter: { select: { full_name: true } },
-      country: { select: { name: true } },
+      country: { select: { name: true, region: { select: { name: true } } } },
     },
     orderBy: { created_at: "desc" },
   });
 
-  // Standard candidate-list data (SRS FR-2.8): name, region/country, role, contact, screening result (status), date.
-  const header = ["Name", "Nationality", "Country", "Recruiter", "Desired Role", "Contact", "Status", "Date"];
+  // Standard candidate-list data (Regional Supervisory Operational
+  // Workflow p.7): name, region, role, contact, screening result, status,
+  // date — screening result and status are two distinct fields, not one.
+  const header = ["Name", "Nationality", "Region", "Country", "Recruiter", "Desired Role", "Contact", "Screening Result", "Status", "Date"];
   const rows = candidates.map((c: (typeof candidates)[number]) => [
     c.user?.full_name ?? c.full_name ?? "",
     c.nationality ?? "",
+    c.country?.region.name ?? "",
     c.country?.name ?? "",
     c.recruiter?.full_name ?? "",
     c.desired_role ?? "",
     c.user?.email ?? c.email ?? c.phone ?? "",
+    c.screening_result === null ? "Not yet evaluated" : c.screening_result ? "Passed" : "Failed",
     c.lifecycle_status,
     c.created_at.toISOString().slice(0, 10),
   ]);

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { verifyToken } from "@/lib/jwt";
 import { canAccessPortal, homeFor } from "@/lib/rbac";
 
-const PROTECTED_PATHS = ["/dashboard", "/admin", "/recruiter", "/supervisor", "/management"];
+const PROTECTED_PATHS = ["/dashboard", "/admin", "/recruiter", "/supervisor", "/management", "/marketing"];
 
 export function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
@@ -34,5 +34,5 @@ export function proxy(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/dashboard/:path*", "/admin/:path*", "/recruiter/:path*", "/supervisor/:path*", "/management/:path*"],
+  matcher: ["/dashboard/:path*", "/admin/:path*", "/recruiter/:path*", "/supervisor/:path*", "/management/:path*", "/marketing/:path*"],
 };

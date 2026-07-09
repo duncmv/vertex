@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { createJobSchema } from "@/lib/validations";
-import { getAuthUser, requireAdmin } from "@/lib/api-auth";
+import { getAuthUser, requireRole } from "@/lib/api-auth";
 export const dynamic = "force-dynamic";
+
+const JOB_MANAGER_ROLES = ["marketing", "admin"] as const;
 
 // GET /api/jobs/[id] — public
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -15,11 +17,11 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   return NextResponse.json(job);
 }
 
-// PUT /api/jobs/[id] — admin only
+// PUT /api/jobs/[id] — Marketing (admin retains override)
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const user = await getAuthUser(req);
-  const guardRes = requireAdmin(user);
+  const guardRes = requireRole(user, [...JOB_MANAGER_ROLES]);
   if (guardRes) return guardRes;
 
   let body: unknown;
@@ -34,11 +36,11 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   return NextResponse.json(job);
 }
 
-// DELETE /api/jobs/[id] — admin only
+// DELETE /api/jobs/[id] — Marketing (admin retains override)
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const user = await getAuthUser(req);
-  const guardRes = requireAdmin(user);
+  const guardRes = requireRole(user, [...JOB_MANAGER_ROLES]);
   if (guardRes) return guardRes;
 
   await prisma.job.delete({ where: { id } });

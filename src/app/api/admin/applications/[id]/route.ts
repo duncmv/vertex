@@ -1,14 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { auditedPrisma } from "@/lib/audit";
-import { getAuthUser, requireAdmin } from "@/lib/api-auth";
+import { getAuthUser, requireRole } from "@/lib/api-auth";
 import { sendStatusUpdateEmail, sendInterviewInvitationEmail } from "@/lib/email";
-import { createCaseForApprovedApplication } from "@/server/services/caseLifecycle";
+
+const APPLICATION_REVIEWER_ROLES = ["inhouse_supervisor", "director", "admin"] as const;
 
 // GET /api/admin/applications/[id]
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const user = await getAuthUser(req);
-  const guardRes = requireAdmin(user);
+  const guardRes = requireRole(user, [...APPLICATION_REVIEWER_ROLES]);
   if (guardRes) return guardRes;
 
   const { id } = await params;
@@ -27,6 +28,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
           }
         },
         job: true,
+        preferred_country_1: { select: { name: true } },
+        preferred_sector: { select: { name: true } },
       }
     });
 
@@ -44,7 +47,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 // PUT /api/admin/applications/[id]
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const user = await getAuthUser(req);
-  const guardRes = requireAdmin(user);
+  const guardRes = requireRole(user, [...APPLICATION_REVIEWER_ROLES]);
   if (guardRes) return guardRes;
 
   const { id } = await params;
@@ -60,7 +63,8 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       where: { id },
       include: {
         candidate: { include: { user: true } },
-        job: true
+        job: true,
+        preferred_sector: true,
       }
     });
 
@@ -76,13 +80,10 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       data: updateData,
     });
 
-    // A Case is the start of the Phase 4 mobility lifecycle (SRS FR-4.1/4.2)
-    // — this is the second of two admin paths that can approve an
-    // application (the other is the list view's inline status dropdown),
-    // so both must open the case, not just one.
-    if (body.application_status === "approved") {
-      await createCaseForApprovedApplication(id, user!.userId);
-    }
+    // This legacy hiring-status field is distinct from the candidate's own
+    // lifecycle_status — Case creation (SRS FR-4.1/4.2) is triggered by
+    // Candidate.lifecycle_status reaching "approved" (see
+    // /api/candidates/[id]/status), not this field.
 
     // A recruiter-sourced candidate with no linked account yet has no
     // email to send to (SRS FR-2.1) — skip rather than crash.
@@ -91,7 +92,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         await sendStatusUpdateEmail(
           existingApp.candidate.user.email,
           existingApp.candidate.user.full_name,
-          existingApp.job.title,
+          existingApp.job?.title ?? existingApp.preferred_sector?.name ?? "your Vertex programme",
           body.application_status
         );
       }
@@ -100,7 +101,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         await sendInterviewInvitationEmail(
           existingApp.candidate.user.email,
           existingApp.candidate.user.full_name,
-          existingApp.job.title,
+          existingApp.job?.title ?? existingApp.preferred_sector?.name ?? "your Vertex programme",
           new Date(body.interview_date)
         );
       }

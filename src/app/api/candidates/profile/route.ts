@@ -41,6 +41,9 @@ export async function PUT(req: NextRequest) {
   if (parsed.data.date_of_birth) {
     data.date_of_birth = new Date(parsed.data.date_of_birth);
   }
+  if (parsed.data.passport_expiry) {
+    data.passport_expiry = new Date(parsed.data.passport_expiry);
+  }
 
   const profile = await auditedPrisma(user!.userId).candidate.update({
     where: { user_id: user!.userId },

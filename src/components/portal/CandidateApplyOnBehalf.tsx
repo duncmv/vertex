@@ -1,13 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
-
-interface Job {
-  id: string;
-  title: string;
-  country: string;
-  city: string;
-}
+import { useState } from "react";
+import { X } from "@phosphor-icons/react";
+import ApplicationForm from "@/components/ApplicationForm";
 
 interface Props {
   candidateId: string;
@@ -15,53 +10,13 @@ interface Props {
 }
 
 /**
- * Lets a recruiter submit a real job application on behalf of a guided-to-
- * apply candidate who has no account of their own yet (SRS FR-2.1). This is
- * what actually advances the candidate to "submitted" — there's no manual
- * status flag anymore, only a genuine Application record.
+ * Lets a recruiter submit a real Candidate Information Form on behalf of a
+ * guided-to-apply candidate who has no account of their own yet (SRS
+ * FR-2.1). This is what actually advances the candidate to "submitted" —
+ * there's no manual status flag anymore, only a genuine Application record.
  */
 export default function CandidateApplyOnBehalf({ candidateId, onSubmitted }: Props) {
   const [open, setOpen] = useState(false);
-  const [jobs, setJobs] = useState<Job[]>([]);
-  const [jobId, setJobId] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState("");
-
-  useEffect(() => {
-    if (!open) return;
-    fetch("/api/jobs?limit=50")
-      .then((r) => r.json())
-      .then((res) => {
-        const list: Job[] = res.jobs ?? [];
-        setJobs(list);
-        if (list.length > 0) setJobId(list[0].id);
-      })
-      .catch(() => setError("Failed to load jobs."));
-  }, [open]);
-
-  const submit = async () => {
-    if (!jobId) return;
-    setSubmitting(true);
-    setError("");
-    try {
-      const res = await fetch("/api/applications", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ candidate_id: candidateId, job_id: jobId }),
-      });
-      const body = await res.json();
-      if (!res.ok) {
-        setError(body.error ?? "Failed to submit application.");
-        return;
-      }
-      setOpen(false);
-      onSubmitted();
-    } catch {
-      setError("Failed to submit application.");
-    } finally {
-      setSubmitting(false);
-    }
-  };
 
   if (!open) {
     return (
@@ -76,30 +31,26 @@ export default function CandidateApplyOnBehalf({ candidateId, onSubmitted }: Pro
   }
 
   return (
-    <div className="bg-ivory-100 border border-midnight-900/10 rounded-lg p-3 space-y-2 max-w-xs">
-      {jobs.length === 0 ? (
-        <p className="text-xs text-midnight-900/50">No active jobs available right now.</p>
-      ) : (
-        <select value={jobId} onChange={(e) => setJobId(e.target.value)} className="input-field py-1.5 text-xs w-full">
-          {jobs.map((j) => (
-            <option key={j.id} value={j.id}>{j.title} — {j.city}, {j.country}</option>
-          ))}
-        </select>
-      )}
-      <div className="flex gap-2">
+    <div className="fixed inset-0 z-[200] bg-midnight-950/60 backdrop-blur-sm flex items-center justify-center p-4">
+      <div className="bg-white max-w-2xl w-full max-h-[90vh] overflow-y-auto rounded-2xl shadow-2xl p-6 sm:p-8 relative">
         <button
           type="button"
-          disabled={submitting || jobs.length === 0}
-          onClick={submit}
-          className="btn-primary py-1.5 px-3 text-xs disabled:opacity-50"
+          onClick={() => setOpen(false)}
+          className="absolute top-4 right-4 text-midnight-900/40 hover:text-midnight-900"
         >
-          {submitting ? "Submitting…" : "Submit"}
+          <X size={20} weight="bold" />
         </button>
-        <button type="button" onClick={() => setOpen(false)} className="btn-secondary py-1.5 px-3 text-xs">
-          Cancel
-        </button>
+        <h2 className="text-xl font-black text-midnight-900 mb-1">Candidate Information Form</h2>
+        <p className="text-sm text-midnight-900/50 mb-6">Submitted on this candidate&apos;s behalf.</p>
+        <ApplicationForm
+          candidateId={candidateId}
+          compact
+          onSubmitted={() => {
+            setOpen(false);
+            onSubmitted();
+          }}
+        />
       </div>
-      {error && <div className="text-[10px] text-red-500">{error}</div>}
     </div>
   );
 }

@@ -4,6 +4,7 @@ import { auditedPrisma } from "@/lib/audit";
 import { getAuthUser, requireRole } from "@/lib/api-auth";
 import { canAccessCandidate } from "@/server/scope";
 import { canSetLifecycleStatus, type LifecycleStatus } from "@/server/services/candidateLifecycle";
+import { createCaseForApprovedApplication } from "@/server/services/caseLifecycle";
 import { evaluateScreeningGateForCandidateId } from "@/server/services/screening";
 import { updateCandidateStatusSchema } from "@/lib/validations";
 import { sendCandidateInviteEmail } from "@/lib/email";
@@ -79,6 +80,14 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   if (target === "guided_to_apply") {
     const screening = await evaluateScreeningGateForCandidateId(id);
+    // Persisted regardless of outcome — "screening result" is its own
+    // standard report-content field (Regional Supervisory Operational
+    // Workflow p.7), not just a live gate check that vanishes once the
+    // request completes.
+    await auditedPrisma(user!.userId).candidate.update({
+      where: { id },
+      data: { screening_result: screening.passed, screening_evaluated_at: new Date() },
+    });
     if (!screening.passed) {
       return NextResponse.json(
         { error: { code: "screening_gate_failed", message: "Candidate has not cleared the screening gate.", details: screening.failures } },
@@ -106,6 +115,21 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   // email to invite yet (a phone-only lead can still be screened).
   if (target === "screened" && !candidate.user_id && candidate.email) {
     sendCandidateInviteEmail(id, candidate.email, candidate.full_name ?? "there").catch(console.error);
+  }
+
+  // A Case is the start of the Phase 4 mobility lifecycle (SRS FR-4.1/4.2)
+  // — it opens once a candidate is actually "Approved by In-House"
+  // (Regional Supervisory Operational Workflow p.5), the real trigger,
+  // not the legacy Application.application_status field. Attached to
+  // their most recent application.
+  if (target === "approved") {
+    const application = await prisma.application.findFirst({
+      where: { candidate_id: id },
+      orderBy: { submitted_at: "desc" },
+    });
+    if (application) {
+      await createCaseForApprovedApplication(application.id, user!.userId);
+    }
   }
 
   return NextResponse.json({ data: updated });

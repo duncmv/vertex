@@ -35,9 +35,20 @@ describe("canSetLifecycleStatus", () => {
       expect(result.reason).toMatch(/must be reported/i);
     });
 
-    it("can verify and approve once reported", () => {
+    it("can verify once reported", () => {
       expect(canSetLifecycleStatus("country_supervisor", "reported", "verified").allowed).toBe(true);
-      expect(canSetLifecycleStatus("country_supervisor", "verified", "approved").allowed).toBe(true);
+    });
+
+    it("cannot approve — that's In-House's controlling position (Regional Supervisory Operational Workflow, Candidate Status Lifecycle stage 7)", () => {
+      const result = canSetLifecycleStatus("country_supervisor", "verified", "approved");
+      expect(result.allowed).toBe(false);
+      expect(result.reason).toMatch(/only in-house/i);
+    });
+
+    it("cannot touch a candidate that's already approved, including reversing the approval", () => {
+      const result = canSetLifecycleStatus("country_supervisor", "approved", "verified");
+      expect(result.allowed).toBe(false);
+      expect(result.reason).toMatch(/only in-house/i);
     });
 
     it("can return a candidate to an earlier stage (marked isReturn)", () => {
@@ -48,9 +59,20 @@ describe("canSetLifecycleStatus", () => {
   });
 
   describe("inhouse_supervisor and director", () => {
-    it("behave the same as country_supervisor for gating purposes", () => {
+    it("can verify, same as country_supervisor", () => {
       expect(canSetLifecycleStatus("inhouse_supervisor", "reported", "verified").allowed).toBe(true);
       expect(canSetLifecycleStatus("director", "reported", "verified").allowed).toBe(true);
+    });
+
+    it("can also approve, unlike country_supervisor", () => {
+      expect(canSetLifecycleStatus("inhouse_supervisor", "verified", "approved").allowed).toBe(true);
+      expect(canSetLifecycleStatus("director", "verified", "approved").allowed).toBe(true);
+    });
+
+    it("can reverse an approval", () => {
+      const result = canSetLifecycleStatus("inhouse_supervisor", "approved", "verified");
+      expect(result.allowed).toBe(true);
+      expect(result.isReturn).toBe(true);
     });
   });
 

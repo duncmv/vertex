@@ -27,11 +27,19 @@ export const loginSchema = z.object({
   password: z.string().min(1, "Password is required"),
 });
 
-// Candidate profile
+// Candidate profile — Section 2 of the Candidate Information Form
+// ("Candidate Personal Information"), self-service edit path.
 export const candidateProfileSchema = z.object({
   passport_number: z.string().optional(),
   date_of_birth: z.string().optional(),
   nationality: z.string().optional(),
+  second_nationality: z.string().max(100).optional(),
+  passport_expiry: z.string().optional(),
+  current_occupation: z.string().max(150).optional(),
+  highest_education: z.string().max(150).optional(),
+  home_address: z.string().max(500).optional(),
+  whatsapp_number: z.string().max(30).optional(),
+  marital_status: z.string().max(50).optional(),
 });
 
 // Jobs
@@ -45,14 +53,39 @@ export const createJobSchema = z.object({
   status: z.enum(["active", "closed", "draft"]).default("active"),
 });
 
-// Applications
+// Applications — currently the Candidate Information Form: a general
+// programme-interest submission, not an application to a specific job
+// listing (jobs aren't listed on the platform yet). job_id stays as an
+// optional field for when real job matching exists.
 export const submitApplicationSchema = z.object({
-  job_id: z.string().cuid("Invalid job ID"),
+  job_id: z.string().cuid("Invalid job ID").optional(),
   cover_letter: z.string().optional(),
   // Present when a recruiter/supervisor submits on behalf of a candidate
   // who has no account of their own yet (SRS FR-2.1) — otherwise the
   // authenticated candidate's own profile is used.
   candidate_id: z.string().cuid().optional(),
+
+  // Section 1 — Programme Selection. Up to 3 alternatives are requested
+  // because vacancy/embassy capacity varies by country.
+  preferred_country_1_id: z.string().cuid("Select your preferred country"),
+  preferred_country_2_id: z.string().cuid().optional(),
+  preferred_country_3_id: z.string().cuid().optional(),
+  preferred_sector_id: z.string().cuid("Select your preferred type of work"),
+  earliest_travel_date: z.string().min(1, "Earliest possible travel date is required"),
+  prior_eu_visa_applied: z.string().max(500).optional(),
+
+  // Section 5 — Visa & Travel Readiness
+  current_location_country: z.string().max(100).optional(),
+  holds_schengen_visa: z.string().max(200).optional(),
+  prior_visa_refusals: z.string().max(500).optional(),
+  available_for_embassy_appointment: z.boolean().default(false),
+  willing_to_start_within_30_days: z.boolean().default(false),
+  preferred_contact_channel: z.enum(["email", "whatsapp", "phone"]).optional(),
+
+  // Section 4 — Payment Plan Acknowledgement: must be explicitly ticked to submit.
+  payment_plan_acknowledged: z.literal(true, {
+    message: "You must acknowledge the payment plan to submit.",
+  }),
 });
 
 export const updateApplicationStatusSchema = z.object({
@@ -69,8 +102,28 @@ export const createCountrySchema = z.object({
   region_id: z.string().cuid("Invalid region ID"),
 });
 
-// Staff role/supervisor/country assignment (SRS FR-1.1, FR-1.3, FR-1.4)
-const STAFF_ROLES = ["regional_recruiter", "country_supervisor", "inhouse_supervisor", "director", "admin"] as const;
+// Sectors ("Preferred Type of Work" on the Candidate Information Form) and
+// per-country document requirements (Section 3's "Required for: X" tags) —
+// both admin-configurable reference data, same pattern as Region/Country.
+export const createSectorSchema = z.object({
+  name: z.string().min(2).max(100),
+});
+
+const DOCUMENT_TYPES = [
+  "cv", "passport", "transcript", "certificate", "medical", "police_clearance", "contract", "visa", "other",
+  "all_passport_pages", "passport_photo", "national_id", "cv_europass", "education_diploma",
+  "driving_licence", "tachograph_card", "professional_training_certificate", "e_apostille", "zab_recognition_letter",
+] as const;
+export const updateCountryDocumentRequirementsSchema = z.object({
+  document_types: z.array(z.enum(DOCUMENT_TYPES)),
+});
+
+// Staff role/supervisor/country assignment (SRS FR-1.1, FR-1.3, FR-1.4) —
+// every role assignable via the admin staff directory. Deliberately wider
+// than lib/rbac.ts's STAFF_ROLES (which governs the three-tier candidate
+// hierarchy specifically): "marketing" is a real, assignable staff role
+// but sits outside that hierarchy entirely.
+const STAFF_ROLES = ["regional_recruiter", "country_supervisor", "inhouse_supervisor", "director", "marketing", "admin"] as const;
 export const updateStaffUserSchema = z.object({
   role: z.enum(STAFF_ROLES).optional(),
   supervisor_id: z.string().cuid().nullable().optional(),
@@ -106,7 +159,8 @@ export const registerCandidateSchema = z.object({
 
 // Progressive candidate detail edits + consent (SRS FR-2.5, FR-2.8) — a
 // recruiter fills in a lead's profile over time, not necessarily all at
-// registration.
+// registration. Also covers Section 2 of the Candidate Information Form
+// for a recruiter-sourced lead who has no account of their own to edit it.
 export const updateCandidateDetailsSchema = z.object({
   full_name: z.string().min(2).max(100).optional(),
   nationality: z.string().min(2).max(100).optional(),
@@ -116,6 +170,13 @@ export const updateCandidateDetailsSchema = z.object({
   email: optionalEmail,
   desired_role: z.string().max(150).optional(),
   consent_given: z.boolean().optional(),
+  second_nationality: z.string().max(100).optional(),
+  passport_expiry: z.string().optional(),
+  current_occupation: z.string().max(150).optional(),
+  highest_education: z.string().max(150).optional(),
+  home_address: z.string().max(500).optional(),
+  whatsapp_number: z.string().max(30).optional(),
+  marital_status: z.string().max(50).optional(),
 });
 
 // Candidate lifecycle status transitions (SRS FR-2.4, FR-2.5, FR-2.7)
@@ -224,8 +285,11 @@ export const signContractSchema = z.object({
   signed_by_name: z.string().min(2).max(200),
 });
 
+// The 3-stage plan from the Candidate Information Form: documentation
+// (Stage 1 · 20%, on engagement), permit (Stage 2 · 40%, after the work
+// permit is issued), visa (Stage 3 · 40%, after the visa is granted).
 export const recordCasePaymentSchema = z.object({
-  type: z.enum(["initial", "final"]),
+  type: z.enum(["documentation", "permit", "visa"]),
   amount: z.number().positive(),
   currency: z.string().length(3).default("USD"),
   receipt_reference: z.string().max(200).optional(),
@@ -234,8 +298,9 @@ export const recordCasePaymentSchema = z.object({
 export const updateFeePolicySchema = z.object({
   country_id: z.string().cuid().nullish(),
   enabled: z.boolean(),
-  initial_amount: z.number().positive().nullish(),
-  final_amount: z.number().positive().nullish(),
+  documentation_amount: z.number().positive().nullish(),
+  permit_amount: z.number().positive().nullish(),
+  visa_amount: z.number().positive().nullish(),
   currency: z.string().length(3).default("USD"),
 });
 

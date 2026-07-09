@@ -46,7 +46,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const effectivePolicy = countryPolicy ?? globalPolicy;
 
   if (!effectivePolicy?.enabled) {
-    return NextResponse.json({ error: "Milestone payments are not enabled for this destination. An admin must enable the fee policy first." }, { status: 403 });
+    return NextResponse.json({ error: "Milestone payments are not enabled for this destination. In-House must enable the fee policy first." }, { status: 403 });
   }
 
   const payment = await auditedPrisma(user!.userId).casePayment.create({

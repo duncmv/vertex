@@ -26,7 +26,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const caseRecord = await prisma.case.findUnique({
     where: { id },
     include: {
-      application: { include: { candidate: { include: { user: true } }, job: true } },
+      application: { include: { candidate: { include: { user: true } }, job: true, preferred_sector: true } },
       stage_events: { where: { completed_at: null } },
     },
   });
@@ -92,7 +92,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     sendCaseStageUpdateEmail(
       caseRecord.application.candidate.user.email,
       caseRecord.application.candidate.user.full_name,
-      caseRecord.application.job.title,
+      caseRecord.application.job?.title ?? caseRecord.application.preferred_sector?.name ?? "your programme",
       parsed.data.stage
     ).catch((err) => console.error("Failed to send case stage update email.", err));
   }

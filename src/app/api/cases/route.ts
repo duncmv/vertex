@@ -25,6 +25,8 @@ export async function GET(req: NextRequest) {
         include: {
           candidate: { include: { user: { select: { full_name: true, email: true } }, country: true, recruiter: { select: { full_name: true } } } },
           job: { select: { title: true, country: true, city: true } },
+          preferred_country_1: { select: { name: true } },
+          preferred_sector: { select: { name: true } },
         },
       },
       contract: { select: { status: true } },

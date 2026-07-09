@@ -16,6 +16,11 @@ enum Role {
   inhouse_supervisor
   director
   admin
+  // Solely responsible for posting/editing/closing job listings — not part
+  // of the three-tier operational hierarchy (Regional Supervisory
+  // Operational Workflow) and deliberately kept out of STAFF_ROLES so it
+  // doesn't incidentally inherit broader candidate/application access.
+  marketing
 }
 
 enum ApplicationStatus {
@@ -76,6 +81,11 @@ model Region {
   campaign_targets CampaignTarget[]
 }
 
+// The Country reference-data model doubles as the "preferred programme
+// destination" a candidate selects on the Candidate Information Form —
+// admin populates this with the European programme countries Vertex
+// actually places into (Poland, Belarus, Italy, etc.), not a general
+// world-country list.
 model Country {
   id        String @id @default(cuid())
   name      String @unique
@@ -87,8 +97,36 @@ model Country {
   reports          Report[]
   campaign_targets CampaignTarget[]
   fee_policies     FeePolicy[]
+  document_requirements    CountryDocumentRequirement[]
+  preferred_by_1           Application[]                @relation("PreferredCountry1")
+  preferred_by_2           Application[]                @relation("PreferredCountry2")
+  preferred_by_3           Application[]                @relation("PreferredCountry3")
 
   @@index([region_id])
+}
+
+// Admin-managed "type of work" taxonomy (Candidate Information Form §1,
+// "Preferred Type of Work") — e.g. Warehouse, Agriculture, Hotel, Driving.
+model Sector {
+  id           String        @id @default(cuid())
+  name         String        @unique
+  created_at   DateTime      @default(now())
+  applications Application[]
+}
+
+// Which documents a given destination country actually requires (form §3:
+// "Required for: Poland" etc.) — admin-configurable rather than a
+// hardcoded per-country list, so a new programme country's requirements
+// don't need a code change.
+model CountryDocumentRequirement {
+  id            String       @id @default(cuid())
+  country_id    String
+  country       Country      @relation(fields: [country_id], references: [id], onDelete: Cascade)
+  document_type DocumentType
+  created_at    DateTime     @default(now())
+
+  @@unique([country_id, document_type])
+  @@index([country_id])
 }
 
 enum CandidateSource {
@@ -110,8 +148,15 @@ model Candidate {
   id              String    @id @default(cuid())
   user_id         String?   @unique // nullable: a recruiter-sourced lead may not have an account yet (SRS FR-2.1)
   passport_number String?
+  passport_expiry DateTime? // every programme requires >= 6 months validity (Candidate Information Form §2)
   date_of_birth   DateTime?
   nationality     String?
+  second_nationality  String?
+  current_occupation  String?
+  highest_education   String?
+  home_address        String?  @db.Text
+  whatsapp_number     String?
+  marital_status      String?
   created_at      DateTime  @default(now())
   updated_at      DateTime  @updatedAt
 
@@ -139,6 +184,14 @@ model Candidate {
   consent_at    DateTime?
   return_reason String?   @db.Text
 
+  // The screening gate's pass/fail outcome, persisted — "screening result"
+  // is its own standard report-content field, distinct from status
+  // (Regional Supervisory Operational Workflow p.7), not just a live gate
+  // check that vanishes the moment the request completes. Null until the
+  // gate has actually been evaluated once.
+  screening_result       Boolean?
+  screening_evaluated_at DateTime?
+
   user         User?         @relation(fields: [user_id], references: [id], onDelete: Cascade)
   applications Application[]
   documents    Document[]
@@ -148,6 +201,8 @@ model Candidate {
   @@index([country_id])
 }
 
+// police_clearance already covers the Candidate Information Form's
+// "Criminal Record Certificate" — no separate type needed for it.
 enum DocumentType {
   cv
   passport
@@ -158,6 +213,16 @@ enum DocumentType {
   contract
   visa
   other
+  all_passport_pages
+  passport_photo
+  national_id
+  cv_europass
+  education_diploma
+  driving_licence
+  tachograph_card
+  professional_training_certificate
+  e_apostille
+  zab_recognition_letter
 }
 
 enum VerificationStatus {
@@ -326,10 +391,21 @@ model Job {
   @@index([country])
 }
 
+enum ContactChannel {
+  email
+  whatsapp
+  phone
+}
+
+// A candidate's submission of the Candidate Information Form — currently a
+// general programme-interest application, not an application to a specific
+// job listing, since jobs aren't listed on the platform yet (job_id is
+// nullable for exactly this reason; it becomes meaningful once real job
+// matching exists).
 model Application {
   id                 String            @id @default(cuid())
   candidate_id       String
-  job_id             String
+  job_id             String?
   application_status ApplicationStatus @default(submitted)
   cover_letter       String?           @db.Text
   internal_notes     String?           @db.Text
@@ -337,11 +413,34 @@ model Application {
   submitted_at       DateTime          @default(now())
   updated_at         DateTime          @updatedAt
 
+  // Section 1 — Programme Selection. Up to 3 alternatives are requested
+  // because vacancy/embassy capacity varies by country (form's own words).
+  preferred_country_1_id String?
+  preferred_country_1    Country?  @relation("PreferredCountry1", fields: [preferred_country_1_id], references: [id], onDelete: SetNull)
+  preferred_country_2_id String?
+  preferred_country_2    Country?  @relation("PreferredCountry2", fields: [preferred_country_2_id], references: [id], onDelete: SetNull)
+  preferred_country_3_id String?
+  preferred_country_3    Country?  @relation("PreferredCountry3", fields: [preferred_country_3_id], references: [id], onDelete: SetNull)
+  preferred_sector_id    String?
+  preferred_sector       Sector?   @relation(fields: [preferred_sector_id], references: [id], onDelete: SetNull)
+  earliest_travel_date   DateTime?
+  prior_eu_visa_applied  String?   @db.Text // "Yes / No / Where" — kept free-text per the form
+
+  // Section 5 — Visa & Travel Readiness
+  current_location_country          String?
+  holds_schengen_visa                String?  @db.Text
+  prior_visa_refusals                String?  @db.Text
+  available_for_embassy_appointment  Boolean  @default(false)
+  willing_to_start_within_30_days    Boolean  @default(false)
+  preferred_contact_channel          ContactChannel?
+
+  // Section 4 — Payment Plan Acknowledgement (the candidate's "I understand" tick)
+  payment_plan_acknowledged Boolean @default(false)
+
   candidate Candidate @relation(fields: [candidate_id], references: [id], onDelete: Cascade)
-  job       Job       @relation(fields: [job_id], references: [id], onDelete: Cascade)
+  job       Job?      @relation(fields: [job_id], references: [id], onDelete: Cascade)
   case      Case?
 
-  @@unique([candidate_id, job_id])
   @@index([candidate_id])
   @@index([job_id])
 }
@@ -430,9 +529,14 @@ model RetentionFollowUp {
   notes        String?   @db.Text
 }
 
+// Matches the Candidate Information Form's 3-stage payment plan exactly:
+// documentation (Stage 1 · 20%, on engagement), permit (Stage 2 · 40%,
+// after the work permit is issued), visa (Stage 3 · 40%, after the visa
+// is granted).
 enum MilestonePaymentType {
-  initial
-  final
+  documentation
+  permit
+  visa
 }
 
 model CasePayment {
@@ -456,16 +560,17 @@ model CasePayment {
 // the business decides. Case-payment recording reads this policy at
 // runtime rather than a hardcoded rule.
 model FeePolicy {
-  id             String   @id @default(cuid())
-  country_id     String? // null = global default; a country-specific row overrides it
-  country        Country? @relation(fields: [country_id], references: [id], onDelete: SetNull)
-  enabled        Boolean  @default(false)
-  initial_amount Float?
-  final_amount   Float?
-  currency       String   @default("USD")
-  updated_by     String
-  updater        User     @relation("FeePolicyUpdater", fields: [updated_by], references: [id], onDelete: Cascade)
-  updated_at     DateTime @updatedAt
+  id                  String   @id @default(cuid())
+  country_id          String? // null = global default; a country-specific row overrides it
+  country             Country? @relation(fields: [country_id], references: [id], onDelete: SetNull)
+  enabled             Boolean  @default(false)
+  documentation_amount Float?
+  permit_amount        Float?
+  visa_amount          Float?
+  currency            String   @default("USD")
+  updated_by          String
+  updater             User     @relation("FeePolicyUpdater", fields: [updated_by], references: [id], onDelete: Cascade)
+  updated_at          DateTime @updatedAt
 
   @@index([country_id])
 }

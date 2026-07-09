@@ -29,7 +29,15 @@ interface CandidateRow {
   desired_role: string | null;
   consent_given: boolean;
   return_reason: string | null;
+  screening_result: boolean | null;
   created_at: string;
+  second_nationality: string | null;
+  passport_expiry: string | null;
+  current_occupation: string | null;
+  highest_education: string | null;
+  home_address: string | null;
+  whatsapp_number: string | null;
+  marital_status: string | null;
   user: { full_name: string; email: string } | null;
   recruiter: { id: string; full_name: string } | null;
   country: { id: string; name: string } | null;
@@ -45,11 +53,13 @@ interface CandidateRow {
 export default function CandidateList({
   emptyLabel,
   canVerify = false,
+  canApprove = false,
   showStatusControls = true,
   refreshKey = 0,
 }: {
   emptyLabel: string;
   canVerify?: boolean;
+  canApprove?: boolean;
   showStatusControls?: boolean;
   refreshKey?: number;
 }) {
@@ -123,7 +133,19 @@ export default function CandidateList({
                     <div className="mt-1">
                       <CandidateEditDetails
                         candidateId={c.id}
-                        initial={{ date_of_birth: c.date_of_birth, passport_number: c.passport_number, email: c.email, desired_role: c.desired_role }}
+                        initial={{
+                          date_of_birth: c.date_of_birth,
+                          passport_number: c.passport_number,
+                          email: c.email,
+                          desired_role: c.desired_role,
+                          second_nationality: c.second_nationality,
+                          passport_expiry: c.passport_expiry,
+                          current_occupation: c.current_occupation,
+                          highest_education: c.highest_education,
+                          home_address: c.home_address,
+                          whatsapp_number: c.whatsapp_number,
+                          marital_status: c.marital_status,
+                        }}
                         onSaved={(data) =>
                           setCandidates((prev) => prev.map((row) => (row.id === c.id ? { ...row, ...data } : row)))
                         }
@@ -138,6 +160,11 @@ export default function CandidateList({
                   <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${STATUS_STYLES[c.lifecycle_status] ?? "bg-slate-100 text-slate-700"}`}>
                     {c.lifecycle_status.replace(/_/g, " ")}
                   </span>
+                  {c.screening_result !== null && (
+                    <div className={`text-[11px] mt-1 font-medium ${c.screening_result ? "text-emerald-600" : "text-red-500"}`}>
+                      Screening: {c.screening_result ? "Passed" : "Failed"}
+                    </div>
+                  )}
                   {c.return_reason && (
                     <div className="text-xs text-red-500 mt-1.5 max-w-[220px]">
                       <span className="font-semibold">Returned:</span> {c.return_reason}
@@ -149,6 +176,7 @@ export default function CandidateList({
                         candidateId={c.id}
                         status={c.lifecycle_status as never}
                         canVerify={canVerify}
+                        canApprove={canApprove}
                         onChanged={(next) =>
                           setCandidates((prev) =>
                             prev.map((row) =>

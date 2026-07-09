@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import PortalShell from "@/components/portal/PortalShell";
-import { ADMIN_NAV_ITEMS } from "@/components/portal/adminNav";
+import { MARKETING_NAV_ITEMS } from "@/components/portal/marketingNav";
 import { Plus } from "@phosphor-icons/react";
 
 interface Job {
@@ -39,7 +39,7 @@ export default function AdminJobsPage() {
   };
 
   return (
-    <PortalShell roleLabel="System Administrator" navItems={ADMIN_NAV_ITEMS}>
+    <PortalShell roleLabel="Marketing" navItems={MARKETING_NAV_ITEMS}>
       <div className="flex items-center justify-between mb-8">
         <div>
           <p className="eyebrow mb-3">
@@ -48,7 +48,7 @@ export default function AdminJobsPage() {
           </p>
           <h1 className="section-title text-3xl md:text-4xl">Jobs.</h1>
         </div>
-        <Link href="/admin/jobs/new" className="btn-primary text-xs">
+        <Link href="/marketing/jobs/new" className="btn-primary text-xs">
           <Plus size={16} weight="bold" /> Post New Job
         </Link>
       </div>
@@ -79,7 +79,7 @@ export default function AdminJobsPage() {
                   <td className="px-5 py-4 font-medium text-midnight-900/70">{job._count?.applications || 0} applied</td>
                   <td className="px-5 py-4 text-right space-x-4">
                     <Link href={`/jobs/${job.id}`} target="_blank" className="text-gold-600 hover:underline font-medium text-xs">View</Link>
-                    <Link href={`/admin/jobs/${job.id}/edit`} className="text-midnight-900/60 hover:text-gold-600 hover:underline font-medium text-xs">Edit</Link>
+                    <Link href={`/marketing/jobs/${job.id}/edit`} className="text-midnight-900/60 hover:text-gold-600 hover:underline font-medium text-xs">Edit</Link>
                     <button onClick={() => handleDelete(job.id)} className="text-red-500 hover:text-red-700 hover:underline font-medium text-xs">Delete</button>
                   </td>
                 </tr>

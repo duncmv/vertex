@@ -4,6 +4,7 @@ export const dynamic = "force-dynamic";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import CandidateCaseCard from "@/components/CandidateCaseCard";
+import CandidateProfileForm from "@/components/CandidateProfileForm";
 import {
   ClipboardText,
   FileText,
@@ -21,14 +22,24 @@ interface Application {
   id: string;
   application_status: string;
   submitted_at: string;
-  job: { id: string; title: string; country: string; city: string; salary_range?: string };
+  job: { id: string; title: string; country: string; city: string; salary_range?: string } | null;
+  preferred_country_1: { name: string } | null;
+  preferred_sector: { name: string } | null;
 }
 
 interface Profile {
   id: string;
   documents: { id: string; type: string; verification_status: string }[];
-  passport_number?: string;
-  nationality?: string;
+  passport_number?: string | null;
+  nationality?: string | null;
+  second_nationality?: string | null;
+  date_of_birth?: string | null;
+  passport_expiry?: string | null;
+  current_occupation?: string | null;
+  highest_education?: string | null;
+  home_address?: string | null;
+  whatsapp_number?: string | null;
+  marital_status?: string | null;
   _count: { applications: number };
   user: { full_name: string; email: string; phone?: string; country?: string };
 }
@@ -137,6 +148,19 @@ export default function DashboardPage() {
           })}
         </div>
 
+        {/* Personal Information (Candidate Information Form Section 2) */}
+        {profile && (
+          <div className="card p-6">
+            <h2 className="text-lg font-semibold text-midnight-900 mb-4 flex items-center gap-2">
+              <IdentificationCard size={18} weight="regular" /> Personal Information
+            </h2>
+            <CandidateProfileForm
+              initial={profile}
+              onSaved={() => fetch("/api/candidates/profile").then((r) => r.json()).then((p) => !p.error && setProfile(p))}
+            />
+          </div>
+        )}
+
         {/* Document Upload */}
         <div className="card p-6">
           <h2 className="text-lg font-semibold text-midnight-900 mb-4 flex items-center gap-2">
@@ -190,7 +214,7 @@ export default function DashboardPage() {
               <table className="w-full text-sm text-left">
                 <thead className="text-midnight-900/40 text-xs uppercase tracking-wider">
                   <tr className="border-b border-midnight-900/10">
-                    <th className="px-5 py-3 font-semibold">Job Title & Location</th>
+                    <th className="px-5 py-3 font-semibold">Programme</th>
                     <th className="px-5 py-3 font-semibold">Status</th>
                     <th className="px-5 py-3 font-semibold">Applied On</th>
                     <th className="px-5 py-3 font-semibold text-right">Action</th>
@@ -200,17 +224,32 @@ export default function DashboardPage() {
                   {applications.map((app) => (
                     <tr key={app.id} className="border-b border-midnight-900/5 last:border-0">
                       <td className="px-5 py-4">
-                        <div className="font-medium text-midnight-900 mb-1">{app.job.title}</div>
-                        <div className="text-midnight-900/45 text-xs flex items-center gap-1">
-                          <MapPin size={12} weight="regular" /> {app.job.city}, {app.job.country}
-                        </div>
+                        {app.job ? (
+                          <>
+                            <div className="font-medium text-midnight-900 mb-1">{app.job.title}</div>
+                            <div className="text-midnight-900/45 text-xs flex items-center gap-1">
+                              <MapPin size={12} weight="regular" /> {app.job.city}, {app.job.country}
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <div className="font-medium text-midnight-900 mb-1">{app.preferred_sector?.name ?? "General Programme Application"}</div>
+                            {app.preferred_country_1 && (
+                              <div className="text-midnight-900/45 text-xs flex items-center gap-1">
+                                <MapPin size={12} weight="regular" /> {app.preferred_country_1.name}
+                              </div>
+                            )}
+                          </>
+                        )}
                       </td>
                       <td className="px-5 py-4"><StatusBadge status={app.application_status} /></td>
                       <td className="px-5 py-4 text-midnight-900/60">{new Date(app.submitted_at).toLocaleDateString()}</td>
                       <td className="px-5 py-4 text-right">
-                        <Link href={`/jobs/${app.job.id}`} className="inline-flex items-center gap-1 text-sm font-semibold text-gold-600 hover:underline">
-                          View Job <ArrowRight size={14} weight="bold" />
-                        </Link>
+                        {app.job && (
+                          <Link href={`/jobs/${app.job.id}`} className="inline-flex items-center gap-1 text-sm font-semibold text-gold-600 hover:underline">
+                            View Job <ArrowRight size={14} weight="bold" />
+                          </Link>
+                        )}
                       </td>
                     </tr>
                   ))}

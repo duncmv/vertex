@@ -2,15 +2,16 @@
 
 import { useEffect, useState } from "react";
 import PortalShell from "@/components/portal/PortalShell";
-import { ADMIN_NAV_ITEMS } from "@/components/portal/adminNav";
+import { MANAGEMENT_NAV_ITEMS } from "@/components/portal/managementNav";
 
 interface FeePolicy {
   id: string;
   country_id: string | null;
   country: { name: string } | null;
   enabled: boolean;
-  initial_amount: number | null;
-  final_amount: number | null;
+  documentation_amount: number | null;
+  permit_amount: number | null;
+  visa_amount: number | null;
   currency: string;
   updated_at: string;
 }
@@ -24,8 +25,9 @@ export default function FeePolicyPage() {
 
   const [countryId, setCountryId] = useState("");
   const [enabled, setEnabled] = useState(false);
-  const [initialAmount, setInitialAmount] = useState("");
-  const [finalAmount, setFinalAmount] = useState("");
+  const [documentationAmount, setDocumentationAmount] = useState("");
+  const [permitAmount, setPermitAmount] = useState("");
+  const [visaAmount, setVisaAmount] = useState("");
   const [currency, setCurrency] = useState("USD");
 
   const load = () => {
@@ -48,19 +50,20 @@ export default function FeePolicyPage() {
       body: JSON.stringify({
         country_id: countryId || null,
         enabled,
-        initial_amount: initialAmount ? Number(initialAmount) : null,
-        final_amount: finalAmount ? Number(finalAmount) : null,
+        documentation_amount: documentationAmount ? Number(documentationAmount) : null,
+        permit_amount: permitAmount ? Number(permitAmount) : null,
+        visa_amount: visaAmount ? Number(visaAmount) : null,
         currency,
       }),
     });
     const json = await res.json();
     if (!res.ok) { alert(json.error ?? "Failed to save."); return; }
-    setCountryId(""); setEnabled(false); setInitialAmount(""); setFinalAmount(""); setCurrency("USD");
+    setCountryId(""); setEnabled(false); setDocumentationAmount(""); setPermitAmount(""); setVisaAmount(""); setCurrency("USD");
     load();
   };
 
   return (
-    <PortalShell roleLabel="System Administrator" navItems={ADMIN_NAV_ITEMS}>
+    <PortalShell roleLabel="Management" navItems={MANAGEMENT_NAV_ITEMS}>
       <p className="eyebrow mb-3">
         <span className="eyebrow-rule" />
         Mobility Lifecycle
@@ -68,7 +71,7 @@ export default function FeePolicyPage() {
       <h1 className="section-title text-3xl md:text-4xl mb-2">Fee policy.</h1>
       <p className="text-midnight-900/55 font-light mb-8 max-w-2xl">
         SRS FR-4.5 — milestone-payment recording defaults off. Turn it on globally or per destination country, and
-        set the initial/final amounts, whenever the business is ready.
+        set the three stage amounts (documentation · 20%, work permit · 40%, visa · 40%) whenever the business is ready.
       </p>
 
       {loading ? (
@@ -77,7 +80,7 @@ export default function FeePolicyPage() {
         <>
           <div className="card p-6 mb-6">
             <h2 className="text-sm font-semibold text-midnight-900/70 uppercase tracking-wider mb-4">Set a policy</h2>
-            <div className="grid sm:grid-cols-5 gap-3 items-end">
+            <div className="grid sm:grid-cols-3 lg:grid-cols-6 gap-3 items-end">
               <div>
                 <label className="block text-xs font-medium text-midnight-900/60 mb-1">Country</label>
                 <select value={countryId} onChange={(e) => setCountryId(e.target.value)} className="input-field text-sm">
@@ -86,12 +89,16 @@ export default function FeePolicyPage() {
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-medium text-midnight-900/60 mb-1">Initial amount</label>
-                <input type="number" min="0" value={initialAmount} onChange={(e) => setInitialAmount(e.target.value)} className="input-field text-sm" />
+                <label className="block text-xs font-medium text-midnight-900/60 mb-1">Documentation (Stage 1 · 20%)</label>
+                <input type="number" min="0" value={documentationAmount} onChange={(e) => setDocumentationAmount(e.target.value)} className="input-field text-sm" />
               </div>
               <div>
-                <label className="block text-xs font-medium text-midnight-900/60 mb-1">Final amount</label>
-                <input type="number" min="0" value={finalAmount} onChange={(e) => setFinalAmount(e.target.value)} className="input-field text-sm" />
+                <label className="block text-xs font-medium text-midnight-900/60 mb-1">Work Permit (Stage 2 · 40%)</label>
+                <input type="number" min="0" value={permitAmount} onChange={(e) => setPermitAmount(e.target.value)} className="input-field text-sm" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-midnight-900/60 mb-1">Visa (Stage 3 · 40%)</label>
+                <input type="number" min="0" value={visaAmount} onChange={(e) => setVisaAmount(e.target.value)} className="input-field text-sm" />
               </div>
               <div>
                 <label className="block text-xs font-medium text-midnight-900/60 mb-1">Currency</label>
@@ -111,21 +118,23 @@ export default function FeePolicyPage() {
                 <tr className="border-b border-midnight-900/10 text-left text-midnight-900/40 text-xs uppercase tracking-wider">
                   <th className="px-5 py-3 font-semibold">Scope</th>
                   <th className="px-5 py-3 font-semibold">Enabled</th>
-                  <th className="px-5 py-3 font-semibold">Initial</th>
-                  <th className="px-5 py-3 font-semibold">Final</th>
+                  <th className="px-5 py-3 font-semibold">Documentation</th>
+                  <th className="px-5 py-3 font-semibold">Work Permit</th>
+                  <th className="px-5 py-3 font-semibold">Visa</th>
                   <th className="px-5 py-3 font-semibold">Updated</th>
                 </tr>
               </thead>
               <tbody>
                 {policies.length === 0 && (
-                  <tr><td colSpan={5} className="px-5 py-8 text-center text-midnight-900/40">No policies set yet — milestone payments are disabled everywhere by default.</td></tr>
+                  <tr><td colSpan={6} className="px-5 py-8 text-center text-midnight-900/40">No policies set yet — milestone payments are disabled everywhere by default.</td></tr>
                 )}
                 {policies.map((p) => (
                   <tr key={p.id} className="border-b border-midnight-900/5 last:border-0">
                     <td className="px-5 py-4 font-medium text-midnight-900">{p.country?.name ?? "Global default"}</td>
                     <td className="px-5 py-4">{p.enabled ? <span className="badge-approved">Enabled</span> : <span className="badge-closed">Disabled</span>}</td>
-                    <td className="px-5 py-4 text-midnight-900/70">{p.initial_amount ? `${p.currency} ${p.initial_amount}` : "—"}</td>
-                    <td className="px-5 py-4 text-midnight-900/70">{p.final_amount ? `${p.currency} ${p.final_amount}` : "—"}</td>
+                    <td className="px-5 py-4 text-midnight-900/70">{p.documentation_amount ? `${p.currency} ${p.documentation_amount}` : "—"}</td>
+                    <td className="px-5 py-4 text-midnight-900/70">{p.permit_amount ? `${p.currency} ${p.permit_amount}` : "—"}</td>
+                    <td className="px-5 py-4 text-midnight-900/70">{p.visa_amount ? `${p.currency} ${p.visa_amount}` : "—"}</td>
                     <td className="px-5 py-4 text-midnight-900/45">{new Date(p.updated_at).toLocaleDateString()}</td>
                   </tr>
                 ))}

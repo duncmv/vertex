@@ -18,7 +18,9 @@ interface CaseRow {
       user: { full_name: string; email: string } | null;
       recruiter: { full_name: string } | null;
     };
-    job: { title: string; country: string; city: string };
+    job: { title: string; country: string; city: string } | null;
+    preferred_country_1: { name: string } | null;
+    preferred_sector: { name: string } | null;
   };
 }
 
@@ -69,7 +71,9 @@ export default function CaseList({ emptyLabel, basePath }: { emptyLabel: string;
             <div className="min-w-0">
               <div className="font-medium text-midnight-900">{name}</div>
               <div className="text-xs text-midnight-900/45 mb-3">
-                {c.application.job.title} · {c.application.job.city}, {c.application.job.country}
+                {c.application.job
+                  ? <>{c.application.job.title} · {c.application.job.city}, {c.application.job.country}</>
+                  : <>{c.application.preferred_sector?.name ?? "General Programme"}{c.application.preferred_country_1 && <> · {c.application.preferred_country_1.name}</>}</>}
                 {c.application.candidate.recruiter && <> · {c.application.candidate.recruiter.full_name}</>}
               </div>
               <div className="w-72 max-w-full">

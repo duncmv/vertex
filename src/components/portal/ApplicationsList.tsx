@@ -14,16 +14,19 @@ interface ApplicationRow {
     country: { id: string; name: string } | null;
     documents: { id: string; type: string; verification_status: string }[];
   };
-  job: { title: string; country: string; city: string };
+  job: { title: string; country: string; city: string } | null;
+  preferred_country_1: { name: string } | null;
+  preferred_sector: { name: string } | null;
 }
 
 /**
  * Read-only application tracking for the recruiter/supervisor portals
  * (SRS FR-2.1 "guide and track applications") — scoped server-side
  * exactly like the candidate list. Status changes (interview/approved/
- * rejected) stay an admin action (/admin/applications), matching Phase
- * 1's decision to retain hiring-decision screens under System
- * Administrator; this is visibility, not a second place to edit from.
+ * rejected) are In-House Supervisor/Director's controlling position
+ * (/management/applications — Regional Supervisory Operational Workflow
+ * p.5, "Approved by In-House"); this is visibility, not a second place
+ * to edit from.
  */
 export default function ApplicationsList({ emptyLabel }: { emptyLabel: string }) {
   const [applications, setApplications] = useState<ApplicationRow[]>([]);
@@ -48,7 +51,7 @@ export default function ApplicationsList({ emptyLabel }: { emptyLabel: string })
         <thead>
           <tr className="border-b border-midnight-900/10 text-left text-midnight-900/40 text-xs uppercase tracking-wider">
             <th className="px-5 py-3 font-semibold">Candidate</th>
-            <th className="px-5 py-3 font-semibold">Job</th>
+            <th className="px-5 py-3 font-semibold">Programme</th>
             <th className="px-5 py-3 font-semibold">Recruiter</th>
             <th className="px-5 py-3 font-semibold">Status</th>
             <th className="px-5 py-3 font-semibold">Documents</th>
@@ -66,8 +69,17 @@ export default function ApplicationsList({ emptyLabel }: { emptyLabel: string })
                   <div className="text-xs text-midnight-900/45">{contact}</div>
                 </td>
                 <td className="px-5 py-4 text-midnight-900/70">
-                  <div>{a.job.title}</div>
-                  <div className="text-xs text-midnight-900/45">{a.job.city}, {a.job.country}</div>
+                  {a.job ? (
+                    <>
+                      <div>{a.job.title}</div>
+                      <div className="text-xs text-midnight-900/45">{a.job.city}, {a.job.country}</div>
+                    </>
+                  ) : (
+                    <>
+                      <div>{a.preferred_sector?.name ?? "General Programme"}</div>
+                      {a.preferred_country_1 && <div className="text-xs text-midnight-900/45">{a.preferred_country_1.name}</div>}
+                    </>
+                  )}
                 </td>
                 <td className="px-5 py-4 text-midnight-900/70">{a.candidate.recruiter?.full_name ?? "—"}</td>
                 <td className="px-5 py-4">

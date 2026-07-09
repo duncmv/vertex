@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import PortalShell from "@/components/portal/PortalShell";
-import { ADMIN_NAV_ITEMS } from "@/components/portal/adminNav";
+import { MANAGEMENT_NAV_ITEMS } from "@/components/portal/managementNav";
 import DocumentLink from "@/components/DocumentLink";
 import DocumentVerifyControls from "@/components/DocumentVerifyControls";
 
@@ -14,7 +14,9 @@ interface Application {
   application_status: string;
   submitted_at: string;
   candidate: { full_name: string | null; documents: CandidateDocument[]; user: { full_name: string; email: string } | null };
-  job: { title: string };
+  job: { title: string } | null;
+  preferred_country_1: { name: string } | null;
+  preferred_sector: { name: string } | null;
 }
 
 export default function AdminApplicationsPage() {
@@ -40,7 +42,7 @@ export default function AdminApplicationsPage() {
   };
 
   return (
-    <PortalShell roleLabel="System Administrator" navItems={ADMIN_NAV_ITEMS}>
+    <PortalShell roleLabel="Management" navItems={MANAGEMENT_NAV_ITEMS}>
       <p className="eyebrow mb-3">
         <span className="eyebrow-rule" />
         Recruitment
@@ -57,7 +59,7 @@ export default function AdminApplicationsPage() {
             <thead className="text-midnight-900/40 text-xs uppercase tracking-wider">
               <tr>
                 <th className="px-5 py-3 font-semibold">Candidate</th>
-                <th className="px-5 py-3 font-semibold">Job Applied</th>
+                <th className="px-5 py-3 font-semibold">Programme</th>
                 <th className="px-5 py-3 font-semibold">Documents</th>
                 <th className="px-5 py-3 font-semibold">Status Action</th>
               </tr>
@@ -70,7 +72,14 @@ export default function AdminApplicationsPage() {
                     {app.candidate.user?.email && <div className="text-midnight-900/45 text-xs">{app.candidate.user.email}</div>}
                     <div className="text-midnight-900/35 text-xs mt-1">Applied: {new Date(app.submitted_at).toLocaleDateString()}</div>
                   </td>
-                  <td className="px-5 py-4 text-midnight-900 font-medium">{app.job.title}</td>
+                  <td className="px-5 py-4 text-midnight-900 font-medium">
+                    {app.job ? app.job.title : (
+                      <>
+                        {app.preferred_sector?.name ?? "General Programme"}
+                        {app.preferred_country_1 && <div className="text-xs text-midnight-900/45 font-normal">{app.preferred_country_1.name}</div>}
+                      </>
+                    )}
+                  </td>
                   <td className="px-5 py-4">
                     <div className="flex flex-col gap-2 items-start">
                       {(["cv", "passport"] as const).map((type) => {
@@ -105,7 +114,7 @@ export default function AdminApplicationsPage() {
                         <option value="rejected">Rejected</option>
                         <option value="approved">Approved (Hired)</option>
                       </select>
-                      <Link href={`/admin/applications/${app.id}`} className="text-xs text-gold-600 hover:underline font-medium">
+                      <Link href={`/management/applications/${app.id}`} className="text-xs text-gold-600 hover:underline font-medium">
                         Detailed View & Notes →
                       </Link>
                     </div>

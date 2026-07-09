@@ -38,6 +38,22 @@ export default async function globalSetup() {
       create: { name: "E2E Country", region_id: region.id },
     });
 
+    // "Approved by In-House" is a distinct, higher tier than Country
+    // Supervisor's "Verified" ceiling (Regional Supervisory Operational
+    // Workflow p.5) — tests that need to reach "approved" need a real
+    // In-House account, not the country supervisor.
+    await prisma.user.upsert({
+      where: { email: "e2e-inhouse@test.local" },
+      update: { role: "inhouse_supervisor", password_hash, email_verified: true },
+      create: {
+        full_name: "E2E In-House Supervisor",
+        email: "e2e-inhouse@test.local",
+        password_hash,
+        role: "inhouse_supervisor",
+        email_verified: true,
+      },
+    });
+
     const supervisor = await prisma.user.upsert({
       where: { email: "e2e-supervisor@test.local" },
       update: { role: "country_supervisor", password_hash, email_verified: true, assigned_country_id: country.id },
@@ -87,14 +103,15 @@ export default async function globalSetup() {
         },
       }));
 
-    // A candidate with a real, logged-in-able account and a real, still-
-    // pending application — built directly rather than walked through the
-    // full Phase 2 screening-gate + invite-email flow (already covered by
+    // A candidate with a real, logged-in-able account, already "verified"
+    // (one step short of "approved"), and a real, still-pending
+    // application — built directly rather than walked through the full
+    // Phase 2 screening-gate + invite-email flow (already covered by
     // candidate-lifecycle.spec.ts), so the Phase 4 case-workflow E2E test
-    // can focus on what's new: an admin approving the application through
-    // the real UI (exercising the actual case-auto-creation hook, not a
-    // pre-baked one), stage advance, and the candidate signing their own
-    // contract.
+    // can focus on what's new: an In-House Supervisor approving the
+    // candidate through the real UI (exercising the actual
+    // case-auto-creation hook, not a pre-baked one), stage advance, and
+    // the candidate signing their own contract.
     const caseCandidateUser = await prisma.user.upsert({
       where: { email: "e2e-case-candidate@test.local" },
       update: { role: "candidate", password_hash, email_verified: true },
@@ -109,15 +126,26 @@ export default async function globalSetup() {
 
     const caseCandidate = await prisma.candidate.upsert({
       where: { user_id: caseCandidateUser.id },
-      update: {},
-      create: { user_id: caseCandidateUser.id, source: "self_registered", lifecycle_status: "approved" },
+      update: { lifecycle_status: "verified" },
+      create: { user_id: caseCandidateUser.id, source: "self_registered", lifecycle_status: "verified" },
     });
 
-    await prisma.application.upsert({
-      where: { candidate_id_job_id: { candidate_id: caseCandidate.id, job_id: job.id } },
-      update: { application_status: "submitted" },
-      create: { candidate_id: caseCandidate.id, job_id: job.id, application_status: "submitted" },
+    // job_id has no unique constraint against candidate_id anymore
+    // (applications are general programme submissions, not tied to a
+    // specific job listing) — find-then-create/update instead of upsert.
+    const existingCaseApplication = await prisma.application.findFirst({
+      where: { candidate_id: caseCandidate.id, job_id: job.id },
     });
+    if (existingCaseApplication) {
+      await prisma.application.update({
+        where: { id: existingCaseApplication.id },
+        data: { application_status: "submitted" },
+      });
+    } else {
+      await prisma.application.create({
+        data: { candidate_id: caseCandidate.id, job_id: job.id, application_status: "submitted" },
+      });
+    }
   } finally {
     await prisma.$disconnect();
   }

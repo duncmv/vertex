@@ -1,8 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { createJobSchema } from "@/lib/validations";
-import { getAuthUser, requireAdmin } from "@/lib/api-auth";
+import { getAuthUser, requireRole } from "@/lib/api-auth";
 export const dynamic = "force-dynamic";
+
+// Job postings are Marketing's sole responsibility — a role deliberately
+// kept outside the three-tier operational hierarchy (Regional Supervisory
+// Operational Workflow). Admin keeps override access.
+const JOB_MANAGER_ROLES = ["marketing", "admin"] as const;
 
 // GET /api/jobs — public paginated listing
 export async function GET(req: NextRequest) {
@@ -50,10 +55,10 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ jobs, total, page, pages: Math.ceil(total / limit) });
 }
 
-// POST /api/jobs — admin only
+// POST /api/jobs — Marketing (admin retains override)
 export async function POST(req: NextRequest) {
   const user = await getAuthUser(req);
-  const guardRes = requireAdmin(user);
+  const guardRes = requireRole(user, [...JOB_MANAGER_ROLES]);
   if (guardRes) return guardRes;
 
   let body: unknown;

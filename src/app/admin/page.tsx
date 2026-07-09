@@ -12,8 +12,9 @@ interface Job {
 interface Application {
   id: string;
   application_status: string;
-  candidate: { user: { full_name: string } };
-  job: { title: string };
+  candidate: { full_name: string | null; user: { full_name: string } | null };
+  job: { title: string } | null;
+  preferred_sector: { name: string } | null;
 }
 
 export default function AdminOverviewPage() {
@@ -71,15 +72,15 @@ export default function AdminOverviewPage() {
               <thead className="text-midnight-900/40 text-xs uppercase tracking-wider">
                 <tr>
                   <th className="px-5 py-3 font-semibold">Candidate</th>
-                  <th className="px-5 py-3 font-semibold">Job Applied</th>
+                  <th className="px-5 py-3 font-semibold">Programme</th>
                   <th className="px-5 py-3 font-semibold">Status</th>
                 </tr>
               </thead>
               <tbody>
                 {applications.slice(0, 5).map((app) => (
                   <tr key={app.id} className="border-b border-midnight-900/5 last:border-0">
-                    <td className="px-5 py-4 font-medium text-midnight-900">{app.candidate.user.full_name}</td>
-                    <td className="px-5 py-4 text-midnight-900/60">{app.job.title}</td>
+                    <td className="px-5 py-4 font-medium text-midnight-900">{app.candidate.user?.full_name ?? app.candidate.full_name ?? "— unnamed lead —"}</td>
+                    <td className="px-5 py-4 text-midnight-900/60">{app.job?.title ?? app.preferred_sector?.name ?? "General Programme"}</td>
                     <td className="px-5 py-4">
                       <span className={`badge-${app.application_status}`}>{app.application_status}</span>
                     </td>

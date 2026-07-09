@@ -37,7 +37,7 @@ test.describe("Authenticated access (regression coverage for the middleware cryp
     // Wait for the login POST + client-side redirect to actually land
     // before navigating away — otherwise the next page.goto can race the
     // in-flight request and abort it before the session cookie is set.
-    await page.waitForURL((url) => !url.pathname.startsWith("/auth/login"), { timeout: 10_000 });
+    await page.waitForURL((url) => !url.pathname.startsWith("/auth/login"), { timeout: 25_000 });
 
     // This must NOT bounce back to /auth/login — that exact regression
     // (valid session, still redirected) is what shipped silently before

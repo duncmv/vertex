@@ -58,9 +58,14 @@ export default function Footer() {
           <div className="col-span-1 lg:col-span-1">
             <div className="flex items-center gap-3 mb-6">
               <img src="/logo.svg" alt="Vertex" className="h-8 w-auto brightness-0 invert opacity-90" />
-              <span className="text-gold-400 font-medium text-[9px] tracking-[0.35em] uppercase leading-none">
-                International
-              </span>
+              <div className="flex flex-col justify-center">
+                <span className="text-ivory-50 font-semibold text-sm leading-none tracking-[0.2em]">
+                  VERTEX
+                </span>
+                <span className="text-gold-400 font-medium text-[9px] tracking-[0.35em] uppercase leading-none mt-1.5">
+                  International
+                </span>
+              </div>
             </div>
             <p className="text-sm leading-relaxed text-ivory-50/50 font-light max-w-xs">
               A UK-incorporated human capital and mobility enterprise connecting talent, employers, agencies

@@ -25,10 +25,10 @@ export default function Loading() {
           />
                
           {/* Center Logo with heartbeat scale */}
-          <img 
-            src="/logo.svg" 
-            alt="Vertex Loading..." 
-            className="h-16 w-auto relative z-10 drop-shadow-md"
+          <img
+            src="/logo.svg"
+            alt="Vertex Loading..."
+            className="h-16 w-auto relative z-10 brightness-0 drop-shadow-md"
             style={{ animation: 'pulse-scale 2s ease-in-out infinite' }}
           />
         </div>

@@ -88,6 +88,7 @@ function RegisterForm() {
         <div className="text-center mb-8">
           <Link href="/" className="inline-block mb-6">
             <img src="/logo.svg" alt="Vertex" className="h-10 w-auto brightness-0 invert mx-auto" />
+            <span className="block text-ivory-50 font-semibold text-lg tracking-[0.2em] mt-3">VERTEX</span>
             <span className="block text-gold-400 text-xs font-semibold tracking-widest uppercase mt-1">International</span>
           </Link>
           <h1 className="section-title-dark text-3xl">Create Your Account</h1>

@@ -3,9 +3,8 @@ import { canSetLifecycleStatus } from "./candidateLifecycle";
 
 describe("canSetLifecycleStatus", () => {
   describe("regional_recruiter", () => {
-    it("can advance forward up to reported", () => {
+    it("can advance forward up to reported, except the two system-only stages", () => {
       expect(canSetLifecycleStatus("regional_recruiter", "identified", "screened").allowed).toBe(true);
-      expect(canSetLifecycleStatus("regional_recruiter", "screened", "guided_to_apply").allowed).toBe(true);
       expect(canSetLifecycleStatus("regional_recruiter", "submitted", "reported").allowed).toBe(true);
     });
 
@@ -21,10 +20,16 @@ describe("canSetLifecycleStatus", () => {
       expect(result.isReturn).toBe(true);
     });
 
-    it("cannot manually mark a candidate submitted — that only happens once a real application exists", () => {
+    it("cannot manually mark a candidate guided_to_apply — that only happens once the candidate claims their invite and creates an account", () => {
+      const result = canSetLifecycleStatus("regional_recruiter", "screened", "guided_to_apply");
+      expect(result.allowed).toBe(false);
+      expect(result.reason).toMatch(/claims their emailed invite/i);
+    });
+
+    it("cannot manually mark a candidate submitted — that only happens once required documents are uploaded", () => {
       const result = canSetLifecycleStatus("regional_recruiter", "guided_to_apply", "submitted");
       expect(result.allowed).toBe(false);
-      expect(result.reason).toMatch(/real job application/i);
+      expect(result.reason).toMatch(/documents are uploaded/i);
     });
   });
 

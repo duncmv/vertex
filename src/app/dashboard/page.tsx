@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import CandidateCaseCard from "@/components/CandidateCaseCard";
 import CandidateProfileForm from "@/components/CandidateProfileForm";
+import { UNIVERSAL_DOCUMENT_TYPES, documentTypeLabel } from "@/lib/documentTypes";
 import {
   ClipboardText,
   FileText,
@@ -23,6 +24,7 @@ interface Application {
   application_status: string;
   submitted_at: string;
   job: { id: string; title: string; country: string; city: string; salary_range?: string } | null;
+  preferred_country_1_id: string | null;
   preferred_country_1: { name: string } | null;
   preferred_sector: { name: string } | null;
 }
@@ -66,6 +68,7 @@ export default function DashboardPage() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [applications, setApplications] = useState<Application[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
+  const [extraDocumentTypes, setExtraDocumentTypes] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -79,6 +82,17 @@ export default function DashboardPage() {
       setApplications(Array.isArray(a) ? a : []);
       setPayments(Array.isArray(payRes) ? payRes : []);
       setLoading(false);
+
+      // The Candidate Information Form's own Section 3 says some documents
+      // are only required for specific destination countries (admin-managed
+      // CountryDocumentRequirement) — show those alongside the universal set.
+      const countryId = Array.isArray(a) ? a[0]?.preferred_country_1_id : null;
+      if (countryId) {
+        fetch(`/api/admin/countries/${countryId}/document-requirements`)
+          .then((r) => r.json())
+          .then((res) => setExtraDocumentTypes((res.data ?? []).map((r: { document_type: string }) => r.document_type)))
+          .catch(() => {});
+      }
     }).catch(() => { setError("Failed to load dashboard."); setLoading(false); });
   }, []);
 
@@ -167,17 +181,29 @@ export default function DashboardPage() {
             <UploadSimple size={18} weight="regular" /> Upload Documents
           </h2>
           <div className="grid sm:grid-cols-2 gap-4">
-            {(["cv", "passport"] as const).map((type) => {
-              const Icon = type === "cv" ? FileText : IdentificationCard;
+            {[...UNIVERSAL_DOCUMENT_TYPES, ...extraDocumentTypes].map((type) => {
+              const uploaded = profile?.documents.some((d) => d.type === type) ?? false;
               return (
-                <label key={type} className="border-2 border-dashed border-midnight-900/15 rounded-xl p-6 text-center cursor-pointer hover:border-gold-400 hover:bg-gold-50/40 transition-colors group">
-                  <Icon size={30} weight="regular" className="mx-auto mb-2 text-midnight-900/40 group-hover:text-gold-600" />
+                <label
+                  key={type}
+                  className={`border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-colors group ${
+                    uploaded
+                      ? "border-emerald-300 bg-emerald-50/40"
+                      : "border-midnight-900/15 hover:border-gold-400 hover:bg-gold-50/40"
+                  }`}
+                >
+                  {uploaded ? (
+                    <CheckCircle size={30} weight="fill" className="mx-auto mb-2 text-emerald-600" />
+                  ) : (
+                    <FileText size={30} weight="regular" className="mx-auto mb-2 text-midnight-900/40 group-hover:text-gold-600" />
+                  )}
                   <div className="font-semibold text-midnight-800 group-hover:text-midnight-950">
-                    Upload {type === "cv" ? "CV / Resume" : "Passport Scan"}
+                    {uploaded ? "Uploaded" : "Upload"} {documentTypeLabel(type)}
                   </div>
-                  <div className="text-xs text-midnight-900/40 mt-1">PDF, JPG, PNG · Max 5MB</div>
+                  <div className="text-xs text-midnight-900/40 mt-1">PDF, JPG, PNG · Max 5MB{uploaded && " · Click to replace"}</div>
                   <input
                     type="file"
+                    data-testid={`upload-${type}-input`}
                     accept=".pdf,.jpg,.jpeg,.png"
                     className="hidden"
                     onChange={async (e) => {

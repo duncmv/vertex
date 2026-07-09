@@ -6,9 +6,11 @@ import { updateCountryDocumentRequirementsSchema } from "@/lib/validations";
 // GET /api/admin/countries/:id/document-requirements — the extra documents
 // (beyond the universal passport/photo/CV set) a specific programme
 // destination requires (Candidate Information Form §3's "Required for: X").
+// Readable by the candidate too — they need to know what their own
+// dashboard's document checklist expects of them.
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const user = await getAuthUser(req);
-  const guardRes = requireRole(user, ["regional_recruiter", "country_supervisor", "inhouse_supervisor", "director", "marketing", "admin"]);
+  const guardRes = requireRole(user, ["candidate", "regional_recruiter", "country_supervisor", "inhouse_supervisor", "director", "marketing", "admin"]);
   if (guardRes) return guardRes;
 
   const { id } = await params;

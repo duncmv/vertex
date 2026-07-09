@@ -50,12 +50,17 @@ export async function POST(req: NextRequest) {
   // one. An invalid, expired, or already-claimed invite falls back to
   // normal self-registration rather than blocking the person entirely.
   let linkedCandidateId: string | null = null;
+  let linkedCandidateLifecycleStatus: string | null = null;
   if (invite) {
     try {
       const { candidateId } = verifyCandidateInviteToken(invite);
-      const candidate = await prisma.candidate.findUnique({ where: { id: candidateId }, select: { id: true, user_id: true } });
+      const candidate = await prisma.candidate.findUnique({
+        where: { id: candidateId },
+        select: { id: true, user_id: true, lifecycle_status: true },
+      });
       if (candidate && !candidate.user_id) {
         linkedCandidateId = candidate.id;
+        linkedCandidateLifecycleStatus = candidate.lifecycle_status;
       }
     } catch {
       // Ignore — treat as a normal self-registration.
@@ -77,7 +82,19 @@ export async function POST(req: NextRequest) {
   });
 
   if (linkedCandidateId) {
-    await db.candidate.update({ where: { id: linkedCandidateId }, data: { user_id: user.id } });
+    await db.candidate.update({
+      where: { id: linkedCandidateId },
+      data: {
+        user_id: user.id,
+        // Claiming the invite is what "guided to apply" now means — the
+        // candidate has created their own account and can go upload
+        // documents (candidateLifecycle.ts treats this transition as
+        // system-only, not something staff manually advance). Guarded so
+        // this never clobbers a candidate a supervisor has already moved
+        // further along by the time they get around to registering.
+        ...(linkedCandidateLifecycleStatus === "screened" ? { lifecycle_status: "guided_to_apply" } : {}),
+      },
+    });
   }
 
   // Send verification email (non-blocking)

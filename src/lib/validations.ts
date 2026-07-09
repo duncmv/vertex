@@ -5,6 +5,15 @@ import { z } from "zod";
 // an untouched form input, since .optional() only short-circuits undefined.
 const optionalEmail = z.preprocess((val) => (val === "" ? undefined : val), z.string().email().optional());
 
+// Matches the Prisma DocumentType enum — used both for the Candidate
+// Information Form's Section 3 self-reported checklist and for admin's
+// per-country document-requirement configuration.
+const DOCUMENT_TYPES = [
+  "cv", "passport", "transcript", "certificate", "medical", "police_clearance", "contract", "visa", "other",
+  "all_passport_pages", "passport_photo", "national_id", "cv_europass", "education_diploma",
+  "driving_licence", "tachograph_card", "professional_training_certificate", "e_apostille", "zab_recognition_letter",
+] as const;
+
 // Auth
 export const registerSchema = z.object({
   full_name: z.string().min(2, "Full name must be at least 2 characters").max(100),
@@ -53,17 +62,44 @@ export const createJobSchema = z.object({
   status: z.enum(["active", "closed", "draft"]).default("active"),
 });
 
-// Applications — currently the Candidate Information Form: a general
-// programme-interest submission, not an application to a specific job
-// listing (jobs aren't listed on the platform yet). job_id stays as an
-// optional field for when real job matching exists.
+// Applications — the Candidate Information Form: the first thing a
+// candidate (or a recruiter on a walk-in lead's behalf) ever fills in, not
+// an application to a specific job listing (jobs aren't listed on the
+// platform yet — job_id stays optional for when real job matching
+// exists). Submitting this is what creates the Candidate record itself
+// when there isn't one yet (anonymous self-service, or a recruiter
+// entering a brand-new lead) — see POST /api/applications for exactly
+// when the Section 2 fields below are actually required; they're all
+// optional here since they're irrelevant when completing an existing
+// candidate's form.
 export const submitApplicationSchema = z.object({
   job_id: z.string().cuid("Invalid job ID").optional(),
   cover_letter: z.string().optional(),
-  // Present when a recruiter/supervisor submits on behalf of a candidate
-  // who has no account of their own yet (SRS FR-2.1) — otherwise the
-  // authenticated candidate's own profile is used.
+  // Present when staff submits on behalf of an existing candidate record
+  // (SRS FR-2.1) — otherwise the authenticated candidate's own profile is
+  // used, or (if neither applies) a brand-new Candidate is created.
   candidate_id: z.string().cuid().optional(),
+
+  // Section 2 — Candidate Personal Information. Required only when this
+  // submission creates a brand-new Candidate.
+  full_name: z.string().min(2).max(100).optional(),
+  nationality: z.string().min(2).max(100).optional(),
+  date_of_birth: z.string().optional(),
+  passport_number: z.string().optional(),
+  passport_expiry: z.string().optional(),
+  second_nationality: z.string().max(100).optional(),
+  current_occupation: z.string().max(150).optional(),
+  highest_education: z.string().max(150).optional(),
+  home_address: z.string().max(500).optional(),
+  phone: z.string().optional(),
+  whatsapp_number: z.string().max(30).optional(),
+  email: optionalEmail,
+  marital_status: z.string().max(50).optional(),
+  // The form's own "Candidate Declaration" ("I confirm the information
+  // provided is true and complete") — the consent capture point for a
+  // brand-new candidate; an existing lead may already have consent on
+  // file from a recruiter's separate capture.
+  consent_given: z.boolean().optional(),
 
   // Section 1 — Programme Selection. Up to 3 alternatives are requested
   // because vacancy/embassy capacity varies by country.
@@ -74,8 +110,15 @@ export const submitApplicationSchema = z.object({
   earliest_travel_date: z.string().min(1, "Earliest possible travel date is required"),
   prior_eu_visa_applied: z.string().max(500).optional(),
 
-  // Section 5 — Visa & Travel Readiness
-  current_location_country: z.string().max(100).optional(),
+  // Section 3 — Document Checklist: self-reported "can you provide this?"
+  // at submission time, not the documents themselves — those are
+  // uploaded later from the candidate's own dashboard once an account
+  // exists.
+  documents_available: z.array(z.enum(DOCUMENT_TYPES)).default([]),
+
+  // Section 5 — Visa & Travel Readiness. current_location_country_id also
+  // drives round-robin recruiter assignment for a self-service submission.
+  current_location_country_id: z.string().cuid("Select your current location"),
   holds_schengen_visa: z.string().max(200).optional(),
   prior_visa_refusals: z.string().max(500).optional(),
   available_for_embassy_appointment: z.boolean().default(false),
@@ -86,6 +129,23 @@ export const submitApplicationSchema = z.object({
   payment_plan_acknowledged: z.literal(true, {
     message: "You must acknowledge the payment plan to submit.",
   }),
+});
+
+// The subset of submitApplicationSchema's Section 2 fields required when
+// a Candidate Information Form submission creates a brand-new Candidate
+// (no candidate_id, no logged-in candidate profile) — checked in the
+// route handler rather than baked into submitApplicationSchema itself,
+// since these fields are meaningless when completing an existing
+// candidate's form.
+export const newCandidatePersonalInfoSchema = z.object({
+  full_name: z.string().min(2, "Full name is required").max(100),
+  nationality: z.string().min(2, "Nationality is required").max(100),
+  date_of_birth: z.string().min(1, "Date of birth is required"),
+  passport_number: z.string().min(1, "Passport number is required"),
+  passport_expiry: z.string().min(1, "Passport expiry date is required"),
+  phone: z.string().min(1, "Phone number is required"),
+  email: z.string().email("A valid email is required"),
+  consent_given: z.literal(true, { message: "You must confirm the candidate declaration to submit." }),
 });
 
 export const updateApplicationStatusSchema = z.object({
@@ -109,11 +169,6 @@ export const createSectorSchema = z.object({
   name: z.string().min(2).max(100),
 });
 
-const DOCUMENT_TYPES = [
-  "cv", "passport", "transcript", "certificate", "medical", "police_clearance", "contract", "visa", "other",
-  "all_passport_pages", "passport_photo", "national_id", "cv_europass", "education_diploma",
-  "driving_licence", "tachograph_card", "professional_training_certificate", "e_apostille", "zab_recognition_letter",
-] as const;
 export const updateCountryDocumentRequirementsSchema = z.object({
   document_types: z.array(z.enum(DOCUMENT_TYPES)),
 });
@@ -142,19 +197,6 @@ export const createStaffUserSchema = z.object({
 // verification_status/verified_by/verified_at added in Phase 1)
 export const verifyDocumentSchema = z.object({
   verification_status: z.enum(["verified", "rejected"]),
-});
-
-// Candidate registration by a recruiter (SRS FR-2.1) — pre-registration
-// identity, since the person may not have their own account yet.
-export const registerCandidateSchema = z.object({
-  full_name: z.string().min(2).max(100),
-  nationality: z.string().min(2).max(100),
-  date_of_birth: z.string().optional(),
-  passport_number: z.string().optional(),
-  phone: z.string().optional(),
-  email: optionalEmail,
-  desired_role: z.string().max(150).optional(),
-  country_id: z.string().cuid().optional(),
 });
 
 // Progressive candidate detail edits + consent (SRS FR-2.5, FR-2.8) — a

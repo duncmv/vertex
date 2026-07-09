@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
+import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { auditedPrisma } from "@/lib/audit";
-import { submitApplicationSchema } from "@/lib/validations";
+import { submitApplicationSchema, newCandidatePersonalInfoSchema } from "@/lib/validations";
 import { getAuthUser, requireAuth } from "@/lib/api-auth";
 import { isStaffRole } from "@/lib/rbac";
 import { canAccessCandidate, scopeCandidatesToRequester } from "@/server/scope";
+import { assignNextRecruiterForCountry } from "@/server/services/recruiterAssignment";
+import { rateLimit } from "@/lib/rate-limit";
 
 // GET /api/applications — a candidate sees their own; every staff role
 // sees applications scoped exactly like the candidate list itself (SRS
@@ -56,16 +59,16 @@ export async function GET(req: NextRequest) {
   return NextResponse.json(applications);
 }
 
-// POST /api/applications — an authenticated candidate submits for
-// themselves, or a recruiter/supervisor submits on behalf of a
-// recruiter-sourced lead who has no account yet (SRS FR-2.1). Either path
-// creates a real Application record, which is what actually advances a
-// candidate's lifecycle_status to "submitted" — that status is no longer
-// something a recruiter can just flip manually (see candidateLifecycle.ts).
+// POST /api/applications — the Candidate Information Form. The first
+// thing anyone fills in: a candidate submitting anonymously (no account
+// yet — the whole point is that screening happens before an account
+// exists), a recruiter entering a walk-in lead who has none either, or
+// (less commonly now) an existing candidate/lead completing or
+// resubmitting theirs. Creating a brand-new Candidate this way sets
+// lifecycle_status "identified"; a self-service submission with no
+// recruiter gets one round-robin-assigned by current-location country.
 export async function POST(req: NextRequest) {
   const user = await getAuthUser(req);
-  const guardRes = requireAuth(user);
-  if (guardRes) return guardRes;
 
   let body: unknown;
   try { body = await req.json(); } catch { return NextResponse.json({ error: "Invalid JSON" }, { status: 400 }); }
@@ -75,9 +78,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Validation failed", details: parsed.error.flatten().fieldErrors }, { status: 422 });
   }
 
-  let candidate;
+  type ExistingCandidate = Prisma.CandidateGetPayload<{
+    include: { user: true; documents: { select: { type: true } } };
+  }>;
+
+  let candidate: ExistingCandidate | null = null;
+  let isNewCandidate = false;
+
   if (parsed.data.candidate_id) {
-    if (!isStaffRole(user!.role)) {
+    if (!user || !isStaffRole(user.role)) {
       return NextResponse.json({ error: "Only staff can submit an application on behalf of a candidate." }, { status: 403 });
     }
     candidate = await prisma.candidate.findUnique({
@@ -85,34 +94,55 @@ export async function POST(req: NextRequest) {
       include: { user: true, documents: { select: { type: true } } },
     });
     if (!candidate) return NextResponse.json({ error: "Candidate not found." }, { status: 404 });
-    if (!(await canAccessCandidate(user!, candidate))) {
+    if (!(await canAccessCandidate(user, candidate))) {
       return NextResponse.json({ error: "Forbidden." }, { status: 403 });
     }
-  } else {
+  } else if (user && user.role === "candidate") {
     candidate = await prisma.candidate.findUnique({
-      where: { user_id: user!.userId },
+      where: { user_id: user.userId },
       include: { user: true, documents: { select: { type: true } } },
     });
     if (!candidate) return NextResponse.json({ error: "Candidate profile not found." }, { status: 404 });
+  } else if (user && !isStaffRole(user.role)) {
+    // An authenticated, non-staff, non-candidate role (shouldn't really
+    // exist, but fail closed rather than silently treating them as a new
+    // anonymous submitter).
+    return NextResponse.json({ error: "Forbidden." }, { status: 403 });
+  } else {
+    // Anonymous self-service, or staff entering a brand-new walk-in lead.
+    isNewCandidate = true;
   }
 
-  const hasCv = candidate.documents.some((d: { type: string }) => d.type === "cv");
-  const hasPassport = candidate.documents.some((d: { type: string }) => d.type === "passport");
-  if (!hasCv || !hasPassport) {
-    return NextResponse.json(
-      { error: "A CV and Passport scan must be uploaded before applying." },
-      { status: 400 }
-    );
+  let newCandidateInfo: ReturnType<typeof newCandidatePersonalInfoSchema.parse> | null = null;
+  if (isNewCandidate) {
+    if (!user) {
+      const ip = req.headers.get("x-forwarded-for") ?? "unknown";
+      const rl = rateLimit(`applications-new:${ip}`, { max: 5, windowMs: 60_000 });
+      if (!rl.success) {
+        return NextResponse.json({ error: "Too many submissions. Please try again later." }, { status: 429 });
+      }
+    }
+    const infoParsed = newCandidatePersonalInfoSchema.safeParse(parsed.data);
+    if (!infoParsed.success) {
+      return NextResponse.json(
+        { error: "Validation failed", details: infoParsed.error.flatten().fieldErrors },
+        { status: 422 }
+      );
+    }
+    newCandidateInfo = infoParsed.data;
   }
 
   // A candidate already mid-pipeline shouldn't be able to submit a second,
   // conflicting Candidate Information Form — resubmission belongs to
-  // whichever staff role owns that stage (e.g. a supervisor Return).
-  const existing = await prisma.application.findFirst({
-    where: { candidate_id: candidate.id, application_status: { not: "rejected" } },
-  });
-  if (existing) {
-    return NextResponse.json({ error: "This candidate already has an active application on file." }, { status: 409 });
+  // whichever staff role owns that stage (e.g. a supervisor Return). Not
+  // relevant for a brand-new candidate, who by definition has none yet.
+  if (candidate) {
+    const existing = await prisma.application.findFirst({
+      where: { candidate_id: candidate.id, application_status: { not: "rejected" } },
+    });
+    if (existing) {
+      return NextResponse.json({ error: "This candidate already has an active application on file." }, { status: 409 });
+    }
   }
 
   // job_id stays for when real job matching exists — jobs aren't listed on
@@ -124,11 +154,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Job not found or no longer active." }, { status: 404 });
     }
 
-    // Ensure payment is completed if fee required. A recruiter-sourced
-    // candidate with no linked account has no way to have paid themselves —
-    // block rather than silently skip the fee requirement.
+    // Ensure payment is completed if fee required. A candidate with no
+    // linked account (brand-new, or a recruiter-sourced lead) has no way
+    // to have paid themselves — block rather than silently skip the fee
+    // requirement.
     if (job.application_fee && job.application_fee > 0) {
-      if (!candidate.user_id) {
+      if (!candidate?.user_id) {
         return NextResponse.json({
           error: "This position requires a paid application fee, which only the candidate can pay from their own account. Ask them to create an account first.",
         }, { status: 402 });
@@ -151,18 +182,63 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  const [country1, sector] = await Promise.all([
+  const [country1, sector, currentLocationCountry] = await Promise.all([
     prisma.country.findUnique({ where: { id: parsed.data.preferred_country_1_id } }),
     prisma.sector.findUnique({ where: { id: parsed.data.preferred_sector_id } }),
+    prisma.country.findUnique({ where: { id: parsed.data.current_location_country_id } }),
   ]);
   if (!country1) return NextResponse.json({ error: "Preferred country (option 1) not found." }, { status: 404 });
   if (!sector) return NextResponse.json({ error: "Preferred type of work not found." }, { status: 404 });
+  if (!currentLocationCountry) return NextResponse.json({ error: "Current location country not found." }, { status: 404 });
 
-  const db = auditedPrisma(user!.userId);
+  const db = auditedPrisma(user?.userId ?? null);
+
+  if (isNewCandidate && newCandidateInfo) {
+    const isStaffSubmission = !!user && isStaffRole(user.role);
+    // Only an actual Regional Recruiter self-assigns as the owner; any
+    // other staff role (a supervisor stepping in, say) triggers the same
+    // round-robin assignment an anonymous submission would, rather than
+    // incorrectly attributing the lead to a non-recruiter.
+    let recruiterId: string | null;
+    if (user?.role === "regional_recruiter") {
+      recruiterId = user.userId;
+    } else if (user?.role === "admin") {
+      recruiterId = null;
+    } else {
+      recruiterId = await assignNextRecruiterForCountry(parsed.data.current_location_country_id);
+    }
+
+    candidate = await db.candidate.create({
+      data: {
+        full_name: newCandidateInfo.full_name,
+        nationality: newCandidateInfo.nationality,
+        date_of_birth: new Date(newCandidateInfo.date_of_birth),
+        passport_number: newCandidateInfo.passport_number,
+        passport_expiry: new Date(newCandidateInfo.passport_expiry),
+        second_nationality: parsed.data.second_nationality,
+        current_occupation: parsed.data.current_occupation,
+        highest_education: parsed.data.highest_education,
+        home_address: parsed.data.home_address,
+        phone: newCandidateInfo.phone,
+        whatsapp_number: parsed.data.whatsapp_number,
+        email: newCandidateInfo.email,
+        marital_status: parsed.data.marital_status,
+        consent_given: true,
+        consent_at: new Date(),
+        source: isStaffSubmission ? "recruiter_sourced" : "self_registered",
+        recruiter_id: recruiterId,
+        country_id: parsed.data.current_location_country_id,
+        lifecycle_status: "identified",
+      },
+      include: { user: true, documents: { select: { type: true } } },
+    });
+  }
+
+  const activeCandidate = candidate!;
 
   const application = await db.application.create({
     data: {
-      candidate_id: candidate.id,
+      candidate_id: activeCandidate.id,
       job_id: parsed.data.job_id,
       cover_letter: parsed.data.cover_letter,
       preferred_country_1_id: parsed.data.preferred_country_1_id,
@@ -171,7 +247,8 @@ export async function POST(req: NextRequest) {
       preferred_sector_id: parsed.data.preferred_sector_id,
       earliest_travel_date: new Date(parsed.data.earliest_travel_date),
       prior_eu_visa_applied: parsed.data.prior_eu_visa_applied,
-      current_location_country: parsed.data.current_location_country,
+      documents_available: parsed.data.documents_available,
+      current_location_country_id: parsed.data.current_location_country_id,
       holds_schengen_visa: parsed.data.holds_schengen_visa,
       prior_visa_refusals: parsed.data.prior_visa_refusals,
       available_for_embassy_appointment: parsed.data.available_for_embassy_appointment,
@@ -181,15 +258,15 @@ export async function POST(req: NextRequest) {
     },
   });
 
-  // Auto-advance the pre-application lifecycle now that a real submission
-  // exists (SRS FR-2.4) — only from guided_to_apply, so this doesn't
-  // clobber a candidate a supervisor has already moved further along.
-  if (candidate.lifecycle_status === "guided_to_apply") {
-    await db.candidate.update({ where: { id: candidate.id }, data: { lifecycle_status: "submitted" } });
+  // Auto-advance only applies to an existing candidate somehow already at
+  // guided_to_apply resubmitting — a brand-new candidate always starts at
+  // identified, several stages earlier.
+  if (!isNewCandidate && activeCandidate.lifecycle_status === "guided_to_apply") {
+    await db.candidate.update({ where: { id: activeCandidate.id }, data: { lifecycle_status: "submitted" } });
   }
 
-  const recipientEmail = candidate.user?.email ?? candidate.email;
-  const recipientName = candidate.user?.full_name ?? candidate.full_name;
+  const recipientEmail = activeCandidate.user?.email ?? activeCandidate.email;
+  const recipientName = activeCandidate.user?.full_name ?? activeCandidate.full_name;
   if (recipientEmail && recipientName) {
     try {
       const { sendApplicationConfirmationEmail } = await import("@/lib/email");

@@ -77,16 +77,11 @@ export default function ApplyPage() {
         {authState === "loading" && <p className="text-center text-slate-400 py-10">Loading…</p>}
 
         {authState === "signed_out" && (
-          <div className="card p-8 text-center">
-            <h2 className="font-bold text-slate-800 text-lg mb-2">Create an account to apply</h2>
-            <p className="text-slate-500 text-sm mb-6">
-              We track your application and documents through your own Vertex account, so you'll need to
-              sign in or register first.
+          <div className="card p-8">
+            <ApplicationForm includePersonalInfo onSubmitted={() => {}} />
+            <p className="text-center text-xs text-slate-400 mt-4">
+              Already submitted and have an account? <Link href="/auth/login?redirect=/apply" className="underline">Log in</Link> to check your status.
             </p>
-            <div className="flex gap-3 justify-center">
-              <Link href="/auth/register?redirect=/apply" className="btn-gold text-sm py-2.5 px-6">Create Account</Link>
-              <Link href="/auth/login?redirect=/apply" className="btn-secondary text-sm py-2.5 px-6">Log In</Link>
-            </div>
           </div>
         )}
 

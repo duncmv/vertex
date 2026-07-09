@@ -6,18 +6,23 @@ export interface ScreeningResult {
 }
 
 const MINIMUM_AGE_YEARS = 18;
+const MINIMUM_PASSPORT_VALIDITY_MONTHS = 6;
 
 type ScreenableCandidate = {
   full_name: string | null;
   nationality: string | null;
   date_of_birth: Date | null;
   passport_number: string | null;
+  passport_expiry: Date | null;
   phone: string | null;
   email: string | null;
-  desired_role: string | null;
   consent_given: boolean;
   user: { full_name: string; email: string; phone: string | null } | null;
-  documents: { type: string; verification_status: string }[];
+  applications: {
+    preferred_country_1_id: string | null;
+    preferred_sector_id: string | null;
+    earliest_travel_date: Date | null;
+  }[];
 };
 
 function calculateAge(dob: Date): number {
@@ -30,22 +35,27 @@ function calculateAge(dob: Date): number {
   return age;
 }
 
+function monthsUntil(date: Date): number {
+  const now = new Date();
+  return (date.getFullYear() - now.getFullYear()) * 12 + (date.getMonth() - now.getMonth());
+}
+
 /**
- * Screening gate (SRS FR-2.5): a candidate cannot be guided to apply until
- * eligibility, documentation, availability/consent, and complete data are
- * confirmed. "Role suitability" from FR-2.5 has no dedicated matching model
- * yet (that's Phase 4's Case/stage territory) — represented here as simply
- * requiring a desired_role be on file, not an actual suitability judgment.
+ * Screening gate (SRS FR-2.5): evaluated against the Candidate Information
+ * Form itself — the candidate's own Section 2 answers plus their
+ * Application's Section 1 selections — not against uploaded documents or
+ * an account, neither of which exist yet at this point in the real
+ * process (the CIF is filled in first, screened, and only then does the
+ * candidate get invited to create an account and upload documents).
+ * "Role suitability" from FR-2.5 has no dedicated matching model yet
+ * (that's Phase 4's Case/stage territory) — represented here as requiring
+ * a preferred sector be on file via the CIF, not an actual suitability
+ * judgment.
  */
 export function evaluateScreeningGate(candidate: ScreenableCandidate): ScreeningResult {
   const failures: string[] = [];
 
   const fullName = candidate.user?.full_name ?? candidate.full_name;
-  // Phone alone is enough at initial registration (a recruiter's first
-  // field contact may only yield a phone number), but by the time a
-  // candidate is guided to apply, an email is required — application
-  // status updates, payment receipts, and their eventual account login
-  // (User.email is unique + mandatory) all depend on it.
   const email = candidate.user?.email ?? candidate.email;
   const phone = candidate.user?.phone ?? candidate.phone;
 
@@ -55,18 +65,25 @@ export function evaluateScreeningGate(candidate: ScreenableCandidate): Screening
   if (!candidate.passport_number) failures.push("Passport number is missing.");
   if (!phone) failures.push("Phone number is missing.");
   if (!email) failures.push("Email address is missing.");
-  if (!candidate.desired_role) failures.push("Desired role is missing.");
 
   if (candidate.date_of_birth && calculateAge(candidate.date_of_birth) < MINIMUM_AGE_YEARS) {
     failures.push(`Candidate is under the minimum eligible age of ${MINIMUM_AGE_YEARS}.`);
   }
 
-  const cv = candidate.documents.find((d) => d.type === "cv");
-  const passport = candidate.documents.find((d) => d.type === "passport");
-  if (!cv) failures.push("CV has not been uploaded.");
-  else if (cv.verification_status === "rejected") failures.push("Uploaded CV was rejected.");
-  if (!passport) failures.push("Passport scan has not been uploaded.");
-  else if (passport.verification_status === "rejected") failures.push("Uploaded passport scan was rejected.");
+  if (!candidate.passport_expiry) {
+    failures.push("Passport expiry date is missing.");
+  } else if (monthsUntil(candidate.passport_expiry) < MINIMUM_PASSPORT_VALIDITY_MONTHS) {
+    failures.push(`Passport must have at least ${MINIMUM_PASSPORT_VALIDITY_MONTHS} months' validity remaining.`);
+  }
+
+  const application = candidate.applications[0];
+  if (!application) {
+    failures.push("No Candidate Information Form submission on file.");
+  } else {
+    if (!application.preferred_country_1_id) failures.push("Preferred programme country is missing.");
+    if (!application.preferred_sector_id) failures.push("Preferred type of work is missing.");
+    if (!application.earliest_travel_date) failures.push("Earliest possible travel date is missing.");
+  }
 
   if (!candidate.consent_given) failures.push("Candidate consent has not been recorded.");
 
@@ -81,12 +98,17 @@ export async function evaluateScreeningGateForCandidateId(candidateId: string): 
       nationality: true,
       date_of_birth: true,
       passport_number: true,
+      passport_expiry: true,
       phone: true,
       email: true,
-      desired_role: true,
       consent_given: true,
       user: { select: { full_name: true, email: true, phone: true } },
-      documents: { select: { type: true, verification_status: true } },
+      applications: {
+        where: { application_status: { not: "rejected" } },
+        orderBy: { submitted_at: "desc" },
+        take: 1,
+        select: { preferred_country_1_id: true, preferred_sector_id: true, earliest_travel_date: true },
+      },
     },
   });
 

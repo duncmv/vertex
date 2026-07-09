@@ -10,8 +10,10 @@ import { updateCandidateStatusSchema } from "@/lib/validations";
 import { sendCandidateInviteEmail } from "@/lib/email";
 
 // PATCH /api/candidates/:id/status — role-gated lifecycle transition
-// (SRS FR-2.4), screening-gate enforced on guided_to_apply (FR-2.5), and
-// the supervisor verification-return workflow (FR-2.7).
+// (SRS FR-2.4), screening-gate enforced on screened (FR-2.5 — evaluated
+// against the Candidate Information Form itself, since no account or
+// documents exist yet at this point), and the supervisor
+// verification-return workflow (FR-2.7).
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const user = await getAuthUser(req);
   const guardRes = requireRole(user, [
@@ -78,7 +80,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     );
   }
 
-  if (target === "guided_to_apply") {
+  if (target === "screened") {
     const screening = await evaluateScreeningGateForCandidateId(id);
     // Persisted regardless of outcome — "screening result" is its own
     // standard report-content field (Regional Supervisory Operational
@@ -109,10 +111,12 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     },
   });
 
-  // Invite the candidate to self-serve once they've been screened (SRS
-  // FR-2.1) — lets them browse real jobs and submit a genuine application
-  // themselves. Skipped if they already have an account, or there's no
-  // email to invite yet (a phone-only lead can still be screened).
+  // Invite the candidate to create their own account now that they've
+  // cleared the screening gate above (SRS FR-2.1) — reaching this line at
+  // target === "screened" means the gate already passed, since a failure
+  // returns 422 before here. Skipped if they already have an account, or
+  // there's no email to invite yet (a phone-only lead can still be
+  // screened, they just can't self-serve from here).
   if (target === "screened" && !candidate.user_id && candidate.email) {
     sendCandidateInviteEmail(id, candidate.email, candidate.full_name ?? "there").catch(console.error);
   }

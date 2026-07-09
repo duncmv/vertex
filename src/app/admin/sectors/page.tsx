@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import PortalShell from "@/components/portal/PortalShell";
 import { ADMIN_NAV_ITEMS } from "@/components/portal/adminNav";
 import { Briefcase, Plus, Trash, FileText } from "@phosphor-icons/react";
+import { DOCUMENT_TYPE_LABELS, CIF_PROGRAMME_SPECIFIC_DOCUMENT_TYPES } from "@/lib/documentTypes";
 
 interface Sector {
   id: string;
@@ -16,21 +17,12 @@ interface Country {
   region: { id: string; name: string };
 }
 
-// Matches the DocumentType enum — labelled in the Candidate Information
-// Form's Section 3 order. "cv"/"passport"/"passport_photo" aren't listed
-// here since every programme requires them regardless of country.
-const DOCUMENT_TYPE_OPTIONS: { value: string; label: string }[] = [
-  { value: "all_passport_pages", label: "All Passport Pages (good quality)" },
-  { value: "national_id", label: "National ID Copy" },
-  { value: "cv_europass", label: "CV in Europass format" },
-  { value: "education_diploma", label: "Education Diploma" },
-  { value: "police_clearance", label: "Criminal Record Certificate" },
-  { value: "driving_licence", label: "Driving Licence — Category CE" },
-  { value: "tachograph_card", label: "Tachograph Card + Code 95" },
-  { value: "professional_training_certificate", label: "Professional Training Certificate" },
-  { value: "e_apostille", label: "e-Apostille" },
-  { value: "zab_recognition_letter", label: "ZAB Recognition Letter (skilled employees)" },
-];
+// Universal types (cv/passport/passport_photo) aren't listed here since
+// every programme requires them regardless of country.
+const DOCUMENT_TYPE_OPTIONS = CIF_PROGRAMME_SPECIFIC_DOCUMENT_TYPES.map((value) => ({
+  value,
+  label: DOCUMENT_TYPE_LABELS[value],
+}));
 
 export default function SectorsPage() {
   const [sectors, setSectors] = useState<Sector[]>([]);

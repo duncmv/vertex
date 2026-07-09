@@ -101,6 +101,7 @@ model Country {
   preferred_by_1           Application[]                @relation("PreferredCountry1")
   preferred_by_2           Application[]                @relation("PreferredCountry2")
   preferred_by_3           Application[]                @relation("PreferredCountry3")
+  current_located_by       Application[]                @relation("CurrentLocationCountry")
 
   @@index([region_id])
 }
@@ -426,8 +427,18 @@ model Application {
   earliest_travel_date   DateTime?
   prior_eu_visa_applied  String?   @db.Text // "Yes / No / Where" — kept free-text per the form
 
-  // Section 5 — Visa & Travel Readiness
-  current_location_country          String?
+  // Section 3 — Document Checklist: self-reported "can you provide this?"
+  // at submission time, not the documents themselves (those are uploaded
+  // later, from the candidate's own dashboard, once an account exists).
+  documents_available DocumentType[]
+
+  // Section 5 — Visa & Travel Readiness. current_location_country_id is
+  // also what drives round-robin recruiter assignment for a self-service
+  // submission (matched against User.assigned_country_id) — a real
+  // Country FK, not free text, scoped in the UI to the source-market
+  // regions (Africa, Middle East & Gulf), not the Europe destination list.
+  current_location_country_id        String?
+  current_location_country           Country? @relation("CurrentLocationCountry", fields: [current_location_country_id], references: [id], onDelete: SetNull)
   holds_schengen_visa                String?  @db.Text
   prior_visa_refusals                String?  @db.Text
   available_for_embassy_appointment  Boolean  @default(false)
@@ -443,6 +454,7 @@ model Application {
 
   @@index([candidate_id])
   @@index([job_id])
+  @@index([current_location_country_id])
 }
 
 model Payment {

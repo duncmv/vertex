@@ -5,6 +5,7 @@ import { saveUploadedFile, deleteUploadedFile } from "@/lib/upload";
 import { getAuthUser, requireAuth } from "@/lib/api-auth";
 import { canAccessCandidate } from "@/server/scope";
 import { isStaffRole } from "@/lib/rbac";
+import { evaluateDocumentCompletenessForCandidateId } from "@/server/services/documentCompleteness";
 import type { DocumentType } from "@prisma/client";
 
 // SRS FR-4.6 extends per-document verification beyond cv/passport to the
@@ -52,14 +53,14 @@ export async function POST(req: NextRequest) {
 
   const targetCandidateId = req.nextUrl.searchParams.get("candidate_id");
 
-  let candidate: { id: string } | null;
+  let candidate: { id: string; lifecycle_status: string } | null;
   if (targetCandidateId) {
     if (!isStaffRole(user!.role)) {
       return NextResponse.json({ error: "Only staff can upload on behalf of a candidate." }, { status: 403 });
     }
     const full = await prisma.candidate.findUnique({
       where: { id: targetCandidateId },
-      select: { id: true, user_id: true, recruiter_id: true, country_id: true },
+      select: { id: true, user_id: true, recruiter_id: true, country_id: true, lifecycle_status: true },
     });
     if (!full) {
       return NextResponse.json({ error: "Candidate not found." }, { status: 404 });
@@ -71,7 +72,7 @@ export async function POST(req: NextRequest) {
   } else {
     candidate = await prisma.candidate.findUnique({
       where: { user_id: user!.userId },
-      select: { id: true },
+      select: { id: true, lifecycle_status: true },
     });
   }
 
@@ -105,6 +106,18 @@ export async function POST(req: NextRequest) {
       storage_path: storagePath,
     },
   });
+
+  // "Submitted" now means the candidate's required documents are all in
+  // (they already submitted the Candidate Information Form itself at
+  // "identified", long before any account or document existed) — this is
+  // the system-only trigger candidateLifecycle.ts expects, so only fires
+  // from guided_to_apply, never clobbering a candidate already further along.
+  if (candidate.lifecycle_status === "guided_to_apply") {
+    const completeness = await evaluateDocumentCompletenessForCandidateId(candidate.id);
+    if (completeness.complete) {
+      await db.candidate.update({ where: { id: candidate.id }, data: { lifecycle_status: "submitted" } });
+    }
+  }
 
   return NextResponse.json({ documentId: document.id, message: "File uploaded successfully." });
 }

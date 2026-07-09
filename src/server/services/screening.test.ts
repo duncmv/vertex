@@ -1,20 +1,25 @@
 import { describe, it, expect } from "vitest";
 import { evaluateScreeningGate } from "./screening";
 
+function farFuturePassportExpiry() {
+  const d = new Date();
+  d.setFullYear(d.getFullYear() + 2);
+  return d;
+}
+
 function baseCandidate() {
   return {
     full_name: "Jane Doe",
     nationality: "Kenyan",
     date_of_birth: new Date("1995-01-01"),
     passport_number: "P12345678",
+    passport_expiry: farFuturePassportExpiry(),
     phone: "+254700000000",
     email: "jane@example.com",
-    desired_role: "Warehouse Operative",
     consent_given: true,
     user: null,
-    documents: [
-      { type: "cv", verification_status: "pending" },
-      { type: "passport", verification_status: "pending" },
+    applications: [
+      { preferred_country_1_id: "country-1", preferred_sector_id: "sector-1", earliest_travel_date: new Date() },
     ],
   };
 }
@@ -50,16 +55,10 @@ describe("evaluateScreeningGate", () => {
     expect(result.failures).toContain("Phone number is missing.");
   });
 
-  it("fails when email is missing, even with a phone on file — phone alone was enough to register but not to be guided to apply", () => {
+  it("fails when email is missing, even with a phone on file — an invite link can't be sent without one", () => {
     const result = evaluateScreeningGate({ ...baseCandidate(), email: null });
     expect(result.passed).toBe(false);
     expect(result.failures).toContain("Email address is missing.");
-  });
-
-  it("fails when desired_role is missing", () => {
-    const result = evaluateScreeningGate({ ...baseCandidate(), desired_role: null });
-    expect(result.passed).toBe(false);
-    expect(result.failures).toContain("Desired role is missing.");
   });
 
   it("fails a candidate under the minimum age", () => {
@@ -70,25 +69,33 @@ describe("evaluateScreeningGate", () => {
     expect(result.failures.some((f) => f.includes("minimum eligible age"))).toBe(true);
   });
 
-  it("fails when CV is missing", () => {
-    const result = evaluateScreeningGate({
-      ...baseCandidate(),
-      documents: [{ type: "passport", verification_status: "pending" }],
-    });
+  it("fails when passport expiry is missing", () => {
+    const result = evaluateScreeningGate({ ...baseCandidate(), passport_expiry: null });
     expect(result.passed).toBe(false);
-    expect(result.failures).toContain("CV has not been uploaded.");
+    expect(result.failures).toContain("Passport expiry date is missing.");
   });
 
-  it("fails when a document was rejected, even if present", () => {
+  it("fails when passport has less than 6 months' validity", () => {
+    const soon = new Date();
+    soon.setMonth(soon.getMonth() + 2);
+    const result = evaluateScreeningGate({ ...baseCandidate(), passport_expiry: soon });
+    expect(result.passed).toBe(false);
+    expect(result.failures.some((f) => f.includes("6 months"))).toBe(true);
+  });
+
+  it("fails when no Candidate Information Form submission is on file", () => {
+    const result = evaluateScreeningGate({ ...baseCandidate(), applications: [] });
+    expect(result.passed).toBe(false);
+    expect(result.failures).toContain("No Candidate Information Form submission on file.");
+  });
+
+  it("fails when the submission is missing a preferred country", () => {
     const result = evaluateScreeningGate({
       ...baseCandidate(),
-      documents: [
-        { type: "cv", verification_status: "rejected" },
-        { type: "passport", verification_status: "pending" },
-      ],
+      applications: [{ preferred_country_1_id: null, preferred_sector_id: "sector-1", earliest_travel_date: new Date() }],
     });
     expect(result.passed).toBe(false);
-    expect(result.failures).toContain("Uploaded CV was rejected.");
+    expect(result.failures).toContain("Preferred programme country is missing.");
   });
 
   it("fails when consent has not been given", () => {
@@ -102,8 +109,8 @@ describe("evaluateScreeningGate", () => {
       ...baseCandidate(),
       nationality: null,
       consent_given: false,
-      documents: [],
+      applications: [],
     });
-    expect(result.failures.length).toBeGreaterThanOrEqual(4);
+    expect(result.failures.length).toBeGreaterThanOrEqual(3);
   });
 });

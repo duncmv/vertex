@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { CaretRight, ArrowUUpLeft } from "@phosphor-icons/react";
-import CandidateApplyOnBehalf from "./CandidateApplyOnBehalf";
 
 const STATUS_ORDER = ["identified", "screened", "guided_to_apply", "submitted", "reported", "verified", "approved"] as const;
 type Status = (typeof STATUS_ORDER)[number];
@@ -59,9 +58,11 @@ export default function CandidateStatusControls({ candidateId, status, canVerify
   // starts once a candidate has actually been reported. Showing a button
   // outside either range would look actionable but always be rejected
   // server-side (verified separately by canSetLifecycleStatus's tests).
-  // "submitted" is a special case: it's not a manual recruiter action at
-  // all anymore — only a real Application record can set it.
-  const recruiterCanAdvance = !canVerify && currentIdx < reportedIdx && status !== "guided_to_apply";
+  // "guided_to_apply" and "submitted" are both system-only now: the
+  // former fires when the candidate claims their invite and creates an
+  // account, the latter when their required documents are all uploaded —
+  // neither is a manual recruiter action.
+  const recruiterCanAdvance = !canVerify && currentIdx < reportedIdx && status !== "screened" && status !== "guided_to_apply";
   const supervisorCanAdvance =
     canVerify && currentIdx >= reportedIdx && !atOrPastApproval && (canApprove || nextStatus !== "approved");
 
@@ -103,11 +104,15 @@ export default function CandidateStatusControls({ candidateId, status, canVerify
           </button>
         )}
 
-        {!canVerify && status === "guided_to_apply" && (
-          <CandidateApplyOnBehalf candidateId={candidateId} onSubmitted={() => onChanged({ lifecycle_status: "submitted", return_reason: null })} />
+        {!canVerify && status === "screened" && (
+          <span className="text-xs text-midnight-900/40 italic">Awaiting candidate to create an account</span>
         )}
 
-        {!canVerify && !recruiterCanAdvance && status !== "guided_to_apply" && (
+        {!canVerify && status === "guided_to_apply" && (
+          <span className="text-xs text-midnight-900/40 italic">Awaiting document upload</span>
+        )}
+
+        {!canVerify && !recruiterCanAdvance && status !== "screened" && status !== "guided_to_apply" && (
           <span className="text-xs text-midnight-900/40 italic">Awaiting supervisor action</span>
         )}
 

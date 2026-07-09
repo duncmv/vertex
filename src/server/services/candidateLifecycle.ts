@@ -40,9 +40,16 @@ export interface TransitionCheck {
 
 /**
  * Role-gated lifecycle transition rules (SRS FR-2.4, FR-2.5, FR-2.7).
- * Screening-gate evaluation for the guided_to_apply transition happens
+ * Screening-gate evaluation for the screened transition happens
  * separately (server/services/screening.ts) — this only decides whether
  * the requester's role may attempt the move at all.
+ *
+ * guided_to_apply and submitted are both system-only forward transitions
+ * now — the Candidate Information Form is screened *before* an account
+ * exists, so "guided to apply" really means "has claimed their invite and
+ * created an account" (fired from /api/auth/register) and "submitted"
+ * means "required documents are uploaded" (fired from /api/upload), not
+ * something staff manually advance to.
  */
 export function canSetLifecycleStatus(role: Role, from: LifecycleStatus, to: LifecycleStatus): TransitionCheck {
   const fromIdx = STATUS_ORDER.indexOf(from);
@@ -61,10 +68,17 @@ export function canSetLifecycleStatus(role: Role, from: LifecycleStatus, to: Lif
     if (isReturn) {
       return { allowed: false, reason: "Recruiters cannot move a candidate backward — only a supervisor can return one.", isReturn };
     }
+    if (from === "screened" && to === "guided_to_apply") {
+      return {
+        allowed: false,
+        reason: "Account creation happens automatically once the candidate claims their emailed invite link — there's nothing to manually advance here.",
+        isReturn,
+      };
+    }
     if (from === "guided_to_apply" && to === "submitted") {
       return {
         allowed: false,
-        reason: "Submission happens automatically once a real job application exists — submit one yourself on the candidate's behalf, or wait for them to apply through their own account.",
+        reason: "Submission happens automatically once the candidate's required documents are uploaded.",
         isReturn,
       };
     }

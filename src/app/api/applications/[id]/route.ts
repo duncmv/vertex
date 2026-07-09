@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { auditedPrisma } from "@/lib/audit";
 import { updateApplicationStatusSchema } from "@/lib/validations";
 import { getAuthUser, requireAdmin } from "@/lib/api-auth";
+import { createCaseForApprovedApplication } from "@/server/services/caseLifecycle";
 
 // PUT /api/applications/[id] — admin updates status
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -27,6 +28,11 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       job: true
     }
   });
+
+  // A Case is the start of the Phase 4 mobility lifecycle (SRS FR-4.1/4.2).
+  if (parsed.data.application_status === "approved") {
+    await createCaseForApprovedApplication(id, user!.userId);
+  }
 
   try {
     const { sendStatusUpdateEmail } = await import("@/lib/email");

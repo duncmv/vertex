@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { auditedPrisma } from "@/lib/audit";
 import { getAuthUser, requireAdmin } from "@/lib/api-auth";
 import { sendStatusUpdateEmail, sendInterviewInvitationEmail } from "@/lib/email";
+import { createCaseForApprovedApplication } from "@/server/services/caseLifecycle";
 
 // GET /api/admin/applications/[id]
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -17,6 +18,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       include: {
         candidate: {
           include: {
+            // full_name/email/phone are the fallback fields for a
+            // recruiter-sourced candidate with no linked account yet — user
+            // being null is a real, reachable state (SRS FR-2.1), not an
+            // edge case to assume away.
             user: { select: { full_name: true, email: true, phone: true, country: true } },
             documents: { select: { id: true, type: true, verification_status: true } },
           }
@@ -71,23 +76,34 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       data: updateData,
     });
 
-    // Send emails if status or interview date changed
-    if (body.application_status && body.application_status !== existingApp.application_status) {
-      await sendStatusUpdateEmail(
-        existingApp.candidate.user.email,
-        existingApp.candidate.user.full_name,
-        existingApp.job.title,
-        body.application_status
-      );
+    // A Case is the start of the Phase 4 mobility lifecycle (SRS FR-4.1/4.2)
+    // — this is the second of two admin paths that can approve an
+    // application (the other is the list view's inline status dropdown),
+    // so both must open the case, not just one.
+    if (body.application_status === "approved") {
+      await createCaseForApprovedApplication(id, user!.userId);
     }
 
-    if (body.interview_date && (!existingApp.interview_date || new Date(body.interview_date).getTime() !== existingApp.interview_date.getTime())) {
-      await sendInterviewInvitationEmail(
-        existingApp.candidate.user.email,
-        existingApp.candidate.user.full_name,
-        existingApp.job.title,
-        new Date(body.interview_date)
-      );
+    // A recruiter-sourced candidate with no linked account yet has no
+    // email to send to (SRS FR-2.1) — skip rather than crash.
+    if (existingApp.candidate.user) {
+      if (body.application_status && body.application_status !== existingApp.application_status) {
+        await sendStatusUpdateEmail(
+          existingApp.candidate.user.email,
+          existingApp.candidate.user.full_name,
+          existingApp.job.title,
+          body.application_status
+        );
+      }
+
+      if (body.interview_date && (!existingApp.interview_date || new Date(body.interview_date).getTime() !== existingApp.interview_date.getTime())) {
+        await sendInterviewInvitationEmail(
+          existingApp.candidate.user.email,
+          existingApp.candidate.user.full_name,
+          existingApp.job.title,
+          new Date(body.interview_date)
+        );
+      }
     }
 
     return NextResponse.json(updated);

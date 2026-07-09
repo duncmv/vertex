@@ -7,9 +7,13 @@ import { canAccessCandidate } from "@/server/scope";
 import { isStaffRole } from "@/lib/rbac";
 import type { DocumentType } from "@prisma/client";
 
-const ALLOWED_TYPES: DocumentType[] = ["cv", "passport"];
+// SRS FR-4.6 extends per-document verification beyond cv/passport to the
+// full mobility-lifecycle document set (transcripts, medical, police
+// clearance, visa, and a supporting contract file distinct from the
+// structured, e-signed Contract record).
+const ALLOWED_TYPES: DocumentType[] = ["cv", "passport", "transcript", "certificate", "medical", "police_clearance", "contract", "visa"];
 
-// POST /api/upload?type=cv|passport[&candidate_id=...]
+// POST /api/upload?type=cv|passport|transcript|certificate|medical|police_clearance|contract|visa[&candidate_id=...]
 // Self-upload (no candidate_id) covers a candidate managing their own
 // account. A recruiter/supervisor/admin passing candidate_id uploads on
 // behalf of a recruiter-sourced lead who has no account yet (SRS FR-2.1,
@@ -23,7 +27,7 @@ export async function POST(req: NextRequest) {
   const fileType = req.nextUrl.searchParams.get("type") as DocumentType | null;
   if (!fileType || !ALLOWED_TYPES.includes(fileType)) {
     return NextResponse.json(
-      { error: "Query param 'type' must be 'cv' or 'passport'." },
+      { error: `Query param 'type' must be one of: ${ALLOWED_TYPES.join(", ")}.` },
       { status: 400 }
     );
   }

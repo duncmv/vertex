@@ -73,8 +73,9 @@ export default async function globalSetup() {
 
     // Job has no unique field to upsert against — check-then-create.
     const existingJob = await prisma.job.findFirst({ where: { title: "E2E Test Job" } });
-    if (!existingJob) {
-      await prisma.job.create({
+    const job =
+      existingJob ??
+      (await prisma.job.create({
         data: {
           title: "E2E Test Job",
           country: "Kenya",
@@ -84,8 +85,39 @@ export default async function globalSetup() {
           status: "active",
           application_fee: 0,
         },
-      });
-    }
+      }));
+
+    // A candidate with a real, logged-in-able account and a real, still-
+    // pending application — built directly rather than walked through the
+    // full Phase 2 screening-gate + invite-email flow (already covered by
+    // candidate-lifecycle.spec.ts), so the Phase 4 case-workflow E2E test
+    // can focus on what's new: an admin approving the application through
+    // the real UI (exercising the actual case-auto-creation hook, not a
+    // pre-baked one), stage advance, and the candidate signing their own
+    // contract.
+    const caseCandidateUser = await prisma.user.upsert({
+      where: { email: "e2e-case-candidate@test.local" },
+      update: { role: "candidate", password_hash, email_verified: true },
+      create: {
+        full_name: "E2E Case Candidate",
+        email: "e2e-case-candidate@test.local",
+        password_hash,
+        role: "candidate",
+        email_verified: true,
+      },
+    });
+
+    const caseCandidate = await prisma.candidate.upsert({
+      where: { user_id: caseCandidateUser.id },
+      update: {},
+      create: { user_id: caseCandidateUser.id, source: "self_registered", lifecycle_status: "approved" },
+    });
+
+    await prisma.application.upsert({
+      where: { candidate_id_job_id: { candidate_id: caseCandidate.id, job_id: job.id } },
+      update: { application_status: "submitted" },
+      create: { candidate_id: caseCandidate.id, job_id: job.id, application_status: "submitted" },
+    });
   } finally {
     await prisma.$disconnect();
   }

@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import CandidateCaseCard from "@/components/CandidateCaseCard";
 import {
   ClipboardText,
   FileText,
@@ -169,6 +170,8 @@ export default function DashboardPage() {
             })}
           </div>
         </div>
+
+        <CandidateCaseCard />
 
         {/* Applications */}
         <div className="card p-6">

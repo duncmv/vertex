@@ -237,3 +237,41 @@ export async function sendInterviewInvitationEmail(to: string, name: string, job
     console.error("Error sending interview invitation:", error);
   }
 }
+
+// SRS FR-4.8 — automated stage-based notification to the candidate on a
+// mobility-case stage change.
+export async function sendCaseStageUpdateEmail(to: string, name: string, jobTitle: string, newStage: string) {
+  const friendlyStage = newStage.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+  const defaultHtml = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;">
+      <div style="background-color: #03120d; padding: 24px; text-align: center;">
+        <h1 style="color: #ffffff; margin: 0; font-size: 24px;">Your Case Has Moved Forward</h1>
+      </div>
+      <div style="padding: 32px; background-color: #ffffff;">
+        <p style="font-size: 16px; color: #334155; margin-bottom: 24px;">Hello {{name}},</p>
+        <p style="font-size: 16px; color: #334155; margin-bottom: 24px;">
+          Your placement case for the <strong>{{jobTitle}}</strong> position has moved to a new stage.
+        </p>
+        <div style="background-color: #fbf9f4; padding: 16px; border-radius: 6px; text-align: center; margin-bottom: 24px;">
+          <span style="font-size: 14px; color: #64748b; text-transform: uppercase; font-weight: bold;">Current Stage</span>
+          <div style="font-size: 20px; color: #03120d; font-weight: bold; margin-top: 4px;">{{friendlyStage}}</div>
+        </div>
+        <div style="text-align: center; margin: 32px 0;">
+          <a href="${APP_URL}/dashboard" style="background-color: #d4af5c; color: #03120d; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">View Your Case</a>
+        </div>
+      </div>
+    </div>
+  `;
+
+  const config = await getEmailConfig("case_stage_update", `Update on your placement: ${jobTitle}`, defaultHtml);
+  const finalHtml = config.html
+    .replace(/\{\{name\}\}/g, name)
+    .replace(/\{\{jobTitle\}\}/g, jobTitle)
+    .replace(/\{\{friendlyStage\}\}/g, friendlyStage);
+
+  try {
+    await transporter.sendMail({ from: FROM, to, subject: config.subject, html: finalHtml });
+  } catch (error) {
+    console.error("Error sending case stage update:", error);
+  }
+}

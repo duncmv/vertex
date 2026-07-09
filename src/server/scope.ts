@@ -80,3 +80,23 @@ export async function canAccessCandidate(
       return false;
   }
 }
+
+/**
+ * Row-level scoping for Cases (SRS FR-4.2), derived through the existing
+ * candidate scope rather than duplicating recruiter_id/country_id onto
+ * Case itself — a case is always reached via application -> candidate.
+ */
+export async function scopeCasesToRequester(user: JwtPayload): Promise<Prisma.CaseWhereInput> {
+  const candidateScope = await scopeCandidatesToRequester(user);
+  return { application: { candidate: candidateScope } };
+}
+
+/**
+ * Single-record authorization check for a Case — mirrors canAccessCandidate.
+ */
+export async function canAccessCase(
+  user: JwtPayload,
+  candidate: CandidateAccessCheck
+): Promise<boolean> {
+  return canAccessCandidate(user, candidate);
+}

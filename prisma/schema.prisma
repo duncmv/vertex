@@ -58,6 +58,11 @@ model User {
   submitted_reports  Report[]    @relation("SubmittedReports")
   campaigns_created  Campaign[]  @relation("CampaignCreator")
 
+  case_stage_events_owned CaseStageEvent[] @relation("CaseStageOwner")
+  case_payments_recorded  CasePayment[]    @relation("CasePaymentRecorder")
+  fee_policies_updated    FeePolicy[]      @relation("FeePolicyUpdater")
+  contracts_created       Contract[]       @relation("ContractCreator")
+
   @@index([email])
   @@index([supervisor_id])
   @@index([assigned_country_id])
@@ -81,6 +86,7 @@ model Country {
   candidates       Candidate[]
   reports          Report[]
   campaign_targets CampaignTarget[]
+  fee_policies     FeePolicy[]
 
   @@index([region_id])
 }
@@ -333,6 +339,7 @@ model Application {
 
   candidate Candidate @relation(fields: [candidate_id], references: [id], onDelete: Cascade)
   job       Job       @relation(fields: [job_id], references: [id], onDelete: Cascade)
+  case      Case?
 
   @@unique([candidate_id, job_id])
   @@index([candidate_id])
@@ -362,6 +369,132 @@ enum PaymentStatus {
   completed
   failed
   refunded
+}
+
+// ── Phase 4: Extended Mobility Lifecycle ────────────────────────────────
+
+enum CaseStage {
+  application_submitted
+  verification
+  offer_issued
+  initial_payment
+  permit_processing
+  permit_delivered
+  final_payment
+  visa_application
+  visa_guidance
+  visa_approved
+  travel_settlement
+}
+
+model Case {
+  id             String      @id @default(cuid())
+  application_id String      @unique
+  application    Application @relation(fields: [application_id], references: [id], onDelete: Cascade)
+  current_stage  CaseStage   @default(application_submitted)
+  // Expected completion of the CURRENT stage — surfaced as an in-app urgency
+  // indicator (FR-4.4: "deadlines and reminders"), not a push-notification trigger.
+  stage_deadline DateTime?
+  created_at     DateTime    @default(now())
+  updated_at     DateTime    @updatedAt
+
+  stage_events        CaseStageEvent[]
+  contract            Contract?
+  payments            CasePayment[]
+  retention_follow_up RetentionFollowUp?
+
+  @@index([current_stage])
+}
+
+model CaseStageEvent {
+  id           String    @id @default(cuid())
+  case_id      String
+  case         Case      @relation(fields: [case_id], references: [id], onDelete: Cascade)
+  stage        CaseStage
+  owner_id     String?
+  owner        User?     @relation("CaseStageOwner", fields: [owner_id], references: [id], onDelete: SetNull)
+  entered_at   DateTime  @default(now())
+  completed_at DateTime?
+  notes        String?   @db.Text
+
+  @@index([case_id])
+  @@index([stage])
+}
+
+model RetentionFollowUp {
+  id           String    @id @default(cuid())
+  case_id      String    @unique
+  case         Case      @relation(fields: [case_id], references: [id], onDelete: Cascade)
+  due_at       DateTime // +90 days from travel_settlement completion
+  completed_at DateTime?
+  notes        String?   @db.Text
+}
+
+enum MilestonePaymentType {
+  initial
+  final
+}
+
+model CasePayment {
+  id                String               @id @default(cuid())
+  case_id           String
+  case              Case                 @relation(fields: [case_id], references: [id], onDelete: Cascade)
+  type              MilestonePaymentType
+  amount            Float
+  currency          String               @default("USD")
+  receipt_reference String? // an invoice/receipt number, or a linked Document id
+  recorded_by       String
+  recorder          User                 @relation("CasePaymentRecorder", fields: [recorded_by], references: [id], onDelete: Cascade)
+  recorded_at       DateTime             @default(now())
+
+  @@index([case_id])
+}
+
+// Admin-configurable milestone-payment policy (SRS FR-4.5) — defaults
+// disabled so no leadership sign-off gates the code shipping; an admin
+// enables/configures amounts (globally or per destination country) whenever
+// the business decides. Case-payment recording reads this policy at
+// runtime rather than a hardcoded rule.
+model FeePolicy {
+  id             String   @id @default(cuid())
+  country_id     String? // null = global default; a country-specific row overrides it
+  country        Country? @relation(fields: [country_id], references: [id], onDelete: SetNull)
+  enabled        Boolean  @default(false)
+  initial_amount Float?
+  final_amount   Float?
+  currency       String   @default("USD")
+  updated_by     String
+  updater        User     @relation("FeePolicyUpdater", fields: [updated_by], references: [id], onDelete: Cascade)
+  updated_at     DateTime @updatedAt
+
+  @@index([country_id])
+}
+
+enum ContractStatus {
+  draft
+  sent
+  signed
+}
+
+// Contract generation + signature capture (FR-4.3). Signature is a real,
+// legally-recognized "simple electronic signature" (typed full-name
+// attestation + authenticated session + timestamp + IP) — deliberate
+// groundwork ahead of Phase 5's e-signature vendor integration (per the
+// platform recommendation, DocuSign/Dropbox Sign is an "integrate", not a
+// build, and explicitly scoped to Phase 5), not a placeholder.
+model Contract {
+  id             String         @id @default(cuid())
+  case_id        String         @unique
+  case           Case           @relation(fields: [case_id], references: [id], onDelete: Cascade)
+  content        String         @db.Text // generated contract body (merged from candidate/job/case data)
+  status         ContractStatus @default(draft)
+  signed_by_name String?
+  signed_at      DateTime?
+  signed_ip      String?
+  created_by     String
+  creator        User           @relation("ContractCreator", fields: [created_by], references: [id], onDelete: Cascade)
+  created_at     DateTime       @default(now())
+  updated_at     DateTime       @updatedAt
 }
 
 model SystemSetting {

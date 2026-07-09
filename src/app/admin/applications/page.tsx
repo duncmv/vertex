@@ -13,7 +13,7 @@ interface Application {
   id: string;
   application_status: string;
   submitted_at: string;
-  candidate: { documents: CandidateDocument[]; user: { full_name: string; email: string } };
+  candidate: { full_name: string | null; documents: CandidateDocument[]; user: { full_name: string; email: string } | null };
   job: { title: string };
 }
 
@@ -66,8 +66,8 @@ export default function AdminApplicationsPage() {
               {applications.map((app) => (
                 <tr key={app.id} className="border-b border-midnight-900/5 last:border-0">
                   <td className="px-5 py-4">
-                    <div className="font-medium text-midnight-900">{app.candidate.user.full_name}</div>
-                    <div className="text-midnight-900/45 text-xs">{app.candidate.user.email}</div>
+                    <div className="font-medium text-midnight-900">{app.candidate.user?.full_name ?? app.candidate.full_name ?? "— unnamed lead —"}</div>
+                    {app.candidate.user?.email && <div className="text-midnight-900/45 text-xs">{app.candidate.user.email}</div>}
                     <div className="text-midnight-900/35 text-xs mt-1">Applied: {new Date(app.submitted_at).toLocaleDateString()}</div>
                   </td>
                   <td className="px-5 py-4 text-midnight-900 font-medium">{app.job.title}</td>

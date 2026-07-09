@@ -101,19 +101,19 @@ export default function ApplicationDetailedPage({ params }: { params: Promise<{ 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <div className="text-xs text-midnight-900/40 font-semibold uppercase mb-1">Full Name</div>
-                    <div className="font-medium text-midnight-900">{appData.candidate.user.full_name}</div>
+                    <div className="font-medium text-midnight-900">{appData.candidate.user?.full_name ?? appData.candidate.full_name ?? "— unnamed lead —"}</div>
                   </div>
                   <div>
                     <div className="text-xs text-midnight-900/40 font-semibold uppercase mb-1">Email</div>
-                    <div className="font-medium text-midnight-900">{appData.candidate.user.email}</div>
+                    <div className="font-medium text-midnight-900">{appData.candidate.user?.email ?? appData.candidate.email ?? "N/A"}</div>
                   </div>
                   <div>
                     <div className="text-xs text-midnight-900/40 font-semibold uppercase mb-1">Phone</div>
-                    <div className="font-medium text-midnight-900">{appData.candidate.user.phone || 'N/A'}</div>
+                    <div className="font-medium text-midnight-900">{appData.candidate.user?.phone ?? appData.candidate.phone ?? 'N/A'}</div>
                   </div>
                   <div>
                     <div className="text-xs text-midnight-900/40 font-semibold uppercase mb-1">Nationality / Country</div>
-                    <div className="font-medium text-midnight-900">{appData.candidate.nationality || appData.candidate.user.country || 'N/A'}</div>
+                    <div className="font-medium text-midnight-900">{appData.candidate.nationality || appData.candidate.user?.country || 'N/A'}</div>
                   </div>
                 </div>
 

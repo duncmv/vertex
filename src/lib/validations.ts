@@ -192,6 +192,57 @@ export const contactFormSchema = z.object({
   message: z.string().min(10).max(2000),
 });
 
+// ── Phase 4: Extended Mobility Lifecycle ────────────────────────────────
+
+const CASE_STAGES = [
+  "application_submitted",
+  "verification",
+  "offer_issued",
+  "initial_payment",
+  "permit_processing",
+  "permit_delivered",
+  "final_payment",
+  "visa_application",
+  "visa_guidance",
+  "visa_approved",
+  "travel_settlement",
+] as const;
+
+export const advanceCaseStageSchema = z.object({
+  stage: z.enum(CASE_STAGES),
+  notes: z.string().max(2000).optional(),
+  // Staff-entered expected completion of the stage being entered (FR-4.4)
+  // — never system-computed from an assumed SLA, since none is specified.
+  stage_deadline: z.string().optional(),
+});
+
+export const createContractSchema = z.object({
+  content: z.string().min(20).max(20000),
+});
+
+export const signContractSchema = z.object({
+  signed_by_name: z.string().min(2).max(200),
+});
+
+export const recordCasePaymentSchema = z.object({
+  type: z.enum(["initial", "final"]),
+  amount: z.number().positive(),
+  currency: z.string().length(3).default("USD"),
+  receipt_reference: z.string().max(200).optional(),
+});
+
+export const updateFeePolicySchema = z.object({
+  country_id: z.string().cuid().nullish(),
+  enabled: z.boolean(),
+  initial_amount: z.number().positive().nullish(),
+  final_amount: z.number().positive().nullish(),
+  currency: z.string().length(3).default("USD"),
+});
+
+export const completeRetentionFollowUpSchema = z.object({
+  notes: z.string().max(2000).optional(),
+});
+
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
 export type CreateJobInput = z.infer<typeof createJobSchema>;

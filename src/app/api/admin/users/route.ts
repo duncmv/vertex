@@ -7,7 +7,7 @@ import { createStaffUserSchema } from "@/lib/validations";
 import { isStaffRole } from "@/lib/rbac";
 import type { Role } from "@prisma/client";
 
-const STAFF_ROLES: Role[] = ["regional_recruiter", "country_supervisor", "inhouse_supervisor", "director", "admin"];
+const STAFF_ROLES: Role[] = ["regional_recruiter", "country_supervisor", "inhouse_supervisor", "director", "marketing", "admin"];
 
 // GET /api/admin/users?role=&q= — staff directory for role/supervisor/country
 // assignment (SRS FR-1.1, FR-1.3, FR-1.4). With no query, defaults to staff

@@ -41,6 +41,7 @@ interface CandidateRow {
   user: { full_name: string; email: string } | null;
   recruiter: { id: string; full_name: string } | null;
   country: { id: string; name: string } | null;
+  partner: { id: string; name: string } | null;
   documents: { id: string; type: string; verification_status: string }[];
 }
 
@@ -155,7 +156,12 @@ export default function CandidateList({
                 </td>
                 <td className="px-5 py-4 text-midnight-900/70">{c.desired_role ?? "—"}</td>
                 <td className="px-5 py-4 text-midnight-900/70">{c.country?.name ?? "—"}</td>
-                <td className="px-5 py-4 text-midnight-900/70">{c.recruiter?.full_name ?? "—"}</td>
+                <td className="px-5 py-4 text-midnight-900/70">
+                  {c.recruiter?.full_name ?? "—"}
+                  {c.source === "partner_sourced" && c.partner && (
+                    <div className="text-[10px] uppercase tracking-wide text-gold-600 mt-0.5">via {c.partner.name}</div>
+                  )}
+                </td>
                 <td className="px-5 py-4">
                   <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${STATUS_STYLES[c.lifecycle_status] ?? "bg-slate-100 text-slate-700"}`}>
                     {c.lifecycle_status.replace(/_/g, " ")}

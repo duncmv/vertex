@@ -6,6 +6,11 @@ import Link from "next/link";
 import PortalShell from "@/components/portal/PortalShell";
 import { MARKETING_NAV_ITEMS } from "@/components/portal/marketingNav";
 
+interface EmployerClient {
+  id: string;
+  name: string;
+}
+
 export default function EditJobPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
   const { id: jobId } = use(params);
@@ -13,6 +18,7 @@ export default function EditJobPage({ params }: { params: Promise<{ id: string }
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(true);
   const [error, setError] = useState("");
+  const [employerClients, setEmployerClients] = useState<EmployerClient[]>([]);
   const [formData, setFormData] = useState({
     title: "",
     country: "",
@@ -22,7 +28,15 @@ export default function EditJobPage({ params }: { params: Promise<{ id: string }
     job_description: "",
     requirements: "",
     status: "active",
+    employer_client_id: "",
   });
+
+  useEffect(() => {
+    fetch("/api/admin/employer-clients")
+      .then((r) => r.json())
+      .then((res) => setEmployerClients(res.data ?? []))
+      .catch(() => {});
+  }, []);
 
   const categories = [
     "Technology", "Healthcare", "Engineering", "Operations",
@@ -43,6 +57,7 @@ export default function EditJobPage({ params }: { params: Promise<{ id: string }
           job_description: data.job_description,
           requirements: data.requirements,
           status: data.status,
+          employer_client_id: data.employer_client_id || "",
         });
         setFetching(false);
       })
@@ -61,7 +76,7 @@ export default function EditJobPage({ params }: { params: Promise<{ id: string }
       const res = await fetch(`/api/jobs/${jobId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({ ...formData, employer_client_id: formData.employer_client_id || undefined }),
       });
 
       if (res.ok) {
@@ -132,6 +147,16 @@ export default function EditJobPage({ params }: { params: Promise<{ id: string }
               <div>
                 <label className="block text-sm font-medium text-midnight-900/70 mb-1.5">Salary Range <span className="text-midnight-900/35 font-normal">(Optional)</span></label>
                 <input type="text" name="salary_range" value={formData.salary_range} onChange={handleChange} className="input-field w-full" />
+              </div>
+
+              <div className="col-span-1 md:col-span-2">
+                <label className="block text-sm font-medium text-midnight-900/70 mb-1.5">Employer / Client <span className="text-midnight-900/35 font-normal">(Optional)</span></label>
+                <select name="employer_client_id" value={formData.employer_client_id} onChange={handleChange} className="input-field w-full">
+                  <option value="">No linked client</option>
+                  {employerClients.map((c) => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
               </div>
 
               <div className="col-span-1 md:col-span-2">

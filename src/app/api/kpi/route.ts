@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthUser, requireRole } from "@/lib/api-auth";
-import { computeKpiSummary, computeTargetsVsActuals, type KpiFilters } from "@/server/services/kpi";
+import { computeKpiSummary, computeTargetsVsActuals, computePartnerPerformance, type KpiFilters } from "@/server/services/kpi";
 
 // GET /api/kpi — Management/Control dashboard data (SRS FR-3.1, FR-3.2,
 // FR-3.8). Restricted to the roles the dashboard itself is for — a
@@ -29,10 +29,11 @@ export async function GET(req: NextRequest) {
 
   const campaignId = searchParams.get("campaign_id");
 
-  const [summary, targetsVsActuals] = await Promise.all([
+  const [summary, targetsVsActuals, partnerPerformance] = await Promise.all([
     computeKpiSummary(filters),
     campaignId ? computeTargetsVsActuals(campaignId, filters) : Promise.resolve(null),
+    computePartnerPerformance(filters),
   ]);
 
-  return NextResponse.json({ data: { summary, targetsVsActuals } });
+  return NextResponse.json({ data: { summary, targetsVsActuals, partnerPerformance } });
 }

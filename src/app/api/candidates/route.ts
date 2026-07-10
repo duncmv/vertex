@@ -44,6 +44,7 @@ export async function GET(req: NextRequest) {
       user: { select: { full_name: true, email: true } },
       recruiter: { select: { id: true, full_name: true } },
       country: { select: { id: true, name: true } },
+      partner: { select: { id: true, name: true } },
       documents: { select: { id: true, type: true, verification_status: true } },
     },
     orderBy: { created_at: "desc" },

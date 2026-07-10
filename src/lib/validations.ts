@@ -60,6 +60,7 @@ export const createJobSchema = z.object({
   job_description: z.string().min(50, "Job description must be at least 50 characters"),
   requirements: z.string().min(20, "Requirements must be at least 20 characters"),
   status: z.enum(["active", "closed", "draft"]).default("active"),
+  employer_client_id: z.string().cuid().optional(),
 });
 
 // Applications — the Candidate Information Form: the first thing a
@@ -79,6 +80,10 @@ export const submitApplicationSchema = z.object({
   // (SRS FR-2.1) — otherwise the authenticated candidate's own profile is
   // used, or (if neither applies) a brand-new Candidate is created.
   candidate_id: z.string().cuid().optional(),
+  // Attributes a brand-new candidate to the sourcing partner/agency (SRS
+  // FR-5.1) — staff-only, never honored for an anonymous self-service
+  // submission (a candidate can't attribute their own partner).
+  partner_id: z.string().cuid().optional(),
 
   // Section 2 — Candidate Personal Information. Required only when this
   // submission creates a brand-new Candidate.
@@ -348,6 +353,56 @@ export const updateFeePolicySchema = z.object({
 
 export const completeRetentionFollowUpSchema = z.object({
   notes: z.string().max(2000).optional(),
+});
+
+// Phase 5: Partner CRM (SRS FR-5.1) — travel agencies, visa consultancies,
+// manpower suppliers. Staff-managed only; no partner self-service portal.
+const PARTNER_TYPES = ["travel_agency", "visa_consultancy", "manpower_supplier", "other"] as const;
+export const createPartnerSchema = z.object({
+  name: z.string().min(2, "Name is required").max(150),
+  partner_type: z.enum(PARTNER_TYPES),
+  country_of_operation: z.string().min(2, "Country of operation is required").max(100),
+  business_registration_number: z.string().max(100).optional(),
+  contact_name: z.string().min(2, "Contact name is required").max(150),
+  contact_email: z.string().email("A valid contact email is required"),
+  contact_phone: z.string().min(3, "Contact phone is required").max(30),
+  notes: z.string().max(2000).optional(),
+});
+
+export const updatePartnerSchema = z.object({
+  name: z.string().min(2).max(150).optional(),
+  partner_type: z.enum(PARTNER_TYPES).optional(),
+  country_of_operation: z.string().min(2).max(100).optional(),
+  business_registration_number: z.string().max(100).nullish(),
+  contact_name: z.string().min(2).max(150).optional(),
+  contact_email: z.string().email().optional(),
+  contact_phone: z.string().min(3).max(30).optional(),
+  status: z.enum(["pending", "active", "suspended"]).optional(),
+  mou_status: z.enum(["none", "sent", "signed"]).optional(),
+  notes: z.string().max(2000).nullish(),
+});
+
+// Phase 5: Employer/Client CRM (SRS FR-5.2) — the employer a vacancy is
+// actually for, distinct from Partner (which sources candidates, not jobs).
+export const createEmployerClientSchema = z.object({
+  name: z.string().min(2, "Name is required").max(150),
+  country: z.string().min(2, "Country is required").max(100),
+  industry: z.string().max(100).optional(),
+  contact_name: z.string().min(2, "Contact name is required").max(150),
+  contact_email: z.string().email("A valid contact email is required"),
+  contact_phone: z.string().min(3, "Contact phone is required").max(30),
+  notes: z.string().max(2000).optional(),
+});
+
+export const updateEmployerClientSchema = z.object({
+  name: z.string().min(2).max(150).optional(),
+  country: z.string().min(2).max(100).optional(),
+  industry: z.string().max(100).nullish(),
+  contact_name: z.string().min(2).max(150).optional(),
+  contact_email: z.string().email().optional(),
+  contact_phone: z.string().min(3).max(30).optional(),
+  status: z.enum(["active", "inactive"]).optional(),
+  notes: z.string().max(2000).nullish(),
 });
 
 export type RegisterInput = z.infer<typeof registerSchema>;

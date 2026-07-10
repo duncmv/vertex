@@ -92,16 +92,16 @@ model Country {
   region_id String
   region    Region @relation(fields: [region_id], references: [id], onDelete: Restrict)
 
-  users            User[]
-  candidates       Candidate[]
-  reports          Report[]
-  campaign_targets CampaignTarget[]
-  fee_policies     FeePolicy[]
-  document_requirements    CountryDocumentRequirement[]
-  preferred_by_1           Application[]                @relation("PreferredCountry1")
-  preferred_by_2           Application[]                @relation("PreferredCountry2")
-  preferred_by_3           Application[]                @relation("PreferredCountry3")
-  current_located_by       Application[]                @relation("CurrentLocationCountry")
+  users                 User[]
+  candidates            Candidate[]
+  reports               Report[]
+  campaign_targets      CampaignTarget[]
+  fee_policies          FeePolicy[]
+  document_requirements CountryDocumentRequirement[]
+  preferred_by_1        Application[]                @relation("PreferredCountry1")
+  preferred_by_2        Application[]                @relation("PreferredCountry2")
+  preferred_by_3        Application[]                @relation("PreferredCountry3")
+  current_located_by    Application[]                @relation("CurrentLocationCountry")
 
   @@index([region_id])
 }
@@ -133,6 +133,7 @@ model CountryDocumentRequirement {
 enum CandidateSource {
   self_registered
   recruiter_sourced
+  partner_sourced
 }
 
 enum CandidateLifecycleStatus {
@@ -146,20 +147,20 @@ enum CandidateLifecycleStatus {
 }
 
 model Candidate {
-  id              String    @id @default(cuid())
-  user_id         String?   @unique // nullable: a recruiter-sourced lead may not have an account yet (SRS FR-2.1)
-  passport_number String?
-  passport_expiry DateTime? // every programme requires >= 6 months validity (Candidate Information Form §2)
-  date_of_birth   DateTime?
-  nationality     String?
-  second_nationality  String?
-  current_occupation  String?
-  highest_education   String?
-  home_address        String?  @db.Text
-  whatsapp_number     String?
-  marital_status      String?
-  created_at      DateTime  @default(now())
-  updated_at      DateTime  @updatedAt
+  id                 String    @id @default(cuid())
+  user_id            String?   @unique // nullable: a recruiter-sourced lead may not have an account yet (SRS FR-2.1)
+  passport_number    String?
+  passport_expiry    DateTime? // every programme requires >= 6 months validity (Candidate Information Form §2)
+  date_of_birth      DateTime?
+  nationality        String?
+  second_nationality String?
+  current_occupation String?
+  highest_education  String?
+  home_address       String?   @db.Text
+  whatsapp_number    String?
+  marital_status     String?
+  created_at         DateTime  @default(now())
+  updated_at         DateTime  @updatedAt
 
   // Pre-registration identity (SRS FR-2.1, FR-2.8) — only meaningful when
   // user_id is null. Once a User is linked, that record's full_name/
@@ -179,6 +180,13 @@ model Candidate {
   country_id       String?
   country          Country?                 @relation(fields: [country_id], references: [id], onDelete: SetNull)
   lifecycle_status CandidateLifecycleStatus @default(identified)
+
+  // Partner CRM attribution (SRS FR-5.1) — set only at creation time, when
+  // staff attribute a new lead to the agency that sourced them; same
+  // one-shot pattern as recruiter_id, not editable afterward via a general
+  // edit form.
+  partner_id String?
+  partner    Partner? @relation(fields: [partner_id], references: [id], onDelete: SetNull)
 
   // Screening gate (SRS FR-2.5) + verification-return workflow (FR-2.7)
   consent_given Boolean   @default(false)
@@ -200,6 +208,7 @@ model Candidate {
   @@index([user_id])
   @@index([recruiter_id])
   @@index([country_id])
+  @@index([partner_id])
 }
 
 // police_clearance already covers the Candidate Information Form's
@@ -385,11 +394,17 @@ model Job {
   created_at      DateTime  @default(now())
   updated_at      DateTime  @updatedAt
 
+  // Which employer/client this vacancy is actually for (SRS FR-5.2) —
+  // optional since not every posting is linked to an on-file client yet.
+  employer_client_id String?
+  employer_client    EmployerClient? @relation(fields: [employer_client_id], references: [id], onDelete: SetNull)
+
   applications Application[]
   payments     Payment[]
 
   @@index([status])
   @@index([country])
+  @@index([employer_client_id])
 }
 
 enum ContactChannel {
@@ -437,13 +452,13 @@ model Application {
   // submission (matched against User.assigned_country_id) — a real
   // Country FK, not free text, scoped in the UI to the source-market
   // regions (Africa, Middle East & Gulf), not the Europe destination list.
-  current_location_country_id        String?
-  current_location_country           Country? @relation("CurrentLocationCountry", fields: [current_location_country_id], references: [id], onDelete: SetNull)
-  holds_schengen_visa                String?  @db.Text
-  prior_visa_refusals                String?  @db.Text
-  available_for_embassy_appointment  Boolean  @default(false)
-  willing_to_start_within_30_days    Boolean  @default(false)
-  preferred_contact_channel          ContactChannel?
+  current_location_country_id       String?
+  current_location_country          Country?        @relation("CurrentLocationCountry", fields: [current_location_country_id], references: [id], onDelete: SetNull)
+  holds_schengen_visa               String?         @db.Text
+  prior_visa_refusals               String?         @db.Text
+  available_for_embassy_appointment Boolean         @default(false)
+  willing_to_start_within_30_days   Boolean         @default(false)
+  preferred_contact_channel         ContactChannel?
 
   // Section 4 — Payment Plan Acknowledgement (the candidate's "I understand" tick)
   payment_plan_acknowledged Boolean @default(false)
@@ -572,17 +587,17 @@ model CasePayment {
 // the business decides. Case-payment recording reads this policy at
 // runtime rather than a hardcoded rule.
 model FeePolicy {
-  id                  String   @id @default(cuid())
-  country_id          String? // null = global default; a country-specific row overrides it
-  country             Country? @relation(fields: [country_id], references: [id], onDelete: SetNull)
-  enabled             Boolean  @default(false)
+  id                   String   @id @default(cuid())
+  country_id           String? // null = global default; a country-specific row overrides it
+  country              Country? @relation(fields: [country_id], references: [id], onDelete: SetNull)
+  enabled              Boolean  @default(false)
   documentation_amount Float?
   permit_amount        Float?
   visa_amount          Float?
-  currency            String   @default("USD")
-  updated_by          String
-  updater             User     @relation("FeePolicyUpdater", fields: [updated_by], references: [id], onDelete: Cascade)
-  updated_at          DateTime @updatedAt
+  currency             String   @default("USD")
+  updated_by           String
+  updater              User     @relation("FeePolicyUpdater", fields: [updated_by], references: [id], onDelete: Cascade)
+  updated_at           DateTime @updatedAt
 
   @@index([country_id])
 }
@@ -612,6 +627,82 @@ model Contract {
   creator        User           @relation("ContractCreator", fields: [created_by], references: [id], onDelete: Cascade)
   created_at     DateTime       @default(now())
   updated_at     DateTime       @updatedAt
+}
+
+// ── Phase 5: Partner CRM (SRS FR-5.1, FR-5.2) ───────────────────────────
+// Staff-managed only — no partner self-service portal (agencies keep
+// submitting the Agency Application Form by email; Vertex staff re-key it
+// via the same Candidate Information Form flow, now attributing the
+// sourcing partner). See docs/PLATFORM_ARCHITECTURE.md for the confirmed-
+// deferred FR-5.3-5.9 integrations this phase deliberately excludes.
+
+enum PartnerType {
+  travel_agency
+  visa_consultancy
+  manpower_supplier
+  other
+}
+
+enum PartnerStatus {
+  pending
+  active
+  suspended
+}
+
+enum MouStatus {
+  none
+  sent
+  signed
+}
+
+// A recruitment/travel agency or manpower supplier that sources candidate
+// leads (Agency Application Form). country_of_operation is free text, not
+// a Country FK — an agency can be based anywhere, not just Vertex's
+// current programme-destination reference list.
+model Partner {
+  id                           String        @id @default(cuid())
+  name                         String
+  partner_type                 PartnerType
+  country_of_operation         String
+  business_registration_number String?
+  contact_name                 String
+  contact_email                String
+  contact_phone                String
+  status                       PartnerStatus @default(pending)
+  mou_status                   MouStatus     @default(none)
+  mou_signed_at                DateTime?
+  notes                        String?       @db.Text
+  created_at                   DateTime      @default(now())
+  updated_at                   DateTime      @updatedAt
+
+  candidates Candidate[]
+
+  @@index([status])
+}
+
+enum EmployerClientStatus {
+  active
+  inactive
+}
+
+// The employer a vacancy is actually for (SRS FR-5.2) — distinct from
+// Partner (which sources candidates, not jobs).
+model EmployerClient {
+  id            String               @id @default(cuid())
+  name          String
+  country       String
+  industry      String?
+  contact_name  String
+  contact_email String
+  contact_phone String
+  status        EmployerClientStatus @default(active)
+  notes         String?              @db.Text
+  created_at    DateTime             @default(now())
+  updated_at    DateTime             @updatedAt
+
+  jobs Job[]
+
+  @@index([status])
 }
 
 model SystemSetting {

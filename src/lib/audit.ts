@@ -19,6 +19,8 @@ const AUDITED_MODELS = new Set([
   "CasePayment",
   "FeePolicy",
   "RetentionFollowUp",
+  "Partner",
+  "EmployerClient",
 ]);
 const AUDITED_OPERATIONS = new Set(["create", "update", "delete"]);
 

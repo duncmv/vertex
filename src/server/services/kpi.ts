@@ -39,11 +39,13 @@ export async function computeAgentSignups(filters: KpiFilters): Promise<number> 
 
 /**
  * "Agency response rate" (SRS FR-3.2) has no further definition in the SRS
- * and no Agency/Partner entity exists yet (that's Phase 5) — interpreted
- * here as how responsive the recruiter network itself was: the percentage
- * of candidates identified in the period who were actually screened (i.e.
- * got a real follow-up from their recruiter), not left sitting at
- * "identified". Documented as a deliberate, disclosed interpretation.
+ * — interpreted here as how responsive the recruiter network itself was:
+ * the percentage of candidates identified in the period who were actually
+ * screened (i.e. got a real follow-up from their recruiter), not left
+ * sitting at "identified". Documented as a deliberate, disclosed
+ * interpretation, kept as-is now that Partner exists (Phase 5) rather than
+ * repurposed — see computePartnerPerformance for the genuine partner-based
+ * metric that entity enables.
  */
 export async function computeRecruiterResponseRate(filters: KpiFilters): Promise<number> {
   const where = candidateWhere(filters);
@@ -123,6 +125,43 @@ export async function computeKpiSummary(filters: KpiFilters): Promise<KpiSummary
     computeConversionRates(filters),
   ]);
   return { agentSignups, recruiterResponseRate, applicantFlow, conversion };
+}
+
+export interface PartnerPerformance {
+  partnerId: string;
+  partnerName: string;
+  candidatesSourced: number;
+  approved: number;
+}
+
+/**
+ * Per-partner performance (SRS FR-5.1): how many candidates each agency
+ * sourced in the period, and how many of those reached "approved" —
+ * a genuinely partner-based metric, additive to (not replacing)
+ * computeRecruiterResponseRate above.
+ */
+export async function computePartnerPerformance(
+  filters: Pick<KpiFilters, "periodStart" | "periodEnd">
+): Promise<PartnerPerformance[]> {
+  const partners = await prisma.partner.findMany({
+    where: { candidates: { some: { created_at: { gte: filters.periodStart, lte: filters.periodEnd } } } },
+    select: {
+      id: true,
+      name: true,
+      candidates: {
+        where: { created_at: { gte: filters.periodStart, lte: filters.periodEnd } },
+        select: { lifecycle_status: true },
+      },
+    },
+    orderBy: { name: "asc" },
+  });
+
+  return partners.map((p: (typeof partners)[number]) => ({
+    partnerId: p.id,
+    partnerName: p.name,
+    candidatesSourced: p.candidates.length,
+    approved: p.candidates.filter((c: (typeof p.candidates)[number]) => c.lifecycle_status === "approved").length,
+  }));
 }
 
 export interface TargetVsActual {

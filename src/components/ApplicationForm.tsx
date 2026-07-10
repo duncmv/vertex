@@ -20,6 +20,8 @@ interface Props {
    * (personal info is already on file in that case).
    */
   includePersonalInfo?: boolean;
+  /** Attributes a brand-new candidate to this sourcing partner (SRS FR-5.1) — staff-only. */
+  partnerId?: string;
 }
 
 const emptyForm = {
@@ -91,7 +93,7 @@ const DOCUMENT_CHECKLIST: { type: string; label: string; requiredFor?: string }[
  * candidate on-behalf flow, since all three submit through the same
  * POST /api/applications.
  */
-export default function ApplicationForm({ candidateId, onSubmitted, compact, includePersonalInfo }: Props) {
+export default function ApplicationForm({ candidateId, onSubmitted, compact, includePersonalInfo, partnerId }: Props) {
   const [countries, setCountries] = useState<Option[]>([]);
   const [locationCountries, setLocationCountries] = useState<Option[]>([]);
   const [sectors, setSectors] = useState<Option[]>([]);
@@ -134,6 +136,7 @@ export default function ApplicationForm({ candidateId, onSubmitted, compact, inc
       body: JSON.stringify({
         ...form,
         candidate_id: candidateId,
+        partner_id: partnerId,
         preferred_country_2_id: form.preferred_country_2_id || undefined,
         preferred_country_3_id: form.preferred_country_3_id || undefined,
         preferred_contact_channel: form.preferred_contact_channel || undefined,

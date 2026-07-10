@@ -7,6 +7,7 @@ import {
   computeConversionRates,
   computeKpiSummary,
   computeTargetsVsActuals,
+  computePartnerPerformance,
   type KpiFilters,
 } from "./kpi";
 
@@ -20,6 +21,8 @@ let recruiterId: string;
 let candidateIds: string[] = [];
 let campaignId: string;
 let filters: KpiFilters;
+let partnerId: string;
+let partnerCandidateIds: string[] = [];
 
 beforeAll(async () => {
   const region = await prisma.region.create({ data: { name: "KPI Test Region" } });
@@ -57,12 +60,35 @@ beforeAll(async () => {
     periodStart: new Date(Date.now() - 60_000),
     periodEnd: new Date(Date.now() + 60_000),
   };
+
+  const partner = await prisma.partner.create({
+    data: {
+      name: "KPI Test Partner",
+      partner_type: "travel_agency",
+      country_of_operation: "Kenya",
+      contact_name: "Partner Contact",
+      contact_email: "kpi-partner@test.local",
+      contact_phone: "+254700000000",
+    },
+  });
+  partnerId = partner.id;
+
+  // 2 candidates sourced via this partner — 1 approved, 1 not — so both
+  // candidatesSourced and approved have a non-trivial, distinguishable value.
+  for (const lifecycle_status of ["approved", "identified"] as const) {
+    const candidate = await prisma.candidate.create({
+      data: { source: "partner_sourced", partner_id: partnerId, country_id: countryId, lifecycle_status },
+    });
+    partnerCandidateIds.push(candidate.id);
+  }
 });
 
 afterAll(async () => {
   await prisma.campaignTarget.deleteMany({ where: { campaign_id: campaignId } });
   await prisma.campaign.delete({ where: { id: campaignId } });
   await prisma.candidate.deleteMany({ where: { id: { in: candidateIds } } });
+  await prisma.candidate.deleteMany({ where: { id: { in: partnerCandidateIds } } });
+  await prisma.partner.delete({ where: { id: partnerId } });
   await prisma.user.delete({ where: { id: recruiterId } });
   await prisma.country.delete({ where: { id: countryId } });
   await prisma.region.delete({ where: { id: regionId } });
@@ -123,6 +149,19 @@ describe("computeKpiSummary", () => {
     expect(summary.recruiterResponseRate).toBe(80);
     expect(summary.applicantFlow.approved).toBe(1);
     expect(summary.conversion.overall).toBe(20);
+  });
+});
+
+describe("computePartnerPerformance", () => {
+  it("counts candidates sourced and approved per partner within the period", async () => {
+    const results = await computePartnerPerformance(filters);
+    const partner = results.find((p) => p.partnerId === partnerId);
+    expect(partner).toMatchObject({ partnerName: "KPI Test Partner", candidatesSourced: 2, approved: 1 });
+  });
+
+  it("omits partners with no candidates sourced in the period", async () => {
+    const results = await computePartnerPerformance({ periodStart: new Date("2000-01-01"), periodEnd: new Date("2000-01-02") });
+    expect(results.find((p) => p.partnerId === partnerId)).toBeUndefined();
   });
 });
 

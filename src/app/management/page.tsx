@@ -42,6 +42,7 @@ export default function ManagementPortalPage() {
   const [campaigns, setCampaigns] = useState<Option[]>([]);
   const [kpi, setKpi] = useState<KpiSummary | null>(null);
   const [targetsVsActuals, setTargetsVsActuals] = useState<{ campaignTargetId: string; metric: string; countryId: string | null; regionId: string | null; targetValue: number; actualValue: number }[]>([]);
+  const [partnerPerformance, setPartnerPerformance] = useState<{ partnerId: string; partnerName: string; candidatesSourced: number; approved: number }[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -67,6 +68,7 @@ export default function ManagementPortalPage() {
       .then((res) => {
         setKpi(res.data?.summary ?? null);
         setTargetsVsActuals(res.data?.targetsVsActuals ?? []);
+        setPartnerPerformance(res.data?.partnerPerformance ?? []);
       })
       .finally(() => setLoading(false));
   }, [filters]);
@@ -109,6 +111,32 @@ export default function ManagementPortalPage() {
             <div className="card p-6 mb-8">
               <h2 className="text-sm font-semibold text-midnight-900/70 uppercase tracking-wider mb-5">Targets vs Actuals</h2>
               <TargetsVsActuals data={targetsVsActuals} />
+            </div>
+          )}
+
+          {partnerPerformance.length > 0 && (
+            <div className="card p-6 mb-8">
+              <h2 className="text-sm font-semibold text-midnight-900/70 uppercase tracking-wider mb-5">Partner Performance</h2>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-midnight-900/10 text-left text-midnight-900/40 text-xs uppercase tracking-wider">
+                      <th className="py-2 pr-4 font-semibold">Partner</th>
+                      <th className="py-2 pr-4 font-semibold">Candidates Sourced</th>
+                      <th className="py-2 pr-4 font-semibold">Approved</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {partnerPerformance.map((p) => (
+                      <tr key={p.partnerId} className="border-b border-midnight-900/5 last:border-0">
+                        <td className="py-2.5 pr-4 font-medium text-midnight-900">{p.partnerName}</td>
+                        <td className="py-2.5 pr-4 text-midnight-900/70">{p.candidatesSourced}</td>
+                        <td className="py-2.5 pr-4 text-midnight-900/70">{p.approved}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
         </div>

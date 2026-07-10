@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import PortalShell from "@/components/portal/PortalShell";
 import { MARKETING_NAV_ITEMS } from "@/components/portal/marketingNav";
+import SearchableSelect from "@/components/SearchableSelect";
 
 interface EmployerClient {
   id: string;
@@ -136,12 +137,12 @@ export default function EditJobPage({ params }: { params: Promise<{ id: string }
 
               <div>
                 <label className="block text-sm font-medium text-midnight-900/70 mb-1.5">Category</label>
-                <select name="category" value={formData.category} onChange={handleChange} className="input-field w-full">
-                  <option value="">Select a Category</option>
-                  {categories.map((cat) => (
-                    <option key={cat} value={cat}>{cat}</option>
-                  ))}
-                </select>
+                <SearchableSelect
+                  value={formData.category}
+                  onChange={(value) => setFormData({ ...formData, category: value })}
+                  placeholder="Select a Category"
+                  options={categories.map((cat) => ({ value: cat, label: cat }))}
+                />
               </div>
 
               <div>
@@ -151,20 +152,25 @@ export default function EditJobPage({ params }: { params: Promise<{ id: string }
 
               <div className="col-span-1 md:col-span-2">
                 <label className="block text-sm font-medium text-midnight-900/70 mb-1.5">Employer / Client <span className="text-midnight-900/35 font-normal">(Optional)</span></label>
-                <select name="employer_client_id" value={formData.employer_client_id} onChange={handleChange} className="input-field w-full">
-                  <option value="">No linked client</option>
-                  {employerClients.map((c) => (
-                    <option key={c.id} value={c.id}>{c.name}</option>
-                  ))}
-                </select>
+                <SearchableSelect
+                  value={formData.employer_client_id}
+                  onChange={(value) => setFormData({ ...formData, employer_client_id: value })}
+                  placeholder="No linked client"
+                  options={employerClients.map((c) => ({ value: c.id, label: c.name }))}
+                />
               </div>
 
               <div className="col-span-1 md:col-span-2">
                 <label className="block text-sm font-medium text-midnight-900/70 mb-1.5">Status</label>
-                <select name="status" value={formData.status} onChange={handleChange} className="input-field w-full max-w-xs">
-                  <option value="active">Active (Open)</option>
-                  <option value="closed">Closed</option>
-                </select>
+                <SearchableSelect
+                  value={formData.status}
+                  onChange={(value) => setFormData({ ...formData, status: value })}
+                  className="input-field w-full max-w-xs"
+                  options={[
+                    { value: "active", label: "Active (Open)" },
+                    { value: "closed", label: "Closed" },
+                  ]}
+                />
               </div>
 
               <div className="col-span-1 md:col-span-2">

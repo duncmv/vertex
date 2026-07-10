@@ -1,47 +1,21 @@
-// Human-readable labels for the DocumentType enum, matching the Candidate
-// Information Form's Section 3 wording exactly. "Universal" types are
-// required for every programme; the rest are only required for specific
-// destination countries (admin-configured via CountryDocumentRequirement).
-export const UNIVERSAL_DOCUMENT_TYPES = ["cv", "passport", "passport_photo"] as const;
+// Document requirement types are admin-managed (DocumentRequirementType,
+// fetched via /api/apply/options or /api/admin/document-types) rather than
+// a fixed enum — this file only holds the small, structurally-fixed
+// exclusion sets that don't belong on the admin-editable list.
 
-// The programme-specific subset of the enum (Section 3's "Required for:
-// X" rows) — what CountryDocumentRequirement picks from, in the form's
-// own item order.
-export const CIF_PROGRAMME_SPECIFIC_DOCUMENT_TYPES = [
-  "all_passport_pages",
-  "national_id",
-  "cv_europass",
-  "education_diploma",
-  "police_clearance",
-  "driving_licence",
-  "tachograph_card",
-  "professional_training_certificate",
-  "e_apostille",
-  "zab_recognition_letter",
-] as const;
+// Types outside the CIF/Agency self-report + per-country-requirement
+// concept entirely: cv is handled by its own dedicated screening-gate
+// upload button (never a checklist item), and the rest predate the
+// programme-requirement model (Phase 4's broader case-document set,
+// plus "other" which has no reachable UI path anywhere). Never shown in
+// the CIF/Agency checklist or admin's per-country requirement toggle,
+// regardless of what admin adds there.
+export const NON_PROGRAMME_TYPE_KEYS = ["cv", "transcript", "certificate", "medical", "contract", "visa", "other"] as const;
 
-export const DOCUMENT_TYPE_LABELS: Record<string, string> = {
-  cv: "CV / Resume",
-  passport: "Passport Copy — first page",
-  passport_photo: "Passport-Size Photos",
-  transcript: "Transcript",
-  certificate: "Certificate",
-  medical: "Medical Report",
-  contract: "Contract",
-  visa: "Visa",
-  other: "Other Document",
-  all_passport_pages: "All Passport Pages (good quality)",
-  national_id: "National ID Copy",
-  cv_europass: "CV in Europass format",
-  education_diploma: "Education Diploma",
-  police_clearance: "Criminal Record Certificate",
-  driving_licence: "Driving Licence — Category CE",
-  tachograph_card: "Tachograph Card + Code 95",
-  professional_training_certificate: "Professional Training Certificate",
-  e_apostille: "e-Apostille",
-  zab_recognition_letter: "ZAB Recognition Letter (skilled employees)",
-};
+// CaseDetail's staff upload picker excludes only cv/passport (already
+// uploaded via the candidate's own dedicated screening-gate buttons).
+export const CASE_UPLOAD_EXCLUDED_KEYS = ["cv", "passport", "other"] as const;
 
 export function documentTypeLabel(type: string): string {
-  return DOCUMENT_TYPE_LABELS[type] ?? type.replace(/_/g, " ");
+  return type.replace(/_/g, " ");
 }

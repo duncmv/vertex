@@ -5,7 +5,9 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import CandidateCaseCard from "@/components/CandidateCaseCard";
 import CandidateProfileForm from "@/components/CandidateProfileForm";
-import { UNIVERSAL_DOCUMENT_TYPES, documentTypeLabel } from "@/lib/documentTypes";
+import Pagination from "@/components/Pagination";
+import { usePagination } from "@/lib/usePagination";
+import { documentTypeLabel } from "@/lib/documentTypes";
 import {
   ClipboardText,
   FileText,
@@ -69,6 +71,8 @@ export default function DashboardPage() {
   const [applications, setApplications] = useState<Application[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [extraDocumentTypes, setExtraDocumentTypes] = useState<string[]>([]);
+  const [documentTypeLabels, setDocumentTypeLabels] = useState<Record<string, string>>({});
+  const [universalDocumentTypes, setUniversalDocumentTypes] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -77,15 +81,21 @@ export default function DashboardPage() {
       fetch("/api/candidates/profile").then((r) => r.json()),
       fetch("/api/applications").then((r) => r.json()),
       fetch("/api/payments/me").then((r) => r.json()).catch(() => []),
-    ]).then(([p, a, payRes]) => {
+      fetch("/api/apply/options").then((r) => r.json()).catch(() => null),
+    ]).then(([p, a, payRes, optionsRes]) => {
       setProfile(p.error ? null : p);
       setApplications(Array.isArray(a) ? a : []);
       setPayments(Array.isArray(payRes) ? payRes : []);
       setLoading(false);
 
-      // The Candidate Information Form's own Section 3 says some documents
-      // are only required for specific destination countries (admin-managed
-      // CountryDocumentRequirement) — show those alongside the universal set.
+      // Document requirement types are admin-managed (DocumentRequirementType)
+      // — is_universal marks the fixed set required for every programme;
+      // the rest are only required for specific destination countries
+      // (admin-managed CountryDocumentRequirement).
+      const types: { key: string; label: string; is_universal: boolean }[] = optionsRes?.documentTypes ?? [];
+      setDocumentTypeLabels(Object.fromEntries(types.map((t) => [t.key, t.label])));
+      setUniversalDocumentTypes(types.filter((t) => t.is_universal).map((t) => t.key));
+
       const countryId = Array.isArray(a) ? a[0]?.preferred_country_1_id : null;
       if (countryId) {
         fetch(`/api/admin/countries/${countryId}/document-requirements`)
@@ -95,6 +105,9 @@ export default function DashboardPage() {
       }
     }).catch(() => { setError("Failed to load dashboard."); setLoading(false); });
   }, []);
+
+  const applicationsPage = usePagination(applications);
+  const paymentsPage = usePagination(payments);
 
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center bg-ivory-50">
@@ -181,7 +194,7 @@ export default function DashboardPage() {
             <UploadSimple size={18} weight="regular" /> Upload Documents
           </h2>
           <div className="grid sm:grid-cols-2 gap-4">
-            {[...UNIVERSAL_DOCUMENT_TYPES, ...extraDocumentTypes].map((type) => {
+            {[...universalDocumentTypes, ...extraDocumentTypes].map((type) => {
               const uploaded = profile?.documents.some((d) => d.type === type) ?? false;
               return (
                 <label
@@ -198,7 +211,7 @@ export default function DashboardPage() {
                     <FileText size={30} weight="regular" className="mx-auto mb-2 text-midnight-900/40 group-hover:text-gold-600" />
                   )}
                   <div className="font-semibold text-midnight-800 group-hover:text-midnight-950">
-                    {uploaded ? "Uploaded" : "Upload"} {documentTypeLabel(type)}
+                    {uploaded ? "Uploaded" : "Upload"} {documentTypeLabels[type] ?? documentTypeLabel(type)}
                   </div>
                   <div className="text-xs text-midnight-900/40 mt-1">PDF, JPG, PNG · Max 5MB{uploaded && " · Click to replace"}</div>
                   <input

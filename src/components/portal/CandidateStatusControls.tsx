@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import SearchableSelect from "@/components/SearchableSelect";
 import { CaretRight, ArrowUUpLeft } from "@phosphor-icons/react";
 
 const STATUS_ORDER = ["identified", "screened", "guided_to_apply", "submitted", "reported", "verified", "approved"] as const;
@@ -148,15 +149,12 @@ export default function CandidateStatusControls({ candidateId, status, canVerify
 
       {showReturnForm && (
         <div className="bg-red-50 border border-red-200 rounded-lg p-3 mt-1 space-y-2 max-w-xs">
-          <select
+          <SearchableSelect
             value={returnTo}
-            onChange={(e) => setReturnTo(e.target.value as Status)}
-            className="input-field py-1.5 text-xs"
-          >
-            {earlierStatuses.map((s) => (
-              <option key={s} value={s}>Return to {STATUS_LABELS[s]}</option>
-            ))}
-          </select>
+            onChange={(value) => setReturnTo(value as Status)}
+            className="text-xs"
+            options={earlierStatuses.map((s) => ({ value: s, label: `Return to ${STATUS_LABELS[s]}` }))}
+          />
           <textarea
             value={returnReason}
             onChange={(e) => setReturnReason(e.target.value)}

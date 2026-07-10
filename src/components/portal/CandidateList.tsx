@@ -5,6 +5,8 @@ import DocumentLink from "@/components/DocumentLink";
 import CandidateStatusControls from "./CandidateStatusControls";
 import CandidateDocumentUpload from "./CandidateDocumentUpload";
 import CandidateEditDetails from "./CandidateEditDetails";
+import Pagination from "@/components/Pagination";
+import { usePagination } from "@/lib/usePagination";
 
 const STATUS_STYLES: Record<string, string> = {
   identified: "bg-slate-100 text-slate-700",
@@ -95,6 +97,8 @@ export default function CandidateList({
     setCandidates((prev) => prev.map((row) => (row.id === id ? { ...row, documents: body.data.documents } : row)));
   };
 
+  const { page, setPage, totalPages, paged, total, pageSize } = usePagination(candidates);
+
   if (loading) return <p className="text-midnight-900/50">Loading…</p>;
   if (error) return <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg p-4 text-sm">{error}</div>;
   if (candidates.length === 0) return <div className="card p-10 text-center text-midnight-900/50">{emptyLabel}</div>;
@@ -113,7 +117,7 @@ export default function CandidateList({
           </tr>
         </thead>
         <tbody>
-          {candidates.map((c) => {
+          {paged.map((c) => {
             const name = c.user?.full_name ?? c.full_name ?? "— unnamed lead —";
             const contact = c.user?.email ?? c.email ?? c.phone ?? "";
             return (
@@ -215,6 +219,9 @@ export default function CandidateList({
           })}
         </tbody>
       </table>
+      <div className="px-5">
+        <Pagination page={page} totalPages={totalPages} onPageChange={setPage} total={total} pageSize={pageSize} />
+      </div>
     </div>
   );
 }

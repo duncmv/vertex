@@ -6,6 +6,7 @@ import PortalShell from "@/components/portal/PortalShell";
 import { MANAGEMENT_NAV_ITEMS } from "@/components/portal/managementNav";
 import DocumentLink from "@/components/DocumentLink";
 import DocumentVerifyControls from "@/components/DocumentVerifyControls";
+import SearchableSelect from "@/components/SearchableSelect";
 
 export default function ApplicationDetailedPage({ params }: { params: Promise<{ id: string }> }) {
   const { id: appId } = use(params);
@@ -157,17 +158,18 @@ export default function ApplicationDetailedPage({ params }: { params: Promise<{ 
                 <div className="space-y-5">
                   <div>
                     <label className="block text-sm font-medium text-midnight-900/70 mb-1.5">Current Status</label>
-                    <select
+                    <SearchableSelect
                       value={status}
-                      onChange={e => setStatus(e.target.value)}
+                      onChange={setStatus}
                       className="input-field w-full text-sm font-semibold"
-                    >
-                      <option value="submitted">Submitted</option>
-                      <option value="under_review">Under Review</option>
-                      <option value="interview">Interview</option>
-                      <option value="rejected">Rejected</option>
-                      <option value="approved">Approved (Hired)</option>
-                    </select>
+                      options={[
+                        { value: "submitted", label: "Submitted" },
+                        { value: "under_review", label: "Under Review" },
+                        { value: "interview", label: "Interview" },
+                        { value: "rejected", label: "Rejected" },
+                        { value: "approved", label: "Approved (Hired)" },
+                      ]}
+                    />
                   </div>
 
                   {status === "interview" && (

@@ -1,7 +1,6 @@
 import path from "path";
 import fs from "fs/promises";
 import { v4 as uuidv4 } from "uuid";
-import type { DocumentType } from "@prisma/client";
 import { signDocumentToken, verifyDocumentToken } from "./jwt";
 import { backupToR2, deleteFromR2, restoreFromR2 } from "./backup";
 
@@ -36,7 +35,7 @@ function resolveWithinStorageRoot(storagePath: string): string {
  */
 export async function saveUploadedFile(
   file: File,
-  type: DocumentType
+  type: string
 ): Promise<string> {
   if (!ALLOWED_MIME_TYPES.includes(file.type)) {
     throw new Error("Invalid file type. Only PDF, JPEG, and PNG are allowed.");

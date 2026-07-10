@@ -1,4 +1,4 @@
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect, type Page, type Locator } from "@playwright/test";
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
@@ -17,6 +17,18 @@ async function login(page: Page, email: string, password: string) {
 async function logout(page: Page) {
   await page.getByText("Log out").click();
   await page.waitForURL((url) => url.pathname.startsWith("/auth/login") || url.pathname === "/", { timeout: 25_000 });
+}
+
+// SearchableSelect renders as a button+listbox combobox, not a native
+// <select> — open it, then click the matching option.
+async function pickOption(page: Page, trigger: Locator, name: string | RegExp) {
+  await trigger.click();
+  await page.getByRole("option", { name }).click();
+}
+
+async function pickOptionByIndex(page: Page, trigger: Locator, index: number) {
+  await trigger.click();
+  await page.getByRole("listbox").getByRole("option").nth(index).click();
 }
 
 const PASSWORD = "E2ETestPassword123!";
@@ -75,13 +87,13 @@ test.describe("Partner CRM (Phase 5, self-service intake)", () => {
       await page.getByLabel(/Phone Number/).fill("+254700111222");
       await page.getByLabel("Email Address").fill(candidateEmail);
 
-      await page.getByLabel(/Preferred Programme — Option 1/).selectOption({ label: "United Kingdom" });
-      await page.getByLabel("Preferred Type of Work").selectOption({ index: 1 });
+      await pickOption(page, page.getByLabel(/Preferred Programme — Option 1/), "United Kingdom");
+      await pickOptionByIndex(page, page.getByLabel("Preferred Type of Work"), 0);
       await page.getByLabel(/Earliest Possible Travel Date/).fill("2026-12-01");
 
       await page.getByLabel("We understand the payment plan above.").check();
 
-      await page.getByLabel(/Current Location \(country\)/).selectOption({ label: "E2E Country" });
+      await pickOption(page, page.getByLabel(/Current Location \(country\)/), "E2E Country");
       await page.locator("form").getByRole("button", { name: "Submit Candidate" }).click();
 
       // The modal closes as soon as the submission succeeds (onSubmitted

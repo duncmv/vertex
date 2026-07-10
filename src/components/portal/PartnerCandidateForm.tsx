@@ -1,10 +1,18 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import SearchableSelect from "@/components/SearchableSelect";
+import { NON_PROGRAMME_TYPE_KEYS } from "@/lib/documentTypes";
 
 interface Option {
   id: string;
   name: string;
+}
+
+interface DocumentTypeOption {
+  key: string;
+  label: string;
+  is_universal: boolean;
 }
 
 interface Props {
@@ -45,25 +53,6 @@ const emptyForm = {
   preferred_contact_channel: "" as "" | "email" | "whatsapp" | "phone",
 };
 
-// Section 4's exact checklist — matches the Agency Application Form's own
-// item order and "Required for: X" annotations (same list as the
-// Candidate Information Form's, since Vertex's document requirements
-// don't differ by intake path).
-const DOCUMENT_CHECKLIST: { type: string; label: string; requiredFor?: string }[] = [
-  { type: "passport", label: "Passport Copy — first page (clear, coloured)" },
-  { type: "all_passport_pages", label: "All Passport Pages in good quality", requiredFor: "Poland" },
-  { type: "passport_photo", label: "Passport-Size Photos (white background)" },
-  { type: "national_id", label: "National ID Copy / personal data", requiredFor: "Belarus" },
-  { type: "cv_europass", label: "CV in Europass format", requiredFor: "Italy · Hungary · Romania" },
-  { type: "education_diploma", label: "Education Diploma", requiredFor: "Serbia" },
-  { type: "police_clearance", label: "Criminal Record Certificate", requiredFor: "Bulgaria" },
-  { type: "driving_licence", label: "Driving Licence — Category CE", requiredFor: "Slovakia" },
-  { type: "tachograph_card", label: "Tachograph Card + Code 95 (assistance available)", requiredFor: "Slovakia" },
-  { type: "professional_training_certificate", label: "Professional Training Certificate", requiredFor: "Belarus" },
-  { type: "e_apostille", label: "e-Apostille", requiredFor: "Belarus" },
-  { type: "zab_recognition_letter", label: "ZAB Recognition Letter (skilled employees)", requiredFor: "Germany" },
-];
-
 /**
  * The Agency Application Form's Sections 2-6 — Section 1 (Agency
  * Information) is already on file on the Partner record itself, not
@@ -76,6 +65,8 @@ export default function PartnerCandidateForm({ onSubmitted }: Props) {
   const [countries, setCountries] = useState<Option[]>([]);
   const [locationCountries, setLocationCountries] = useState<Option[]>([]);
   const [sectors, setSectors] = useState<Option[]>([]);
+  const [documentTypes, setDocumentTypes] = useState<DocumentTypeOption[]>([]);
+  const [documentRequirements, setDocumentRequirements] = useState<{ country_id: string; document_type: string }[]>([]);
   const [form, setForm] = useState(emptyForm);
   const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [message, setMessage] = useState("");
@@ -88,9 +79,28 @@ export default function PartnerCandidateForm({ onSubmitted }: Props) {
         setCountries(res.countries ?? []);
         setLocationCountries(res.locationCountries ?? []);
         setSectors(res.sectors ?? []);
+        setDocumentTypes(res.documentTypes ?? []);
+        setDocumentRequirements(res.documentRequirements ?? []);
       })
       .catch(() => {});
   }, []);
+
+  // Section 4's checklist — admin-managed (DocumentRequirementType) rather
+  // than hardcoded, same list as the Candidate Information Form's since
+  // Vertex's document requirements don't differ by intake path.
+  const documentChecklist = useMemo(
+    () => documentTypes.filter((t) => !(NON_PROGRAMME_TYPE_KEYS as readonly string[]).includes(t.key)),
+    [documentTypes]
+  );
+  const requiredForByType = useMemo(() => {
+    const map: Record<string, string[]> = {};
+    for (const req of documentRequirements) {
+      const country = countries.find((c) => c.id === req.country_id);
+      if (!country) continue;
+      (map[req.document_type] ??= []).push(country.name);
+    }
+    return map;
+  }, [documentRequirements, countries]);
 
   const set = <K extends keyof typeof emptyForm>(key: K, value: (typeof emptyForm)[K]) =>
     setForm((f) => ({ ...f, [key]: value }));
@@ -224,18 +234,14 @@ export default function PartnerCandidateForm({ onSubmitted }: Props) {
               <label htmlFor={key} className={labelCls}>
                 Candidate's Preferred Programme — Option {i + 1} {i === 0 && <span className="text-red-500">*</span>}
               </label>
-              <select
+              <SearchableSelect
                 id={key}
                 value={form[key]}
-                onChange={(e) => set(key, e.target.value)}
+                onChange={(value) => set(key, value)}
                 required={i === 0}
-                className="input-field"
-              >
-                <option value="">{i === 0 ? "Select a country…" : "None"}</option>
-                {countries.map((c) => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-              </select>
+                placeholder={i === 0 ? "Select a country…" : "None"}
+                options={countries.map((c) => ({ value: c.id, label: c.name }))}
+              />
               {err(key) && <p className={errCls}>{err(key)}</p>}
             </div>
           ))}
@@ -244,18 +250,13 @@ export default function PartnerCandidateForm({ onSubmitted }: Props) {
         <div className="grid sm:grid-cols-2 gap-4">
           <div>
             <label htmlFor="preferred_sector_id" className={labelCls}>Preferred Type of Work <span className="text-red-500">*</span></label>
-            <select
+            <SearchableSelect
               id="preferred_sector_id"
               value={form.preferred_sector_id}
-              onChange={(e) => set("preferred_sector_id", e.target.value)}
+              onChange={(value) => set("preferred_sector_id", value)}
               required
-              className="input-field"
-            >
-              <option value="">Select…</option>
-              {sectors.map((s) => (
-                <option key={s.id} value={s.id}>{s.name}</option>
-              ))}
-            </select>
+              options={sectors.map((s) => ({ value: s.id, label: s.name }))}
+            />
             {err("preferred_sector_id") && <p className={errCls}>{err("preferred_sector_id")}</p>}
           </div>
           <div>
@@ -290,17 +291,19 @@ export default function PartnerCandidateForm({ onSubmitted }: Props) {
           that programme — your Vertex manager will confirm the exact document set.
         </p>
         <div className="space-y-2">
-          {DOCUMENT_CHECKLIST.map((doc) => (
-            <label key={doc.type} className="flex items-start gap-2 text-sm text-slate-700">
+          {documentChecklist.map((doc) => (
+            <label key={doc.key} className="flex items-start gap-2 text-sm text-slate-700">
               <input
                 type="checkbox"
-                checked={form.documents_available.includes(doc.type)}
-                onChange={() => toggleDocument(doc.type)}
+                checked={form.documents_available.includes(doc.key)}
+                onChange={() => toggleDocument(doc.key)}
                 className="w-4 h-4 mt-0.5"
               />
               <span>
                 {doc.label}
-                {doc.requiredFor && <span className="block text-xs text-emerald-700">Required for: {doc.requiredFor}</span>}
+                {!doc.is_universal && requiredForByType[doc.key]?.length > 0 && (
+                  <span className="block text-xs text-emerald-700">Required for: {requiredForByType[doc.key].join(" · ")}</span>
+                )}
               </span>
             </label>
           ))}
@@ -345,18 +348,13 @@ export default function PartnerCandidateForm({ onSubmitted }: Props) {
         <div className="grid sm:grid-cols-2 gap-4">
           <div>
             <label htmlFor="current_location_country_id" className={labelCls}>Candidate's Current Location (country) <span className="text-red-500">*</span></label>
-            <select
+            <SearchableSelect
               id="current_location_country_id"
               value={form.current_location_country_id}
-              onChange={(e) => set("current_location_country_id", e.target.value)}
+              onChange={(value) => set("current_location_country_id", value)}
               required
-              className="input-field"
-            >
-              <option value="">Select…</option>
-              {locationCountries.map((c) => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
-            </select>
+              options={locationCountries.map((c) => ({ value: c.id, label: c.name }))}
+            />
             {err("current_location_country_id") && <p className={errCls}>{err("current_location_country_id")}</p>}
           </div>
           <div>
@@ -377,16 +375,15 @@ export default function PartnerCandidateForm({ onSubmitted }: Props) {
           </div>
           <div>
             <label className={labelCls}>Candidate's preferred contact channel</label>
-            <select
+            <SearchableSelect
               value={form.preferred_contact_channel}
-              onChange={(e) => set("preferred_contact_channel", e.target.value as typeof form.preferred_contact_channel)}
-              className="input-field"
-            >
-              <option value="">Select…</option>
-              <option value="email">Email</option>
-              <option value="whatsapp">WhatsApp</option>
-              <option value="phone">Phone</option>
-            </select>
+              onChange={(value) => set("preferred_contact_channel", value as typeof form.preferred_contact_channel)}
+              options={[
+                { value: "email", label: "Email" },
+                { value: "whatsapp", label: "WhatsApp" },
+                { value: "phone", label: "Phone" },
+              ]}
+            />
           </div>
         </div>
         <div className="flex flex-col sm:flex-row gap-4 mt-4">

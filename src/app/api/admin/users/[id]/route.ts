@@ -82,3 +82,29 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   return NextResponse.json({ data: updated });
 }
+
+// DELETE /api/admin/users/:id — removes a staff account. Self-delete is
+// blocked: an admin locking themselves out (especially the only admin
+// account) is a much worse failure mode than requiring another admin to
+// do it.
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const user = await getAuthUser(req);
+  const guardRes = requireAdmin(user);
+  if (guardRes) return guardRes;
+
+  const { id } = await params;
+  if (id === user!.userId) {
+    return NextResponse.json(
+      { error: { code: "self_delete", message: "You can't remove your own account." } },
+      { status: 400 }
+    );
+  }
+
+  const target = await prisma.user.findUnique({ where: { id } });
+  if (!target) {
+    return NextResponse.json({ error: { code: "not_found", message: "User not found." } }, { status: 404 });
+  }
+
+  await auditedPrisma(user!.userId).user.delete({ where: { id } });
+  return NextResponse.json({ data: { id } });
+}

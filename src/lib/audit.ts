@@ -22,6 +22,7 @@ const AUDITED_MODELS = new Set([
   "Partner",
   "EmployerClient",
   "PartnerCandidate",
+  "DocumentRequirementType",
 ]);
 const AUDITED_OPERATIONS = new Set(["create", "update", "delete"]);
 

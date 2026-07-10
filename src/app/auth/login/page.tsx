@@ -3,6 +3,7 @@
 import { useState, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import PasswordInput from "@/components/PasswordInput";
 
 function GoogleButton({ redirect }: { redirect: string }) {
   return (
@@ -102,7 +103,7 @@ function LoginForm() {
         </div>
         <div>
           <label className="block text-sm font-medium text-midnight-900/70 mb-1.5">Password *</label>
-          <input id="login-password" name="password" type="password" value={form.password} onChange={handleChange} required className="input-field" placeholder="••••••••" />
+          <PasswordInput id="login-password" name="password" value={form.password} onChange={handleChange} required placeholder="••••••••" />
         </div>
 
         {message && (

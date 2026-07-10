@@ -4,6 +4,9 @@ import { useEffect, useState, use } from "react";
 import Link from "next/link";
 import PortalShell from "@/components/portal/PortalShell";
 import { MANAGEMENT_NAV_ITEMS } from "@/components/portal/managementNav";
+import SearchableSelect from "@/components/SearchableSelect";
+import Pagination from "@/components/Pagination";
+import { usePagination } from "@/lib/usePagination";
 import { CheckCircle, Copy } from "@phosphor-icons/react";
 
 const PARTNER_TYPE_LABELS: Record<string, string> = {
@@ -116,6 +119,8 @@ export default function PartnerDetailPage({ params }: { params: Promise<{ id: st
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const { page, setPage, totalPages, paged, total, pageSize } = usePagination(partner?.candidates ?? []);
+
   if (loading) {
     return (
       <PortalShell roleLabel="Management" navItems={MANAGEMENT_NAV_ITEMS}>
@@ -202,29 +207,27 @@ export default function PartnerDetailPage({ params }: { params: Promise<{ id: st
 
         <div className="card p-6">
           <label htmlFor="partner-status" className="block text-xs font-semibold text-midnight-900/50 uppercase tracking-wider mb-4">Status</label>
-          <select
+          <SearchableSelect
             id="partner-status"
             value={partner.status}
             disabled={saving}
-            onChange={(e) => updateField({ status: e.target.value })}
+            onChange={(value) => updateField({ status: value })}
             className="input-field mb-2"
-          >
-            {STATUS_OPTIONS.map((s) => <option key={s} value={s}>{s}</option>)}
-          </select>
+            options={STATUS_OPTIONS.map((s) => ({ value: s, label: s }))}
+          />
           <p className="text-xs text-midnight-900/45">Suspend a partner to stop attributing new leads to it.</p>
         </div>
 
         <div className="card p-6">
           <label htmlFor="partner-mou-status" className="block text-xs font-semibold text-midnight-900/50 uppercase tracking-wider mb-4">MOU / Agreement</label>
-          <select
+          <SearchableSelect
             id="partner-mou-status"
             value={partner.mou_status}
             disabled={saving}
-            onChange={(e) => updateField({ mou_status: e.target.value })}
+            onChange={(value) => updateField({ mou_status: value })}
             className="input-field mb-2"
-          >
-            {MOU_OPTIONS.map((s) => <option key={s} value={s}>{s}</option>)}
-          </select>
+            options={MOU_OPTIONS.map((s) => ({ value: s, label: s }))}
+          />
           {partner.mou_signed_at && (
             <p className="text-xs text-emerald-700">Signed {new Date(partner.mou_signed_at).toLocaleDateString()}</p>
           )}
@@ -247,7 +250,7 @@ export default function PartnerDetailPage({ params }: { params: Promise<{ id: st
               </tr>
             </thead>
             <tbody>
-              {partner.candidates.map((c) => (
+              {paged.map((c) => (
                 <tr key={c.id} className="border-b border-midnight-900/5 last:border-0">
                   <td className="px-5 py-4 font-medium text-midnight-900">{c.user?.full_name ?? c.full_name ?? "— unnamed lead —"}</td>
                   <td className="px-5 py-4 text-midnight-900/70">{c.recruiter?.full_name ?? "—"}</td>
@@ -261,6 +264,9 @@ export default function PartnerDetailPage({ params }: { params: Promise<{ id: st
               ))}
             </tbody>
           </table>
+          <div className="px-5">
+            <Pagination page={page} totalPages={totalPages} onPageChange={setPage} total={total} pageSize={pageSize} />
+          </div>
         </div>
       )}
     </PortalShell>

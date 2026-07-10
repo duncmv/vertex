@@ -4,6 +4,8 @@ import { Suspense, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { EnvelopeSimple } from "@phosphor-icons/react";
+import PasswordInput from "@/components/PasswordInput";
+import SearchableSelect from "@/components/SearchableSelect";
 
 function GoogleButton() {
   return (
@@ -137,20 +139,23 @@ function RegisterForm() {
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-midnight-900/70 mb-1.5">Country</label>
-                    <select id="reg-country" name="country" value={form.country} onChange={handleChange} className="input-field">
-                      <option value="">Select country</option>
-                      {COUNTRIES.map((c) => <option key={c} value={c}>{c}</option>)}
-                    </select>
+                    <SearchableSelect
+                      id="reg-country"
+                      value={form.country}
+                      onChange={(value) => { setForm((prev) => ({ ...prev, country: value })); setErrors((prev) => ({ ...prev, country: [] })); }}
+                      placeholder="Select country"
+                      options={COUNTRIES.map((c) => ({ value: c, label: c }))}
+                    />
                   </div>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-midnight-900/70 mb-1.5">Password *</label>
-                  <input id="reg-password" name="password" type="password" value={form.password} onChange={handleChange} required className="input-field" placeholder="Min 8 chars, 1 uppercase, 1 number" />
+                  <PasswordInput id="reg-password" name="password" value={form.password} onChange={handleChange} required placeholder="Min 8 chars, 1 uppercase, 1 number" />
                   {errors.password && <p className="text-red-500 text-xs mt-1">{errors.password[0]}</p>}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-midnight-900/70 mb-1.5">Confirm Password *</label>
-                  <input id="reg-confirm-password" name="confirmPassword" type="password" value={form.confirmPassword} onChange={handleChange} required className="input-field" placeholder="Repeat password" />
+                  <PasswordInput id="reg-confirm-password" name="confirmPassword" value={form.confirmPassword} onChange={handleChange} required placeholder="Repeat password" />
                   {errors.confirmPassword && <p className="text-red-500 text-xs mt-1">{errors.confirmPassword[0]}</p>}
                 </div>
 

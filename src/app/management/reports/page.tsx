@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import PortalShell from "@/components/portal/PortalShell";
 import { MANAGEMENT_NAV_ITEMS } from "@/components/portal/managementNav";
+import Pagination from "@/components/Pagination";
+import { usePagination } from "@/lib/usePagination";
 import { ArrowRight, CaretDown, CaretUp } from "@phosphor-icons/react";
 
 interface ReportRow {
@@ -44,6 +46,7 @@ export default function ManagementReportsPage() {
   useEffect(load, []);
 
   const countryReports = reports.filter((r) => r.scope_level === "country");
+  const { page, setPage, totalPages, paged, total, pageSize } = usePagination(countryReports);
 
   const verify = async (id: string) => {
     await fetch(`/api/reports/${id}/verify`, { method: "PATCH" });
@@ -79,7 +82,7 @@ export default function ManagementReportsPage() {
         <div className="card p-10 text-center text-midnight-900/50">No country reports submitted yet.</div>
       ) : (
         <div className="space-y-3">
-          {countryReports.map((r) => (
+          {paged.map((r) => (
             <div key={r.id} className="card p-5">
               <div className="flex items-start justify-between gap-4">
                 <div>
@@ -143,6 +146,7 @@ export default function ManagementReportsPage() {
               )}
             </div>
           ))}
+          <Pagination page={page} totalPages={totalPages} onPageChange={setPage} total={total} pageSize={pageSize} />
         </div>
       )}
     </PortalShell>

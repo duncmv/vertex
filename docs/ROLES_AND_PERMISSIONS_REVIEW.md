@@ -10,7 +10,7 @@ Working doc for a full pre-team review of every role in the platform: what each 
 
 | Role | Portal home | Who they are | Dev DB test account |
 |---|---|---|---|
-| Candidate | `/dashboard` | A jobseeker with their own account | `grace.wanjiru@example.com` |
+| Candidate | `/dashboard` | A jobseeker with their own account | None yet — self-register via `/apply` to get one (see note below) |
 | Regional Recruiter | `/recruiter` | Sources and shepherds candidates through screening/reporting | `recruiter@test.local` |
 | Country Supervisor | `/supervisor` | Verifies recruiter work for one assigned country | `supervisor@test.local` |
 | In-House Supervisor | `/management` | Approves candidates, sets policy, owns Management portal | `inhouse@test.local` |
@@ -116,25 +116,26 @@ These two share **identical** portal access and API permissions today — `direc
 
 ## Admin (System Administrator)
 
-**Portal:** `/admin` — **Overview**, **Candidates**, **Finances**, **Regions & Countries**, **Sectors & Requirements**, **Staff & Roles**, **Settings**
+**Portal:** `/admin` — **Overview**, **Regions & Countries**, **Sectors & Requirements**, **Staff & Roles**, **Settings**
+
+**Revised in the review batch:** Candidates/Finances/Jobs were removed from Admin's scope entirely — a system administrator provisions accounts and reference data, it doesn't run recruitment operations (that's Marketing/Management's job). `/admin/candidates`, `/admin/finances`, and their backing API routes (`GET /api/admin/candidates`, `GET /api/payments/admin`) no longer exist.
 
 | Page | What it's for |
 |---|---|
-| `/admin` | High-level snapshot across jobs, applications, candidates |
-| `/admin/candidates` | Full candidates pool, read/search across everyone |
-| `/admin/finances` | Every payment ever recorded (`GET /api/payments/admin`, admin-only inline check) |
-| `/admin/regions` | Add regions and the countries within them |
-| `/admin/sectors` | Add sectors ("type of work") and configure per-country document requirements |
-| `/admin/users` | Create staff accounts directly (generates a one-time temp password), assign supervisor/country, promote any existing user into the agent network |
+| `/admin` | System-level snapshot: staff headcount by role, region/country counts, sectors configured — not a recruitment-ops dashboard |
+| `/admin/regions` | Add, rename, and delete regions and the countries within them (delete is blocked with a friendly error if a partner candidate submission still references the country) |
+| `/admin/sectors` | Add/delete sectors ("type of work"); add/delete **document requirement types** (admin-managed — a type added here is immediately usable on the Candidate Information Form, the Agency form, and uploads, no code change needed); configure which of those types each destination country requires |
+| `/admin/users` | Create staff accounts (generates a one-time temp password), stage role/supervisor/country changes behind an explicit Save button per row, reset a user's password, or remove their account entirely |
 | `/admin/settings` | Global feature toggles (AI chatbot on/off, WhatsApp number), Knowledge Base articles (AI chat FAQ content), email template overrides |
 
 **What they can do:** Everything, everywhere — `admin` is included in literally every `requireRole([...])` allow-list in the codebase, and `canSetLifecycleStatus`/`requireAdmin` both special-case it as an unconditional override. This is also the only role that can:
-- Write Region/Country/Sector reference data and per-country document requirements (everyone else can only *read* these)
-- Create/edit staff accounts and reassign supervisor/country
-- View system-wide financial records
+- Write Region/Country/Sector/document-requirement-type reference data (everyone else can only *read* these)
+- Create/edit/delete staff accounts, reassign supervisor/country, and reset any staff member's password
 - Configure AI chatbot / knowledge base / email templates
 
-**Design note:** Admin is *not* part of the three-tier operational hierarchy (Regional Recruiter → Country Supervisor → In-House/Director) — it's a support/override role layered on top, deliberately kept out of day-to-day recruitment screens like Jobs, Fee Policy, or Campaigns (those live under Marketing/Management), retaining API access to them for support purposes only.
+**No longer has a dedicated UI for:** browsing the full candidates pool or system-wide financial records — `/admin/candidates`, `/admin/finances`, and their backing routes (`GET /api/admin/candidates`, `GET /api/payments/admin`) are gone. Worth flagging precisely, since it's easy to overstate: admin still technically has *API-level* access to candidates (`admin` is in `STAFF_ROLES`, which gates the same general `GET /api/candidates` every staff role uses) and to Jobs (`admin` is one of the two `JOB_MANAGER_ROLES`, alongside `marketing`) — those weren't revoked, there's just no admin-facing screen for them anymore. Day-to-day recruitment ops (Jobs, Fee Policy, Campaigns, Candidates) live under Marketing/Management's own portals.
+
+**Design note:** Admin is *not* part of the three-tier operational hierarchy (Regional Recruiter → Country Supervisor → In-House/Director) — it's a support/provisioning role layered on top, deliberately kept off day-to-day recruitment screens now that they've been consolidated under Marketing/Management, while retaining underlying API access for support purposes.
 
 ---
 
@@ -197,6 +198,6 @@ These are the actual `User` rows currently sitting in your local `vertex_dev` da
 | `director@test.local` | `director` | "Test Director" — **newly created for this review**, same shape as `inhouse@test.local` since the two roles behave identically today |
 | `marketing@test.local` | `marketing` | "Test Marketing" — same purpose as `new-recruiter`, proves the Marketing role is assignable from the admin staff picker |
 | `partner@test.local` | `partner` | "Test Partner Contact" — **newly created for this review**, the login for a real `Partner` record ("Test Partner Agency," a travel agency in Kenya, status `active`, MOU `signed`). Confirmed `GET /api/partner/candidates` resolves correctly (empty list, no error) |
-| `grace.wanjiru@example.com` | `candidate` | The one demo candidate in the system — lifecycle status `approved`, sourced by `recruiter@test.local`. Good for exercising the candidate dashboard / case-view / contract-signing flow without redoing the full screening funnel |
+| — | — | The original demo candidate (`grace.wanjiru@example.com`) was removed by the review-batch's DB wipe (Jobs & Candidates cleared for the review). A fresh demo candidate ("Grace Wanjiru," recruiter-sourced, Kenya → United Kingdom, sector Warehouse & Logistics) has been recreated at `screened` — good for demonstrating the screening gate and the recruiter/supervisor's "awaiting candidate to create an account" state. She has **no login of her own yet**: `guided_to_apply`/`submitted` only fire once a candidate claims their emailed invite link (SRS FR-2.1), which needs real SMTP. To demo the candidate dashboard itself, self-register a new account via `/apply` instead — no test account exists for that specific state right now |
 
 ⚠️ Separate from all of the above: `e2e/global-setup.ts` creates its own throwaway fixtures (`e2e-admin@test.local`, `e2e-inhouse@test.local`, `e2e-supervisor@test.local`, `e2e-recruiter@test.local`, `e2e-case-candidate@test.local`, password `E2ETestPassword123!`) every time the Playwright suite runs, and tears them down afterward. Don't rely on those for manual exploration — they're not guaranteed to exist between test runs.

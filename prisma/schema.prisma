@@ -132,14 +132,37 @@ model Sector {
 // hardcoded per-country list, so a new programme country's requirements
 // don't need a code change.
 model CountryDocumentRequirement {
-  id            String       @id @default(cuid())
-  country_id    String
-  country       Country      @relation(fields: [country_id], references: [id], onDelete: Cascade)
-  document_type DocumentType
-  created_at    DateTime     @default(now())
+  id               String                  @id @default(cuid())
+  country_id       String
+  country          Country                 @relation(fields: [country_id], references: [id], onDelete: Cascade)
+  document_type    String
+  requirement_type DocumentRequirementType @relation(fields: [document_type], references: [key], onDelete: Cascade)
+  created_at       DateTime                @default(now())
 
   @@unique([country_id, document_type])
   @@index([country_id])
+}
+
+// Admin-managed document requirement taxonomy (replaces the old fixed
+// DocumentType enum) — lets admin add a brand-new requirement type from
+// the UI and have it immediately usable across the Candidate Information
+// Form / Agency form checklist, per-country requirements, and uploads,
+// with no code change or deploy. `key` is the stable identifier stored on
+// Document.type/CountryDocumentRequirement.document_type/documents_available
+// arrays; `is_universal` marks the fixed cv/passport/passport_photo set
+// required for every programme regardless of destination.
+model DocumentRequirementType {
+  id           String   @id @default(cuid())
+  key          String   @unique
+  label        String
+  is_universal Boolean  @default(false)
+  sort_order   Int      @default(0)
+  created_at   DateTime @default(now())
+
+  documents            Document[]
+  country_requirements CountryDocumentRequirement[]
+
+  @@index([is_universal])
 }
 
 enum CandidateSource {
@@ -229,28 +252,6 @@ model Candidate {
 
 // police_clearance already covers the Candidate Information Form's
 // "Criminal Record Certificate" — no separate type needed for it.
-enum DocumentType {
-  cv
-  passport
-  transcript
-  certificate
-  medical
-  police_clearance
-  contract
-  visa
-  other
-  all_passport_pages
-  passport_photo
-  national_id
-  cv_europass
-  education_diploma
-  driving_licence
-  tachograph_card
-  professional_training_certificate
-  e_apostille
-  zab_recognition_letter
-}
-
 enum VerificationStatus {
   pending
   verified
@@ -258,14 +259,15 @@ enum VerificationStatus {
 }
 
 model Document {
-  id                  String             @id @default(cuid())
+  id                  String                  @id @default(cuid())
   candidate_id        String
-  type                DocumentType
+  type                String
+  requirement_type    DocumentRequirementType @relation(fields: [type], references: [key], onDelete: Restrict)
   storage_path        String // private-bucket path; never a public URL (SRS FR-1.6)
-  verification_status VerificationStatus @default(pending)
+  verification_status VerificationStatus      @default(pending)
   verified_by         String?
   verified_at         DateTime?
-  uploaded_at         DateTime           @default(now())
+  uploaded_at         DateTime                @default(now())
 
   candidate Candidate @relation(fields: [candidate_id], references: [id], onDelete: Cascade)
 
@@ -461,7 +463,7 @@ model Application {
   // Section 3 — Document Checklist: self-reported "can you provide this?"
   // at submission time, not the documents themselves (those are uploaded
   // later, from the candidate's own dashboard, once an account exists).
-  documents_available DocumentType[]
+  documents_available String[]
 
   // Section 5 — Visa & Travel Readiness. current_location_country_id is
   // also what drives round-robin recruiter assignment for a self-service
@@ -750,7 +752,7 @@ model PartnerCandidate {
   prior_eu_visa_applied  String?  @db.Text
 
   // Section 4 — Document Checklist (self-reported, same list as the CIF's)
-  documents_available DocumentType[]
+  documents_available String[]
 
   // Section 5 — Payment Plan Acknowledgement
   payment_plan_acknowledged Boolean @default(false)

@@ -3,8 +3,10 @@
 import { useEffect, useState, useCallback } from "react";
 import DocumentLink from "@/components/DocumentLink";
 import DocumentVerifyControls from "@/components/DocumentVerifyControls";
+import SearchableSelect from "@/components/SearchableSelect";
 import CaseStageProgress from "./CaseStageProgress";
 import { CASE_STAGE_ORDER, CASE_STAGE_LABELS, type CaseStageKey } from "./caseStages";
+import { CASE_UPLOAD_EXCLUDED_KEYS } from "@/lib/documentTypes";
 
 interface Document {
   id: string;
@@ -63,17 +65,6 @@ interface CaseData {
   };
 }
 
-// Beyond the screening-gate's cv/passport (handled separately, earlier in
-// the pipeline): the general mobility-lifecycle set plus the Candidate
-// Information Form's Section 3 per-programme extras (all_passport_pages,
-// national_id, etc.) — which extras actually apply is configured per
-// country under Admin → Sectors & Requirements.
-const DOC_TYPES = [
-  "transcript", "certificate", "medical", "police_clearance", "contract", "visa",
-  "all_passport_pages", "passport_photo", "national_id", "cv_europass", "education_diploma",
-  "driving_licence", "tachograph_card", "professional_training_certificate", "e_apostille", "zab_recognition_letter",
-];
-
 export default function CaseDetail({ caseId }: { caseId: string }) {
   const [data, setData] = useState<CaseData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -91,8 +82,25 @@ export default function CaseDetail({ caseId }: { caseId: string }) {
   const [payAmount, setPayAmount] = useState("");
   const [payReceipt, setPayReceipt] = useState("");
 
-  const [uploadType, setUploadType] = useState(DOC_TYPES[0]);
+  const [docTypes, setDocTypes] = useState<{ key: string; label: string }[]>([]);
+  const [uploadType, setUploadType] = useState("");
   const [uploadFile, setUploadFile] = useState<File | null>(null);
+
+  // Beyond the screening-gate's cv/passport (handled separately, earlier
+  // in the pipeline): the general mobility-lifecycle set plus the
+  // Candidate Information Form's Section 3 per-programme extras — which
+  // extras actually apply is configured per country under Admin → Sectors
+  // & Requirements, and any new type admin adds there shows up here too.
+  useEffect(() => {
+    fetch("/api/admin/document-types")
+      .then((r) => r.json())
+      .then((res) => {
+        const types = (res.data ?? []).filter((t: { key: string }) => !(CASE_UPLOAD_EXCLUDED_KEYS as readonly string[]).includes(t.key));
+        setDocTypes(types);
+        setUploadType((prev) => prev || types[0]?.key || "");
+      })
+      .catch(() => {});
+  }, []);
 
   const load = useCallback(async () => {
     const res = await fetch(`/api/cases/${caseId}`);
@@ -199,12 +207,12 @@ export default function CaseDetail({ caseId }: { caseId: string }) {
         <CaseStageProgress stage={data.current_stage} />
 
         <div className="mt-6 pt-6 border-t border-midnight-900/10 grid sm:grid-cols-3 gap-3">
-          <select value={nextStage} onChange={(e) => setNextStage(e.target.value)} className="input-field text-sm">
-            <option value="">Set stage…</option>
-            {CASE_STAGE_ORDER.map((s) => (
-              <option key={s} value={s} disabled={s === data.current_stage}>{CASE_STAGE_LABELS[s]}</option>
-            ))}
-          </select>
+          <SearchableSelect
+            value={nextStage}
+            onChange={setNextStage}
+            placeholder="Set stage…"
+            options={CASE_STAGE_ORDER.filter((s) => s !== data.current_stage).map((s) => ({ value: s, label: CASE_STAGE_LABELS[s] }))}
+          />
           <input type="date" value={stageDeadline} onChange={(e) => setStageDeadline(e.target.value)} className="input-field text-sm" placeholder="Deadline (optional)" />
           <input value={stageNotes} onChange={(e) => setStageNotes(e.target.value)} className="input-field text-sm" placeholder="Notes (optional)" />
         </div>
@@ -238,9 +246,12 @@ export default function CaseDetail({ caseId }: { caseId: string }) {
           ))}
         </div>
         <div className="flex items-center gap-2 pt-3 border-t border-midnight-900/10">
-          <select value={uploadType} onChange={(e) => setUploadType(e.target.value)} className="input-field text-sm w-auto">
-            {DOC_TYPES.map((t) => <option key={t} value={t}>{t.replace(/_/g, " ")}</option>)}
-          </select>
+          <SearchableSelect
+            value={uploadType}
+            onChange={setUploadType}
+            className="w-auto"
+            options={docTypes.map((t) => ({ value: t.key, label: t.label }))}
+          />
           <input type="file" onChange={(e) => setUploadFile(e.target.files?.[0] ?? null)} className="text-sm" />
           <button onClick={uploadDocument} disabled={!uploadFile} className="btn-primary text-xs disabled:opacity-40">Upload</button>
         </div>
@@ -289,11 +300,16 @@ export default function CaseDetail({ caseId }: { caseId: string }) {
               ))}
             </div>
             <div className="flex items-center gap-2 pt-3 border-t border-midnight-900/10">
-              <select value={payType} onChange={(e) => setPayType(e.target.value as "documentation" | "permit" | "visa")} className="input-field text-sm w-auto">
-                <option value="documentation">Documentation (Stage 1 · 20%)</option>
-                <option value="permit">Work Permit (Stage 2 · 40%)</option>
-                <option value="visa">Visa (Stage 3 · 40%)</option>
-              </select>
+              <SearchableSelect
+                value={payType}
+                onChange={(value) => setPayType(value as "documentation" | "permit" | "visa")}
+                className="w-auto"
+                options={[
+                  { value: "documentation", label: "Documentation (Stage 1 · 20%)" },
+                  { value: "permit", label: "Work Permit (Stage 2 · 40%)" },
+                  { value: "visa", label: "Visa (Stage 3 · 40%)" },
+                ]}
+              />
               <input type="number" min="0" value={payAmount} onChange={(e) => setPayAmount(e.target.value)} className="input-field text-sm w-28" placeholder="Amount" />
               <input value={payReceipt} onChange={(e) => setPayReceipt(e.target.value)} className="input-field text-sm" placeholder="Receipt reference" />
               <button onClick={recordPayment} disabled={!payAmount} className="btn-primary text-xs disabled:opacity-40">Record</button>

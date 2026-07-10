@@ -1,6 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import SearchableSelect from "@/components/SearchableSelect";
+import Pagination from "@/components/Pagination";
+import { usePagination } from "@/lib/usePagination";
 
 export default function AdminSettings() {
   const [settings, setSettings] = useState<any>({ ai_enabled: "true", whatsapp_number: "" });
@@ -20,6 +23,8 @@ export default function AdminSettings() {
     fetch("/api/admin/knowledge").then(r => r.json()).then(k => setKnowledge(Array.isArray(k) ? k : [])).catch(() => {});
     fetch("/api/admin/emails").then(r => r.json()).then(e => setEmails(Array.isArray(e) ? e : [])).catch(() => {});
   }, []);
+
+  const { page, setPage, totalPages, paged, total, pageSize } = usePagination(knowledge);
 
   const saveSettings = async () => {
     const res = await fetch("/api/admin/settings", {
@@ -77,14 +82,14 @@ export default function AdminSettings() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
             <label className="block text-sm font-medium text-midnight-900/70 mb-2">Enable AI Chat Assistant</label>
-            <select
+            <SearchableSelect
               value={settings.ai_enabled || "true"}
-              onChange={e => setSettings({ ...settings, ai_enabled: e.target.value })}
-              className="input-field"
-            >
-              <option value="true">Enabled (Online)</option>
-              <option value="false">Disabled (Offline)</option>
-            </select>
+              onChange={(value) => setSettings({ ...settings, ai_enabled: value })}
+              options={[
+                { value: "true", label: "Enabled (Online)" },
+                { value: "false", label: "Disabled (Offline)" },
+              ]}
+            />
           </div>
           <div>
             <label className="block text-sm font-medium text-midnight-900/70 mb-2">WhatsApp Contact Number</label>
@@ -116,7 +121,7 @@ export default function AdminSettings() {
         </form>
 
         <div className="space-y-3">
-          {knowledge.map(k => (
+          {paged.map(k => (
             <div key={k.id} className="flex items-center justify-between p-4 bg-white border border-midnight-900/10 rounded-lg">
               <div>
                 <span className="text-xs font-semibold text-gold-600 bg-gold-300/15 px-2 py-1 rounded mr-3">{k.category}</span>
@@ -126,6 +131,7 @@ export default function AdminSettings() {
             </div>
           ))}
           {knowledge.length === 0 && <div className="text-midnight-900/40 text-sm">No articles added yet.</div>}
+          <Pagination page={page} totalPages={totalPages} onPageChange={setPage} total={total} pageSize={pageSize} />
         </div>
       </div>
 
@@ -136,24 +142,27 @@ export default function AdminSettings() {
 
         <form onSubmit={saveEmail} className="bg-ivory-100 p-4 rounded-xl border border-midnight-900/10 mb-6 space-y-4">
           <h3 className="font-semibold text-midnight-900 text-sm">Edit Template</h3>
-          <select required value={editEmailEvent} onChange={e => {
-            const ev = e.target.value;
-            setEditEmailEvent(ev);
-            const existing = emails.find(em => em.event === ev);
-            if (existing) {
-              setEditEmailSubject(existing.subject);
-              setEditEmailBody(existing.body_html);
-            } else {
-              setEditEmailSubject(""); setEditEmailBody("");
-            }
-          }} className="input-field">
-            <option value="" disabled>Select System Event...</option>
-            <option value="welcome">Welcome / Verify Email</option>
-            <option value="reset_password">Password Reset</option>
-            <option value="application_received">Application Received</option>
-            <option value="application_status">Application Status Update</option>
-            <option value="payment_receipt">Payment Receipt (Stripe/PayPal)</option>
-          </select>
+          <SearchableSelect
+            value={editEmailEvent}
+            onChange={(ev) => {
+              setEditEmailEvent(ev);
+              const existing = emails.find(em => em.event === ev);
+              if (existing) {
+                setEditEmailSubject(existing.subject);
+                setEditEmailBody(existing.body_html);
+              } else {
+                setEditEmailSubject(""); setEditEmailBody("");
+              }
+            }}
+            placeholder="Select System Event..."
+            options={[
+              { value: "welcome", label: "Welcome / Verify Email" },
+              { value: "reset_password", label: "Password Reset" },
+              { value: "application_received", label: "Application Received" },
+              { value: "application_status", label: "Application Status Update" },
+              { value: "payment_receipt", label: "Payment Receipt (Stripe/PayPal)" },
+            ]}
+          />
           {editEmailEvent && (
             <>
               <input required placeholder="Email Subject" value={editEmailSubject} onChange={e => setEditEmailSubject(e.target.value)} className="input-field" />

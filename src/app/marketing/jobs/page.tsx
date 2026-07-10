@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import PortalShell from "@/components/portal/PortalShell";
 import { MARKETING_NAV_ITEMS } from "@/components/portal/marketingNav";
+import Pagination from "@/components/Pagination";
+import { usePagination } from "@/lib/usePagination";
 import { Plus } from "@phosphor-icons/react";
 
 interface Job {
@@ -27,6 +29,8 @@ export default function AdminJobsPage() {
   };
 
   useEffect(load, []);
+
+  const { page, setPage, totalPages, paged, total, pageSize } = usePagination(jobs);
 
   const handleDelete = async (jobId: string) => {
     if (!confirm("Are you sure you want to delete this job? All associated applications will be removed too.")) return;
@@ -69,7 +73,7 @@ export default function AdminJobsPage() {
               </tr>
             </thead>
             <tbody>
-              {jobs.map((job) => (
+              {paged.map((job) => (
                 <tr key={job.id} className="border-b border-midnight-900/5 last:border-0">
                   <td className="px-5 py-4">
                     <div className="font-medium text-midnight-900">{job.title}</div>
@@ -86,6 +90,9 @@ export default function AdminJobsPage() {
               ))}
             </tbody>
           </table>
+          <div className="px-5">
+            <Pagination page={page} totalPages={totalPages} onPageChange={setPage} total={total} pageSize={pageSize} />
+          </div>
         </div>
       )}
     </PortalShell>

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { MapPin, Tag, CurrencyCircleDollar, Users, ArrowRight, MagnifyingGlass } from "@phosphor-icons/react/dist/ssr";
+import JobsCategoryFilter from "@/components/JobsCategoryFilter";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
@@ -25,7 +26,7 @@ async function getJobs(searchParams: { page?: string; country?: string; category
   const page = searchParams.page || "1";
   const { country = "", category = "", q = "" } = searchParams;
 
-  const params = new URLSearchParams({ page, limit: "12" });
+  const params = new URLSearchParams({ page, limit: "15" });
   if (country) params.append("country", country);
   if (category) params.append("category", category);
   if (q) params.append("q", q);
@@ -88,16 +89,7 @@ export default async function JobsPage({
               placeholder="Country..."
               className="input-field w-full md:w-48 text-sm"
             />
-            <select
-              name="category"
-              defaultValue={params.category || ""}
-              className="input-field w-full md:w-56 text-sm"
-            >
-              <option value="">All Categories</option>
-              {categories.map((cat) => (
-                <option key={cat} value={cat}>{cat}</option>
-              ))}
-            </select>
+            <JobsCategoryFilter categories={categories} defaultValue={params.category || ""} />
             <button type="submit" className="btn-primary w-full md:w-auto text-xs py-3 px-7">
               <MagnifyingGlass size={14} weight="bold" /> Search
             </button>

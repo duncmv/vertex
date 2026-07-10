@@ -6,21 +6,12 @@ import { getAuthUser, requireAuth } from "@/lib/api-auth";
 import { canAccessCandidate } from "@/server/scope";
 import { isStaffRole } from "@/lib/rbac";
 import { evaluateDocumentCompletenessForCandidateId } from "@/server/services/documentCompleteness";
-import type { DocumentType } from "@prisma/client";
 
-// SRS FR-4.6 extends per-document verification beyond cv/passport to the
-// full mobility-lifecycle document set (transcripts, medical, police
-// clearance, visa, and a supporting contract file distinct from the
-// structured, e-signed Contract record) — further widened for the
-// Candidate Information Form's Section 3 per-programme document checklist
-// (all_passport_pages, national_id, cv_europass, etc.).
-const ALLOWED_TYPES: DocumentType[] = [
-  "cv", "passport", "transcript", "certificate", "medical", "police_clearance", "contract", "visa",
-  "all_passport_pages", "passport_photo", "national_id", "cv_europass", "education_diploma",
-  "driving_licence", "tachograph_card", "professional_training_certificate", "e_apostille", "zab_recognition_letter",
-];
-
-// POST /api/upload?type=<DocumentType>[&candidate_id=...]
+// POST /api/upload?type=<key>[&candidate_id=...]
+// `type` is validated against the admin-managed DocumentRequirementType
+// table (SRS FR-4.6's mobility-lifecycle set plus the Candidate
+// Information Form's Section 3 checklist) rather than a fixed allowlist,
+// so a type admin adds from the UI is immediately uploadable.
 // Self-upload (no candidate_id) covers a candidate managing their own
 // account. A recruiter/supervisor/admin passing candidate_id uploads on
 // behalf of a recruiter-sourced lead who has no account yet (SRS FR-2.1,
@@ -31,10 +22,10 @@ export async function POST(req: NextRequest) {
   const guardRes = requireAuth(user);
   if (guardRes) return guardRes;
 
-  const fileType = req.nextUrl.searchParams.get("type") as DocumentType | null;
-  if (!fileType || !ALLOWED_TYPES.includes(fileType)) {
+  const fileType = req.nextUrl.searchParams.get("type");
+  if (!fileType || !(await prisma.documentRequirementType.findUnique({ where: { key: fileType } }))) {
     return NextResponse.json(
-      { error: `Query param 'type' must be one of: ${ALLOWED_TYPES.join(", ")}.` },
+      { error: "Query param 'type' must be a known document requirement type." },
       { status: 400 }
     );
   }

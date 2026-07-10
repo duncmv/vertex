@@ -3,7 +3,10 @@
 import { useEffect, useState } from "react";
 import PortalShell from "@/components/portal/PortalShell";
 import { ADMIN_NAV_ITEMS } from "@/components/portal/adminNav";
-import { GlobeHemisphereWest, Plus, MapPin } from "@phosphor-icons/react";
+import SearchableSelect from "@/components/SearchableSelect";
+import Pagination from "@/components/Pagination";
+import { usePagination } from "@/lib/usePagination";
+import { GlobeHemisphereWest, Plus, MapPin, PencilSimple, Check, X, Trash } from "@phosphor-icons/react";
 
 interface Country {
   id: string;
@@ -29,6 +32,13 @@ export default function RegionsPage() {
   const [newCountryRegionId, setNewCountryRegionId] = useState("");
   const [creatingCountry, setCreatingCountry] = useState(false);
 
+  const [editingRegionId, setEditingRegionId] = useState<string | null>(null);
+  const [editRegionName, setEditRegionName] = useState("");
+  const [editingCountryId, setEditingCountryId] = useState<string | null>(null);
+  const [editCountryName, setEditCountryName] = useState("");
+  const [editCountryRegionId, setEditCountryRegionId] = useState("");
+  const [saving, setSaving] = useState(false);
+
   const load = () => {
     setLoading(true);
     fetch("/api/admin/regions")
@@ -39,6 +49,8 @@ export default function RegionsPage() {
   };
 
   useEffect(load, []);
+
+  const { page, setPage, totalPages, paged, total, pageSize } = usePagination(regions);
 
   const handleCreateRegion = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -82,6 +94,73 @@ export default function RegionsPage() {
     }
   };
 
+  const startEditRegion = (region: Region) => {
+    setEditingRegionId(region.id);
+    setEditRegionName(region.name);
+  };
+
+  const saveRegion = async (id: string) => {
+    setSaving(true);
+    setError("");
+    try {
+      const res = await fetch(`/api/admin/regions/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: editRegionName }),
+      });
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.error?.message || "Failed to update region.");
+      setEditingRegionId(null);
+      load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to update region.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const startEditCountry = (country: { id: string; name: string }, regionId: string) => {
+    setEditingCountryId(country.id);
+    setEditCountryName(country.name);
+    setEditCountryRegionId(regionId);
+  };
+
+  const saveCountry = async (id: string) => {
+    setSaving(true);
+    setError("");
+    try {
+      const res = await fetch(`/api/admin/countries/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: editCountryName, region_id: editCountryRegionId }),
+      });
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.error?.message || "Failed to update country.");
+      setEditingCountryId(null);
+      load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to update country.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const deleteCountry = async (country: { id: string; name: string }) => {
+    if (!window.confirm(`Remove ${country.name}? This can't be undone.`)) return;
+    setSaving(true);
+    setError("");
+    try {
+      const res = await fetch(`/api/admin/countries/${country.id}`, { method: "DELETE" });
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.error?.message || "Failed to remove country.");
+      load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to remove country.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <PortalShell roleLabel="System Administrator" navItems={ADMIN_NAV_ITEMS}>
       <p className="eyebrow mb-3">
@@ -90,7 +169,7 @@ export default function RegionsPage() {
       </p>
       <h1 className="section-title text-3xl md:text-4xl mb-2">Regions & Countries</h1>
       <p className="text-midnight-900/55 font-light mb-10 max-w-2xl">
-        The structure recruiters and candidates are attributed to (SRS FR-1.4). Add regions first, then countries within them.
+        The structure recruiters and candidates are attributed to (SRS FR-1.4). Add regions first, then countries within them — click the pencil next to any name to rename it or move a country to a different region.
       </p>
 
       {error && (
@@ -117,17 +196,14 @@ export default function RegionsPage() {
         <form onSubmit={handleCreateCountry} className="card p-6">
           <h2 className="font-semibold text-midnight-900 mb-4">Add a country</h2>
           <div className="flex gap-3">
-            <select
+            <SearchableSelect
               value={newCountryRegionId}
-              onChange={(e) => setNewCountryRegionId(e.target.value)}
+              onChange={setNewCountryRegionId}
               required
+              placeholder="Region…"
               className="input-field w-40"
-            >
-              <option value="">Region…</option>
-              {regions.map((r) => (
-                <option key={r.id} value={r.id}>{r.name}</option>
-              ))}
-            </select>
+              options={regions.map((r) => ({ value: r.id, label: r.name }))}
+            />
             <input
               value={newCountryName}
               onChange={(e) => setNewCountryName(e.target.value)}
@@ -148,20 +224,86 @@ export default function RegionsPage() {
         <div className="card p-10 text-center text-midnight-900/50">No regions yet — add one above.</div>
       ) : (
         <div className="grid md:grid-cols-2 gap-5">
-          {regions.map((region) => (
+          {paged.map((region) => (
             <div key={region.id} className="card p-6">
-              <div className="flex items-center gap-2 mb-4">
-                <GlobeHemisphereWest size={18} weight="regular" className="text-gold-600" />
-                <h3 className="font-semibold text-midnight-900 tracking-tight">{region.name}</h3>
+              <div className="flex items-center gap-2 mb-4 group">
+                <GlobeHemisphereWest size={18} weight="regular" className="text-gold-600 shrink-0" />
+                {editingRegionId === region.id ? (
+                  <div className="flex items-center gap-2 flex-1">
+                    <input
+                      value={editRegionName}
+                      onChange={(e) => setEditRegionName(e.target.value)}
+                      className="input-field py-1 text-sm flex-1"
+                      autoFocus
+                    />
+                    <button onClick={() => saveRegion(region.id)} disabled={saving} className="text-emerald-600 hover:text-emerald-700 disabled:opacity-50">
+                      <Check size={16} weight="bold" />
+                    </button>
+                    <button onClick={() => setEditingRegionId(null)} className="text-midnight-900/40 hover:text-midnight-900">
+                      <X size={16} weight="bold" />
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <h3 className="font-semibold text-midnight-900 tracking-tight flex-1">{region.name}</h3>
+                    <button
+                      onClick={() => startEditRegion(region)}
+                      className="text-midnight-900/25 hover:text-gold-600 opacity-0 group-hover:opacity-100 transition-opacity"
+                      aria-label="Rename region"
+                    >
+                      <PencilSimple size={15} weight="regular" />
+                    </button>
+                  </>
+                )}
               </div>
               {region.countries.length === 0 ? (
                 <p className="text-sm text-midnight-900/40">No countries yet.</p>
               ) : (
                 <ul className="space-y-2">
                   {region.countries.map((c) => (
-                    <li key={c.id} className="flex items-center gap-2 text-sm text-midnight-900/70">
-                      <MapPin size={14} weight="regular" className="text-midnight-900/30" />
-                      {c.name}
+                    <li key={c.id} className="flex items-center gap-2 text-sm text-midnight-900/70 group">
+                      {editingCountryId === c.id ? (
+                        <div className="flex items-center gap-2 flex-1">
+                          <input
+                            value={editCountryName}
+                            onChange={(e) => setEditCountryName(e.target.value)}
+                            className="input-field py-1 text-sm flex-1"
+                            autoFocus
+                          />
+                          <SearchableSelect
+                            value={editCountryRegionId}
+                            onChange={setEditCountryRegionId}
+                            className="input-field py-1 text-sm w-32"
+                            options={regions.map((r) => ({ value: r.id, label: r.name }))}
+                          />
+                          <button onClick={() => saveCountry(c.id)} disabled={saving} className="text-emerald-600 hover:text-emerald-700 disabled:opacity-50 shrink-0">
+                            <Check size={16} weight="bold" />
+                          </button>
+                          <button onClick={() => setEditingCountryId(null)} className="text-midnight-900/40 hover:text-midnight-900 shrink-0">
+                            <X size={16} weight="bold" />
+                          </button>
+                        </div>
+                      ) : (
+                        <>
+                          <MapPin size={14} weight="regular" className="text-midnight-900/30 shrink-0" />
+                          <span className="flex-1">{c.name}</span>
+                          <button
+                            onClick={() => startEditCountry(c, region.id)}
+                            className="text-midnight-900/25 hover:text-gold-600 opacity-0 group-hover:opacity-100 transition-opacity"
+                            aria-label="Edit country"
+                          >
+                            <PencilSimple size={13} weight="regular" />
+                          </button>
+                          <button
+                            onClick={() => deleteCountry(c)}
+                            disabled={saving}
+                            className="text-midnight-900/25 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity disabled:opacity-50"
+                            aria-label="Remove country"
+                          >
+                            <Trash size={13} weight="regular" />
+                          </button>
+                        </>
+                      )}
                     </li>
                   ))}
                 </ul>
@@ -170,6 +312,7 @@ export default function RegionsPage() {
           ))}
         </div>
       )}
+      <Pagination page={page} totalPages={totalPages} onPageChange={setPage} total={total} pageSize={pageSize} />
     </PortalShell>
   );
 }

@@ -6,13 +6,13 @@ import { usePathname } from "next/navigation";
 import { CaretDown, Check } from "@phosphor-icons/react";
 import { isInternalPortalPath } from "@/lib/rbac";
 
-const NAV_LINKS = [
+const BASE_NAV_LINKS = [
   { href: "/", label: "Home" },
   { href: "/about", label: "About" },
-  { href: "/jobs", label: "Jobs" },
   { href: "/apply", label: "Apply" },
   { href: "/contact", label: "Contact" },
 ];
+const JOBS_LINK = { href: "/jobs", label: "Jobs" };
 
 const LANGUAGES = [
   { code: "en", label: "English" },
@@ -33,7 +33,21 @@ export default function Navbar() {
   const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [currentLang, setCurrentLang] = useState("en");
+  const [hasJobs, setHasJobs] = useState(false);
   const pathname = usePathname();
+
+  // The Jobs nav link only appears once there's something to browse —
+  // no point sending visitors to an empty listings page.
+  useEffect(() => {
+    fetch("/api/jobs?limit=1")
+      .then((r) => r.json())
+      .then((res) => setHasJobs((res.total ?? 0) > 0))
+      .catch(() => {});
+  }, []);
+
+  const navLinks = hasJobs
+    ? [...BASE_NAV_LINKS.slice(0, 2), JOBS_LINK, ...BASE_NAV_LINKS.slice(2)]
+    : BASE_NAV_LINKS;
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 20);
@@ -90,7 +104,7 @@ export default function Navbar() {
 
           {/* Desktop nav */}
           <div className="hidden lg:flex items-center gap-9">
-            {NAV_LINKS.map((link) => (
+            {navLinks.map((link) => (
               <Link
                 key={link.href}
                 href={link.href}
@@ -170,7 +184,7 @@ export default function Navbar() {
         {open && (
           <div className="md:hidden pb-5 border-t border-white/10 mt-1">
             <div className="flex flex-col gap-1 pt-3">
-              {NAV_LINKS.map((link) => (
+              {navLinks.map((link) => (
                 <Link
                   key={link.href}
                   href={link.href}

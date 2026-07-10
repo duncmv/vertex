@@ -61,8 +61,8 @@ const SERVICES = [
       "Matched to employer requirements",
     ],
     text: "We source, screen, and coordinate candidates across regions — matching them to international employer requirements across industries.",
-    cta: "Browse Opportunities",
-    href: "/jobs",
+    cta: "Apply Now",
+    href: "/apply",
   },
   {
     id: "visa",

@@ -3,6 +3,9 @@
 import { useEffect, useState } from "react";
 import PortalShell from "@/components/portal/PortalShell";
 import { SUPERVISOR_NAV_ITEMS } from "@/components/portal/supervisorNav";
+import SearchableSelect from "@/components/SearchableSelect";
+import Pagination from "@/components/Pagination";
+import { usePagination } from "@/lib/usePagination";
 import { Plus, Stack } from "@phosphor-icons/react";
 
 interface ReportRow {
@@ -50,6 +53,9 @@ export default function SupervisorReportsPage() {
   const recruiterInbox = reports.filter((r) => r.scope_level === "recruiter" && r.status === "submitted");
   const verifiedForConsolidation = reports.filter((r) => r.scope_level === "recruiter" && r.status === "verified");
   const myCountryReports = reports.filter((r) => r.scope_level === "country");
+
+  const inboxPage = usePagination(recruiterInbox);
+  const countryReportsPage = usePagination(myCountryReports);
 
   const verify = async (id: string) => {
     await fetch(`/api/reports/${id}/verify`, { method: "PATCH" });
@@ -121,7 +127,7 @@ export default function SupervisorReportsPage() {
         <div className="card p-6 text-center text-midnight-900/40 mb-8">Nothing awaiting review.</div>
       ) : (
         <div className="space-y-3 mb-8">
-          {recruiterInbox.map((r) => (
+          {inboxPage.paged.map((r) => (
             <div key={r.id} className="card p-5">
               <div className="flex items-start justify-between gap-4 mb-2">
                 <div>
@@ -147,6 +153,7 @@ export default function SupervisorReportsPage() {
               </div>
             </div>
           ))}
+          <Pagination page={inboxPage.page} totalPages={inboxPage.totalPages} onPageChange={inboxPage.setPage} total={inboxPage.total} pageSize={inboxPage.pageSize} />
         </div>
       )}
 
@@ -161,10 +168,14 @@ export default function SupervisorReportsPage() {
         <form onSubmit={submitConsolidated} className="card p-6 mb-6 space-y-4">
           <h3 className="font-semibold text-midnight-900 flex items-center gap-2"><Stack size={16} weight="regular" /> New country report</h3>
           <div className="grid sm:grid-cols-3 gap-4">
-            <select value={consolidateForm.type} onChange={(e) => setConsolidateForm({ ...consolidateForm, type: e.target.value })} className="input-field">
-              <option value="weekly">Weekly country report</option>
-              <option value="monthly">Monthly performance summary</option>
-            </select>
+            <SearchableSelect
+              value={consolidateForm.type}
+              onChange={(value) => setConsolidateForm({ ...consolidateForm, type: value })}
+              options={[
+                { value: "weekly", label: "Weekly country report" },
+                { value: "monthly", label: "Monthly performance summary" },
+              ]}
+            />
             <input required type="date" value={consolidateForm.period_start} onChange={(e) => setConsolidateForm({ ...consolidateForm, period_start: e.target.value })} className="input-field" />
             <input required type="date" value={consolidateForm.period_end} onChange={(e) => setConsolidateForm({ ...consolidateForm, period_end: e.target.value })} className="input-field" />
           </div>
@@ -196,7 +207,7 @@ export default function SupervisorReportsPage() {
         <div className="card p-10 text-center text-midnight-900/50">No country reports submitted yet.</div>
       ) : (
         <div className="space-y-3">
-          {myCountryReports.map((r) => (
+          {countryReportsPage.paged.map((r) => (
             <div key={r.id} className="card p-5">
               <div className="flex items-center justify-between mb-1">
                 <div className="text-sm font-medium text-midnight-900 capitalize">{r.type} report</div>
@@ -210,6 +221,7 @@ export default function SupervisorReportsPage() {
               )}
             </div>
           ))}
+          <Pagination page={countryReportsPage.page} totalPages={countryReportsPage.totalPages} onPageChange={countryReportsPage.setPage} total={countryReportsPage.total} pageSize={countryReportsPage.pageSize} />
         </div>
       )}
     </PortalShell>

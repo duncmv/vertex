@@ -3,6 +3,9 @@
 import { useEffect, useState } from "react";
 import PortalShell from "@/components/portal/PortalShell";
 import { MANAGEMENT_NAV_ITEMS } from "@/components/portal/managementNav";
+import SearchableSelect from "@/components/SearchableSelect";
+import Pagination from "@/components/Pagination";
+import { usePagination } from "@/lib/usePagination";
 import { Plus, Target, Trash, X } from "@phosphor-icons/react";
 
 const METRICS = [
@@ -129,6 +132,8 @@ export default function CampaignsPage() {
     load();
   };
 
+  const { page, setPage, totalPages, paged, total, pageSize } = usePagination(campaigns);
+
   return (
     <PortalShell roleLabel="Management" navItems={MANAGEMENT_NAV_ITEMS}>
       <div className="flex items-start justify-between gap-6 mb-2">
@@ -176,7 +181,7 @@ export default function CampaignsPage() {
         <div className="card p-10 text-center text-midnight-900/50">No campaigns yet.</div>
       ) : (
         <div className="space-y-5">
-          {campaigns.map((c) => (
+          {paged.map((c) => (
             <div key={c.id} className="card p-6">
               <div className="flex items-start justify-between gap-4 mb-4">
                 <div>
@@ -191,11 +196,16 @@ export default function CampaignsPage() {
                   </div>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
-                  <select value={c.status} onChange={(e) => updateStatus(c.id, e.target.value)} className="input-field py-1.5 text-xs">
-                    <option value="draft">Draft</option>
-                    <option value="active">Active</option>
-                    <option value="closed">Closed</option>
-                  </select>
+                  <SearchableSelect
+                    value={c.status}
+                    onChange={(value) => updateStatus(c.id, value)}
+                    className="input-field py-1.5 text-xs"
+                    options={[
+                      { value: "draft", label: "Draft" },
+                      { value: "active", label: "Active" },
+                      { value: "closed", label: "Closed" },
+                    ]}
+                  />
                   <button onClick={() => deleteCampaign(c.id)} className="text-red-400 hover:text-red-600 p-1.5" aria-label="Delete campaign">
                     <Trash size={16} weight="regular" />
                   </button>
@@ -224,26 +234,23 @@ export default function CampaignsPage() {
                 )}
 
                 <div className="flex flex-wrap items-center gap-2">
-                  <select
+                  <SearchableSelect
                     value={targetForms[c.id]?.metric ?? "agent_signups"}
-                    onChange={(e) => setTargetForms((prev) => ({ ...prev, [c.id]: { ...prev[c.id], metric: e.target.value, scope: prev[c.id]?.scope ?? "", target_value: prev[c.id]?.target_value ?? "" } }))}
+                    onChange={(value) => setTargetForms((prev) => ({ ...prev, [c.id]: { ...prev[c.id], metric: value, scope: prev[c.id]?.scope ?? "", target_value: prev[c.id]?.target_value ?? "" } }))}
                     className="input-field py-1.5 text-xs w-auto"
-                  >
-                    {METRICS.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
-                  </select>
-                  <select
+                    options={METRICS.map((m) => ({ value: m.value, label: m.label }))}
+                  />
+                  <SearchableSelect
                     value={targetForms[c.id]?.scope ?? ""}
-                    onChange={(e) => setTargetForms((prev) => ({ ...prev, [c.id]: { metric: prev[c.id]?.metric ?? "agent_signups", scope: e.target.value, target_value: prev[c.id]?.target_value ?? "" } }))}
+                    onChange={(value) => setTargetForms((prev) => ({ ...prev, [c.id]: { metric: prev[c.id]?.metric ?? "agent_signups", scope: value, target_value: prev[c.id]?.target_value ?? "" } }))}
                     className="input-field py-1.5 text-xs w-auto"
-                  >
-                    <option value="">Campaign-wide</option>
-                    <optgroup label="Region">
-                      {regions.map((r) => <option key={r.id} value={`region:${r.id}`}>{r.name}</option>)}
-                    </optgroup>
-                    <optgroup label="Country">
-                      {countries.map((co) => <option key={co.id} value={`country:${co.id}`}>{co.name}</option>)}
-                    </optgroup>
-                  </select>
+                    placeholder="Campaign-wide"
+                    options={[
+                      { value: "", label: "Campaign-wide" },
+                      ...regions.map((r) => ({ value: `region:${r.id}`, label: `Region — ${r.name}` })),
+                      ...countries.map((co) => ({ value: `country:${co.id}`, label: `Country — ${co.name}` })),
+                    ]}
+                  />
                   <input
                     type="number"
                     placeholder="Target value"
@@ -258,6 +265,7 @@ export default function CampaignsPage() {
               </div>
             </div>
           ))}
+          <Pagination page={page} totalPages={totalPages} onPageChange={setPage} total={total} pageSize={pageSize} />
         </div>
       )}
     </PortalShell>

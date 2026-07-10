@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import DocumentLink from "@/components/DocumentLink";
+import Pagination from "@/components/Pagination";
+import { usePagination } from "@/lib/usePagination";
 
 interface ApplicationRow {
   id: string;
@@ -41,6 +43,8 @@ export default function ApplicationsList({ emptyLabel }: { emptyLabel: string })
       .finally(() => setLoading(false));
   }, []);
 
+  const { page, setPage, totalPages, paged, total, pageSize } = usePagination(applications);
+
   if (loading) return <p className="text-midnight-900/50">Loading…</p>;
   if (error) return <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg p-4 text-sm">{error}</div>;
   if (applications.length === 0) return <div className="card p-10 text-center text-midnight-900/50">{emptyLabel}</div>;
@@ -59,7 +63,7 @@ export default function ApplicationsList({ emptyLabel }: { emptyLabel: string })
           </tr>
         </thead>
         <tbody>
-          {applications.map((a) => {
+          {paged.map((a) => {
             const name = a.candidate.user?.full_name ?? a.candidate.full_name ?? "— unnamed lead —";
             const contact = a.candidate.user?.email ?? "";
             return (
@@ -99,6 +103,9 @@ export default function ApplicationsList({ emptyLabel }: { emptyLabel: string })
           })}
         </tbody>
       </table>
+      <div className="px-5">
+        <Pagination page={page} totalPages={totalPages} onPageChange={setPage} total={total} pageSize={pageSize} />
+      </div>
     </div>
   );
 }

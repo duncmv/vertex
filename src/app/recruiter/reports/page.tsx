@@ -3,6 +3,9 @@
 import { useEffect, useState } from "react";
 import PortalShell from "@/components/portal/PortalShell";
 import { RECRUITER_NAV_ITEMS } from "@/components/portal/recruiterNav";
+import SearchableSelect from "@/components/SearchableSelect";
+import Pagination from "@/components/Pagination";
+import { usePagination } from "@/lib/usePagination";
 import { Plus, PaperPlaneTilt } from "@phosphor-icons/react";
 
 interface ReportRow {
@@ -43,6 +46,8 @@ export default function RecruiterReportsPage() {
   };
 
   useEffect(load, []);
+
+  const { page, setPage, totalPages, paged, total, pageSize } = usePagination(reports);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -104,11 +109,15 @@ export default function RecruiterReportsPage() {
         <form onSubmit={submit} className="card p-6 mb-6 space-y-4">
           <h3 className="font-semibold text-midnight-900">New report</h3>
           <div className="grid sm:grid-cols-3 gap-4">
-            <select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })} className="input-field">
-              <option value="daily">Daily status update</option>
-              <option value="weekly">Weekly candidate list</option>
-              <option value="monthly">Monthly summary</option>
-            </select>
+            <SearchableSelect
+              value={form.type}
+              onChange={(value) => setForm({ ...form, type: value })}
+              options={[
+                { value: "daily", label: "Daily status update" },
+                { value: "weekly", label: "Weekly candidate list" },
+                { value: "monthly", label: "Monthly summary" },
+              ]}
+            />
             <input required type="date" value={form.period_start} onChange={(e) => setForm({ ...form, period_start: e.target.value })} className="input-field" />
             <input required type="date" value={form.period_end} onChange={(e) => setForm({ ...form, period_end: e.target.value })} className="input-field" />
           </div>
@@ -135,7 +144,7 @@ export default function RecruiterReportsPage() {
               </tr>
             </thead>
             <tbody>
-              {reports.map((r) => (
+              {paged.map((r) => (
                 <tr key={r.id} className="border-b border-midnight-900/5 last:border-0 align-top">
                   <td className="px-5 py-4 text-midnight-900/70">
                     {new Date(r.period_start).toLocaleDateString()} – {new Date(r.period_end).toLocaleDateString()}
@@ -168,6 +177,9 @@ export default function RecruiterReportsPage() {
               ))}
             </tbody>
           </table>
+          <div className="px-5">
+            <Pagination page={page} totalPages={totalPages} onPageChange={setPage} total={total} pageSize={pageSize} />
+          </div>
         </div>
       )}
     </PortalShell>

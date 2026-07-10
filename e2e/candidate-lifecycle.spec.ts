@@ -1,4 +1,4 @@
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect, type Page, type Locator } from "@playwright/test";
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
 
@@ -25,6 +25,18 @@ async function login(page: Page, email: string, password: string) {
 async function logout(page: Page) {
   await page.getByText("Log out").click();
   await page.waitForURL((url) => url.pathname.startsWith("/auth/login") || url.pathname === "/", { timeout: 25_000 });
+}
+
+// SearchableSelect renders as a button+listbox combobox, not a native
+// <select> — open it, then click the matching option.
+async function pickOption(page: Page, trigger: Locator, name: string | RegExp) {
+  await trigger.click();
+  await page.getByRole("option", { name }).click();
+}
+
+async function pickOptionByIndex(page: Page, trigger: Locator, index: number) {
+  await trigger.click();
+  await page.getByRole("listbox").getByRole("option").nth(index).click();
 }
 
 const PASSWORD = "E2ETestPassword123!";
@@ -64,10 +76,13 @@ test.describe("Candidate pre-application lifecycle (Phase 2)", () => {
       // the one seeded destination with none, so document-completeness
       // (and the auto-advance to "submitted" it drives) only depends on
       // the 3 universal uploads this test actually performs.
-      await page.getByLabel("Preferred Country — Option 1").selectOption({ label: "United Kingdom" });
-      await page.getByLabel("Preferred Type of Work").selectOption({ index: 1 });
+      await pickOption(page, page.getByLabel("Preferred Country — Option 1"), "United Kingdom");
+      await pickOptionByIndex(page, page.getByLabel("Preferred Type of Work"), 0);
       await page.getByLabel("Earliest Possible Travel Date").fill("2026-12-01");
-      await page.getByLabel("Current Location (country)").selectOption({ index: 1 });
+      // Alphabetically first non-Europe country — "E2E Country" (global-setup
+      // fixture), which is also e2e-recruiter/e2e-supervisor's assigned
+      // territory, so the candidate lands in the supervisor's scope.
+      await pickOptionByIndex(page, page.getByLabel("Current Location (country)"), 0);
       await page.getByLabel("I understand the payment plan above.").check();
       await page.getByLabel("I confirm the above.").check();
       await page.getByRole("button", { name: "Submit Application" }).click();
@@ -131,7 +146,7 @@ test.describe("Candidate pre-application lifecycle (Phase 2)", () => {
 
       await expect(page.getByText(candidateName)).toBeVisible({ timeout: 25_000 });
       await page.getByRole("button", { name: "Return" }).click();
-      await page.getByRole("combobox").selectOption({ label: "Return to Submitted" });
+      await pickOption(page, page.getByRole("combobox"), "Return to Submitted");
       await page.getByPlaceholder("Reason for return (required)…").fill("Please double-check the passport number.");
       await page.getByRole("button", { name: "Confirm Return" }).click();
 

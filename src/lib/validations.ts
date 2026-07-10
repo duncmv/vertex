@@ -5,15 +5,6 @@ import { z } from "zod";
 // an untouched form input, since .optional() only short-circuits undefined.
 const optionalEmail = z.preprocess((val) => (val === "" ? undefined : val), z.string().email().optional());
 
-// Matches the Prisma DocumentType enum — used both for the Candidate
-// Information Form's Section 3 self-reported checklist and for admin's
-// per-country document-requirement configuration.
-const DOCUMENT_TYPES = [
-  "cv", "passport", "transcript", "certificate", "medical", "police_clearance", "contract", "visa", "other",
-  "all_passport_pages", "passport_photo", "national_id", "cv_europass", "education_diploma",
-  "driving_licence", "tachograph_card", "professional_training_certificate", "e_apostille", "zab_recognition_letter",
-] as const;
-
 // Auth
 export const registerSchema = z.object({
   full_name: z.string().min(2, "Full name must be at least 2 characters").max(100),
@@ -115,7 +106,7 @@ export const submitApplicationSchema = z.object({
   // at submission time, not the documents themselves — those are
   // uploaded later from the candidate's own dashboard once an account
   // exists.
-  documents_available: z.array(z.enum(DOCUMENT_TYPES)).default([]),
+  documents_available: z.array(z.string().min(1).max(60)).default([]),
 
   // Section 5 — Visa & Travel Readiness. current_location_country_id also
   // drives round-robin recruiter assignment for a self-service submission.
@@ -158,9 +149,18 @@ export const createRegionSchema = z.object({
   name: z.string().min(2).max(100),
 });
 
+export const updateRegionSchema = z.object({
+  name: z.string().min(2).max(100),
+});
+
 export const createCountrySchema = z.object({
   name: z.string().min(2).max(100),
   region_id: z.string().cuid("Invalid region ID"),
+});
+
+export const updateCountrySchema = z.object({
+  name: z.string().min(2).max(100).optional(),
+  region_id: z.string().cuid("Invalid region ID").optional(),
 });
 
 // Sectors ("Preferred Type of Work" on the Candidate Information Form) and
@@ -171,7 +171,14 @@ export const createSectorSchema = z.object({
 });
 
 export const updateCountryDocumentRequirementsSchema = z.object({
-  document_types: z.array(z.enum(DOCUMENT_TYPES)),
+  document_types: z.array(z.string().min(1).max(60)),
+});
+
+// Admin-managed document requirement types (replaces the old fixed
+// DocumentType enum) — `key` is derived server-side by slugifying the
+// label, not supplied directly, so admin only ever thinks in labels.
+export const createDocumentRequirementTypeSchema = z.object({
+  label: z.string().min(2).max(150),
 });
 
 // Staff role/supervisor/country assignment (SRS FR-1.1, FR-1.3, FR-1.4) —
@@ -415,7 +422,7 @@ export const submitPartnerCandidateSchema = z.object({
   earliest_travel_date: z.string().min(1, "Earliest possible travel date is required"),
   prior_eu_visa_applied: z.string().max(500).optional(),
 
-  documents_available: z.array(z.enum(DOCUMENT_TYPES)).default([]),
+  documents_available: z.array(z.string().min(1).max(60)).default([]),
 
   payment_plan_acknowledged: z.literal(true, {
     message: "You must acknowledge the payment plan to submit.",

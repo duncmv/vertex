@@ -4,44 +4,64 @@ import { useEffect, useState } from "react";
 import PortalShell from "@/components/portal/PortalShell";
 import { ADMIN_NAV_ITEMS } from "@/components/portal/adminNav";
 
-interface Job {
+interface StaffUser {
   id: string;
-  status: string;
+  role: string;
 }
 
-interface Application {
+interface Region {
   id: string;
-  application_status: string;
-  candidate: { full_name: string | null; user: { full_name: string } | null };
-  job: { title: string } | null;
-  preferred_sector: { name: string } | null;
+  countries: { id: string }[];
 }
 
+interface Sector {
+  id: string;
+}
+
+// System Administrator's Overview is deliberately system-level (staff
+// headcount, reference-data footprint) — not a recruitment-operations
+// dashboard. Jobs/Applications/Candidates/Finances all belong to
+// Marketing/Management, who own that work; Admin's job is provisioning
+// and reference data, so that's what its own landing page reflects.
 export default function AdminOverviewPage() {
-  const [jobs, setJobs] = useState<Job[]>([]);
-  const [applications, setApplications] = useState<Application[]>([]);
-  const [candidateCount, setCandidateCount] = useState(0);
+  const [staff, setStaff] = useState<StaffUser[]>([]);
+  const [regions, setRegions] = useState<Region[]>([]);
+  const [sectors, setSectors] = useState<Sector[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     Promise.all([
-      fetch("/api/jobs?limit=50").then((r) => r.json()),
-      fetch("/api/applications").then((r) => r.json()),
-      fetch("/api/admin/candidates").then((r) => r.json()).catch(() => []),
+      fetch("/api/admin/users").then((r) => r.json()).catch(() => ({ data: [] })),
+      fetch("/api/admin/regions").then((r) => r.json()).catch(() => ({ data: [] })),
+      fetch("/api/admin/sectors").then((r) => r.json()).catch(() => ({ data: [] })),
     ])
-      .then(([jRes, aRes, cRes]) => {
-        setJobs(jRes.jobs || []);
-        setApplications(Array.isArray(aRes) ? aRes : []);
-        setCandidateCount(Array.isArray(cRes) ? cRes.length : 0);
+      .then(([uRes, rRes, sRes]) => {
+        setStaff(uRes.data ?? []);
+        setRegions(rRes.data ?? []);
+        setSectors(sRes.data ?? []);
       })
       .finally(() => setLoading(false));
   }, []);
+
+  const countryCount = regions.reduce((sum, r) => sum + r.countries.length, 0);
+  const roleCounts = staff.reduce<Record<string, number>>((acc, u) => {
+    acc[u.role] = (acc[u.role] ?? 0) + 1;
+    return acc;
+  }, {});
+  const ROLE_LABELS: Record<string, string> = {
+    regional_recruiter: "Regional Recruiters",
+    country_supervisor: "Country Supervisors",
+    inhouse_supervisor: "In-House Supervisors",
+    director: "Directors",
+    marketing: "Marketing",
+    admin: "System Administrators",
+  };
 
   return (
     <PortalShell roleLabel="System Administrator" navItems={ADMIN_NAV_ITEMS}>
       <p className="eyebrow mb-3">
         <span className="eyebrow-rule" />
-        Control
+        System
       </p>
       <h1 className="section-title text-3xl md:text-4xl mb-8">Overview.</h1>
 
@@ -51,46 +71,45 @@ export default function AdminOverviewPage() {
         <>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-10">
             <div className="card p-6">
-              <div className="text-xs text-gold-600 font-semibold uppercase tracking-wider mb-1">Active Jobs</div>
-              <div className="text-3xl font-semibold text-midnight-900">{jobs.filter((j) => j.status === "active").length}</div>
+              <div className="text-xs text-gold-600 font-semibold uppercase tracking-wider mb-1">Staff Accounts</div>
+              <div className="text-3xl font-semibold text-midnight-900">{staff.length}</div>
             </div>
             <div className="card p-6">
-              <div className="text-xs text-gold-600 font-semibold uppercase tracking-wider mb-1">Total Applications</div>
-              <div className="text-3xl font-semibold text-midnight-900">{applications.length}</div>
+              <div className="text-xs text-gold-600 font-semibold uppercase tracking-wider mb-1">Regions</div>
+              <div className="text-3xl font-semibold text-midnight-900">{regions.length}</div>
             </div>
             <div className="card p-6">
-              <div className="text-xs text-midnight-900/45 font-semibold uppercase tracking-wider mb-1">Registered Candidates</div>
-              <div className="text-3xl font-semibold text-midnight-900">{candidateCount}</div>
+              <div className="text-xs text-midnight-900/45 font-semibold uppercase tracking-wider mb-1">Countries</div>
+              <div className="text-3xl font-semibold text-midnight-900">{countryCount}</div>
             </div>
           </div>
 
-          <div className="card overflow-x-auto">
-            <div className="p-5 border-b border-midnight-900/10">
-              <h2 className="font-semibold text-midnight-900">Recent Applications</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="card overflow-x-auto">
+              <div className="p-5 border-b border-midnight-900/10">
+                <h2 className="font-semibold text-midnight-900">Staff by Role</h2>
+              </div>
+              <table className="w-full text-sm text-left">
+                <tbody>
+                  {Object.entries(roleCounts).map(([role, count]) => (
+                    <tr key={role} className="border-b border-midnight-900/5 last:border-0">
+                      <td className="px-5 py-3 text-midnight-900/70">{ROLE_LABELS[role] ?? role}</td>
+                      <td className="px-5 py-3 text-right font-medium text-midnight-900">{count}</td>
+                    </tr>
+                  ))}
+                  {staff.length === 0 && (
+                    <tr><td className="p-10 text-center text-midnight-900/40">No staff accounts yet.</td></tr>
+                  )}
+                </tbody>
+              </table>
             </div>
-            <table className="w-full text-sm text-left">
-              <thead className="text-midnight-900/40 text-xs uppercase tracking-wider">
-                <tr>
-                  <th className="px-5 py-3 font-semibold">Candidate</th>
-                  <th className="px-5 py-3 font-semibold">Programme</th>
-                  <th className="px-5 py-3 font-semibold">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {applications.slice(0, 5).map((app) => (
-                  <tr key={app.id} className="border-b border-midnight-900/5 last:border-0">
-                    <td className="px-5 py-4 font-medium text-midnight-900">{app.candidate.user?.full_name ?? app.candidate.full_name ?? "— unnamed lead —"}</td>
-                    <td className="px-5 py-4 text-midnight-900/60">{app.job?.title ?? app.preferred_sector?.name ?? "General Programme"}</td>
-                    <td className="px-5 py-4">
-                      <span className={`badge-${app.application_status}`}>{app.application_status}</span>
-                    </td>
-                  </tr>
-                ))}
-                {applications.length === 0 && (
-                  <tr><td colSpan={3} className="p-10 text-center text-midnight-900/40">No applications yet.</td></tr>
-                )}
-              </tbody>
-            </table>
+
+            <div className="card p-6">
+              <h2 className="font-semibold text-midnight-900 mb-1">Reference Data</h2>
+              <p className="text-sm text-midnight-900/50 mb-4">Sectors and taxonomy that recruitment forms and job postings draw from.</p>
+              <div className="text-3xl font-semibold text-midnight-900">{sectors.length}</div>
+              <div className="text-xs text-midnight-900/45 uppercase tracking-wider mt-1">Sectors configured</div>
+            </div>
           </div>
         </>
       )}

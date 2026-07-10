@@ -5,6 +5,8 @@ import Link from "next/link";
 import { WarningCircle } from "@phosphor-icons/react";
 import { CASE_STAGE_LABELS, type CaseStageKey } from "./caseStages";
 import CaseStageProgress from "./CaseStageProgress";
+import Pagination from "@/components/Pagination";
+import { usePagination } from "@/lib/usePagination";
 
 interface CaseRow {
   id: string;
@@ -55,12 +57,14 @@ export default function CaseList({ emptyLabel, basePath }: { emptyLabel: string;
       .finally(() => setLoading(false));
   }, []);
 
+  const { page, setPage, totalPages, paged, total, pageSize } = usePagination(cases);
+
   if (loading) return <p className="text-midnight-900/50">Loading…</p>;
   if (cases.length === 0) return <div className="card p-10 text-center text-midnight-900/50">{emptyLabel}</div>;
 
   return (
     <div className="space-y-3">
-      {cases.map((c) => {
+      {paged.map((c) => {
         const name = c.application.candidate.user?.full_name ?? c.application.candidate.full_name ?? "— unnamed —";
         return (
           <Link
@@ -90,6 +94,7 @@ export default function CaseList({ emptyLabel, basePath }: { emptyLabel: string;
           </Link>
         );
       })}
+      <Pagination page={page} totalPages={totalPages} onPageChange={setPage} total={total} pageSize={pageSize} />
     </div>
   );
 }

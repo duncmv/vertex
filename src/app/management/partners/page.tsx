@@ -4,6 +4,9 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import PortalShell from "@/components/portal/PortalShell";
 import { MANAGEMENT_NAV_ITEMS } from "@/components/portal/managementNav";
+import SearchableSelect from "@/components/SearchableSelect";
+import Pagination from "@/components/Pagination";
+import { usePagination } from "@/lib/usePagination";
 import { Handshake, Plus } from "@phosphor-icons/react";
 
 const PARTNER_TYPE_LABELS: Record<string, string> = {
@@ -70,6 +73,8 @@ export default function PartnersPage() {
 
   useEffect(load, []);
 
+  const { page, setPage, totalPages, paged, total, pageSize } = usePagination(partners);
+
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     setCreating(true);
@@ -121,11 +126,12 @@ export default function PartnersPage() {
           </div>
           <div>
             <label htmlFor="partner-type" className="block text-xs font-medium text-midnight-900/60 mb-1.5">Partner Type</label>
-            <select id="partner-type" value={form.partner_type} onChange={(e) => setForm({ ...form, partner_type: e.target.value })} className="input-field">
-              {Object.entries(PARTNER_TYPE_LABELS).map(([value, label]) => (
-                <option key={value} value={value}>{label}</option>
-              ))}
-            </select>
+            <SearchableSelect
+              id="partner-type"
+              value={form.partner_type}
+              onChange={(value) => setForm({ ...form, partner_type: value })}
+              options={Object.entries(PARTNER_TYPE_LABELS).map(([value, label]) => ({ value, label }))}
+            />
           </div>
           <div>
             <label htmlFor="partner-country" className="block text-xs font-medium text-midnight-900/60 mb-1.5">Country of Operation</label>
@@ -174,7 +180,7 @@ export default function PartnersPage() {
               </tr>
             </thead>
             <tbody>
-              {partners.map((p) => (
+              {paged.map((p) => (
                 <tr key={p.id} className="border-b border-midnight-900/5 last:border-0">
                   <td className="px-5 py-4">
                     <Link href={`/management/partners/${p.id}`} className="font-medium text-midnight-900 hover:text-gold-600 flex items-center gap-2">
@@ -200,6 +206,9 @@ export default function PartnersPage() {
               ))}
             </tbody>
           </table>
+          <div className="px-5">
+            <Pagination page={page} totalPages={totalPages} onPageChange={setPage} total={total} pageSize={pageSize} />
+          </div>
         </div>
       )}
     </PortalShell>

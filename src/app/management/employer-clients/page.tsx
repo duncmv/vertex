@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import PortalShell from "@/components/portal/PortalShell";
 import { MANAGEMENT_NAV_ITEMS } from "@/components/portal/managementNav";
+import Pagination from "@/components/Pagination";
+import { usePagination } from "@/lib/usePagination";
 import { Buildings, Plus } from "@phosphor-icons/react";
 
 const STATUS_STYLES: Record<string, string> = {
@@ -50,6 +52,8 @@ export default function EmployerClientsPage() {
   };
 
   useEffect(load, []);
+
+  const { page, setPage, totalPages, paged, total, pageSize } = usePagination(clients);
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -157,7 +161,7 @@ export default function EmployerClientsPage() {
               </tr>
             </thead>
             <tbody>
-              {clients.map((c) => (
+              {paged.map((c) => (
                 <tr key={c.id} className="border-b border-midnight-900/5 last:border-0">
                   <td className="px-5 py-4">
                     <div className="font-medium text-midnight-900 flex items-center gap-2">
@@ -181,6 +185,9 @@ export default function EmployerClientsPage() {
               ))}
             </tbody>
           </table>
+          <div className="px-5">
+            <Pagination page={page} totalPages={totalPages} onPageChange={setPage} total={total} pageSize={pageSize} />
+          </div>
         </div>
       )}
     </PortalShell>

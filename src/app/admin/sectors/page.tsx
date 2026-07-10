@@ -3,8 +3,11 @@
 import { useEffect, useState } from "react";
 import PortalShell from "@/components/portal/PortalShell";
 import { ADMIN_NAV_ITEMS } from "@/components/portal/adminNav";
-import { Briefcase, Plus, Trash, FileText } from "@phosphor-icons/react";
-import { DOCUMENT_TYPE_LABELS, CIF_PROGRAMME_SPECIFIC_DOCUMENT_TYPES } from "@/lib/documentTypes";
+import SearchableSelect from "@/components/SearchableSelect";
+import Pagination from "@/components/Pagination";
+import { usePagination } from "@/lib/usePagination";
+import { Briefcase, Plus, Trash, FileText, Files } from "@phosphor-icons/react";
+import { NON_PROGRAMME_TYPE_KEYS } from "@/lib/documentTypes";
 
 interface Sector {
   id: string;
@@ -17,21 +20,25 @@ interface Country {
   region: { id: string; name: string };
 }
 
-// Universal types (cv/passport/passport_photo) aren't listed here since
-// every programme requires them regardless of country.
-const DOCUMENT_TYPE_OPTIONS = CIF_PROGRAMME_SPECIFIC_DOCUMENT_TYPES.map((value) => ({
-  value,
-  label: DOCUMENT_TYPE_LABELS[value],
-}));
+interface DocumentRequirementType {
+  id: string;
+  key: string;
+  label: string;
+  is_universal: boolean;
+}
 
 export default function SectorsPage() {
   const [sectors, setSectors] = useState<Sector[]>([]);
   const [countries, setCountries] = useState<Country[]>([]);
+  const [documentTypes, setDocumentTypes] = useState<DocumentRequirementType[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   const [newSectorName, setNewSectorName] = useState("");
   const [creatingSector, setCreatingSector] = useState(false);
+
+  const [newDocTypeLabel, setNewDocTypeLabel] = useState("");
+  const [creatingDocType, setCreatingDocType] = useState(false);
 
   const [selectedCountryId, setSelectedCountryId] = useState("");
   const [requiredTypes, setRequiredTypes] = useState<Set<string>>(new Set());
@@ -43,16 +50,29 @@ export default function SectorsPage() {
     Promise.all([
       fetch("/api/admin/sectors").then((r) => r.json()),
       fetch("/api/admin/countries").then((r) => r.json()),
+      fetch("/api/admin/document-types").then((r) => r.json()),
     ])
-      .then(([sectorsRes, countriesRes]) => {
+      .then(([sectorsRes, countriesRes, docTypesRes]) => {
         setSectors(sectorsRes.data ?? []);
         setCountries(countriesRes.data ?? []);
+        setDocumentTypes(docTypesRes.data ?? []);
       })
       .catch(() => setError("Failed to load reference data."))
       .finally(() => setLoading(false));
   };
 
   useEffect(load, []);
+
+  const { page, setPage, totalPages, paged, total, pageSize } = usePagination(sectors);
+  const docTypesPage = usePagination(documentTypes);
+
+  // Universal types (cv/passport/passport_photo) and the legacy Phase-4
+  // mobility-lifecycle set aren't offered as per-country requirements —
+  // they either apply everywhere already or have no country-requirement
+  // concept at all.
+  const requirementEligibleTypes = documentTypes.filter(
+    (t) => !t.is_universal && !(NON_PROGRAMME_TYPE_KEYS as readonly string[]).includes(t.key)
+  );
 
   useEffect(() => {
     if (!selectedCountryId) {
@@ -105,6 +125,41 @@ export default function SectorsPage() {
     }
   };
 
+  const handleCreateDocType = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setCreatingDocType(true);
+    setError("");
+    try {
+      const res = await fetch("/api/admin/document-types", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ label: newDocTypeLabel }),
+      });
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.error?.message || "Failed to create document type.");
+      setNewDocTypeLabel("");
+      load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to create document type.");
+    } finally {
+      setCreatingDocType(false);
+    }
+  };
+
+  const handleDeleteDocType = async (id: string) => {
+    setError("");
+    try {
+      const res = await fetch(`/api/admin/document-types/${id}`, { method: "DELETE" });
+      if (!res.ok) {
+        const body = await res.json();
+        throw new Error(body.error?.message || "Failed to delete document type.");
+      }
+      setDocumentTypes((prev) => prev.filter((t) => t.id !== id));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete document type.");
+    }
+  };
+
   const toggleDocumentType = (value: string) => {
     setRequiredTypes((prev) => {
       const next = new Set(prev);
@@ -141,8 +196,10 @@ export default function SectorsPage() {
       </p>
       <h1 className="section-title text-3xl md:text-4xl mb-2">Sectors & Document Requirements</h1>
       <p className="text-midnight-900/55 font-light mb-10 max-w-2xl">
-        The "Preferred Type of Work" options on the Candidate Information Form, and the extra documents
-        each destination country requires beyond the universal passport/photo/CV set (Section 3).
+        Manage the sectors candidates choose from as their preferred type of work, the document types the
+        Candidate Information Form and Agency form can ask for, and which of those extras each destination
+        country requires on top of the universal passport, photo, and CV set. A document type you add here
+        appears on both forms' checklists immediately — no other change needed.
       </p>
 
       {error && (
@@ -175,9 +232,9 @@ export default function SectorsPage() {
             {sectors.length === 0 ? (
               <div className="card p-8 text-center text-midnight-900/50">No sectors yet — add one above.</div>
             ) : (
-              <div className="card p-4">
+              <div className="card p-4 mb-8">
                 <ul className="divide-y divide-midnight-900/5">
-                  {sectors.map((s) => (
+                  {paged.map((s) => (
                     <li key={s.id} className="flex items-center justify-between py-2.5 px-2">
                       <span className="text-sm text-midnight-900/80">{s.name}</span>
                       <button
@@ -190,38 +247,81 @@ export default function SectorsPage() {
                     </li>
                   ))}
                 </ul>
+                <Pagination page={page} totalPages={totalPages} onPageChange={setPage} total={total} pageSize={pageSize} />
+              </div>
+            )}
+
+            <form onSubmit={handleCreateDocType} className="card p-6 mb-6">
+              <h2 className="font-semibold text-midnight-900 mb-4 flex items-center gap-2">
+                <Files size={18} weight="regular" className="text-gold-600" /> Document Types
+              </h2>
+              <div className="flex gap-3">
+                <input
+                  value={newDocTypeLabel}
+                  onChange={(e) => setNewDocTypeLabel(e.target.value)}
+                  placeholder="e.g. Yellow Fever Certificate"
+                  required
+                  className="input-field flex-1"
+                />
+                <button type="submit" disabled={creatingDocType} className="btn-primary px-5 disabled:opacity-60">
+                  <Plus size={16} weight="bold" />
+                </button>
+              </div>
+            </form>
+
+            {documentTypes.length === 0 ? (
+              <div className="card p-8 text-center text-midnight-900/50">No document types yet.</div>
+            ) : (
+              <div className="card p-4">
+                <ul className="divide-y divide-midnight-900/5">
+                  {docTypesPage.paged.map((t) => (
+                    <li key={t.id} className="flex items-center justify-between py-2.5 px-2">
+                      <span className="text-sm text-midnight-900/80">
+                        {t.label}
+                        {t.is_universal && <span className="ml-2 text-[10px] uppercase tracking-wide text-gold-600">Universal</span>}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteDocType(t.id)}
+                        className="text-midnight-900/30 hover:text-red-500"
+                      >
+                        <Trash size={15} weight="regular" />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+                <Pagination page={docTypesPage.page} totalPages={docTypesPage.totalPages} onPageChange={docTypesPage.setPage} total={docTypesPage.total} pageSize={docTypesPage.pageSize} />
               </div>
             )}
           </div>
 
-          <div className="card p-6">
+          <div className="card p-6 h-fit">
             <h2 className="font-semibold text-midnight-900 mb-4 flex items-center gap-2">
               <FileText size={18} weight="regular" className="text-gold-600" /> Document Requirements
             </h2>
-            <select
+            <SearchableSelect
               value={selectedCountryId}
-              onChange={(e) => setSelectedCountryId(e.target.value)}
+              onChange={setSelectedCountryId}
+              placeholder="Select a country…"
               className="input-field mb-4"
-            >
-              <option value="">Select a country…</option>
-              {countries.map((c) => (
-                <option key={c.id} value={c.id}>{c.name} ({c.region.name})</option>
-              ))}
-            </select>
+              options={countries.map((c) => ({ value: c.id, label: `${c.name} (${c.region.name})` }))}
+            />
 
             {!selectedCountryId ? (
               <p className="text-sm text-midnight-900/40">Select a country to manage its extra document requirements.</p>
             ) : loadingRequirements ? (
               <p className="text-sm text-midnight-900/40">Loading…</p>
+            ) : requirementEligibleTypes.length === 0 ? (
+              <p className="text-sm text-midnight-900/40">No programme-specific document types yet — add one on the left.</p>
             ) : (
               <>
                 <div className="space-y-2 mb-5 max-h-80 overflow-y-auto">
-                  {DOCUMENT_TYPE_OPTIONS.map((opt) => (
-                    <label key={opt.value} className="flex items-center gap-2 text-sm text-midnight-900/75 cursor-pointer">
+                  {requirementEligibleTypes.map((opt) => (
+                    <label key={opt.key} className="flex items-center gap-2 text-sm text-midnight-900/75 cursor-pointer">
                       <input
                         type="checkbox"
-                        checked={requiredTypes.has(opt.value)}
-                        onChange={() => toggleDocumentType(opt.value)}
+                        checked={requiredTypes.has(opt.key)}
+                        onChange={() => toggleDocumentType(opt.key)}
                         className="w-4 h-4"
                       />
                       {opt.label}

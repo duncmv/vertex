@@ -8,6 +8,8 @@ import KpiFilterBar, { type KpiFilterState } from "@/components/portal/kpi/KpiFi
 import FunnelChart from "@/components/portal/kpi/FunnelChart";
 import ConversionChart from "@/components/portal/kpi/ConversionChart";
 import TargetsVsActuals from "@/components/portal/kpi/TargetsVsActuals";
+import Pagination from "@/components/Pagination";
+import { usePagination } from "@/lib/usePagination";
 import { UsersThree, TrendUp, ArrowsClockwise, DownloadSimple } from "@phosphor-icons/react";
 
 interface KpiSummary {
@@ -73,6 +75,8 @@ export default function ManagementPortalPage() {
       .finally(() => setLoading(false));
   }, [filters]);
 
+  const { page, setPage, totalPages, paged, total, pageSize } = usePagination(partnerPerformance);
+
   return (
     <PortalShell roleLabel="Management" navItems={MANAGEMENT_NAV_ITEMS}>
       <p className="eyebrow mb-3">
@@ -127,7 +131,7 @@ export default function ManagementPortalPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {partnerPerformance.map((p) => (
+                    {paged.map((p) => (
                       <tr key={p.partnerId} className="border-b border-midnight-900/5 last:border-0">
                         <td className="py-2.5 pr-4 font-medium text-midnight-900">{p.partnerName}</td>
                         <td className="py-2.5 pr-4 text-midnight-900/70">{p.candidatesSourced}</td>
@@ -136,6 +140,7 @@ export default function ManagementPortalPage() {
                     ))}
                   </tbody>
                 </table>
+                <Pagination page={page} totalPages={totalPages} onPageChange={setPage} total={total} pageSize={pageSize} />
               </div>
             </div>
           )}

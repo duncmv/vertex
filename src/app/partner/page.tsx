@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import PortalShell from "@/components/portal/PortalShell";
 import { PARTNER_NAV_ITEMS } from "@/components/portal/partnerNav";
 import PartnerCandidateForm from "@/components/portal/PartnerCandidateForm";
+import Pagination from "@/components/Pagination";
+import { usePagination } from "@/lib/usePagination";
 import { Plus, X } from "@phosphor-icons/react";
 
 const STATUS_STYLES: Record<string, string> = {
@@ -43,6 +45,8 @@ export default function PartnerPortalPage() {
 
   useEffect(load, []);
 
+  const { page, setPage, totalPages, paged, total, pageSize } = usePagination(candidates);
+
   return (
     <PortalShell roleLabel="Partner" navItems={PARTNER_NAV_ITEMS}>
       <div className="flex items-center justify-between mb-2">
@@ -81,7 +85,7 @@ export default function PartnerPortalPage() {
               </tr>
             </thead>
             <tbody>
-              {candidates.map((c) => (
+              {paged.map((c) => (
                 <tr key={c.id} className="border-b border-midnight-900/5 last:border-0">
                   <td className="px-5 py-4">
                     <div className="font-medium text-midnight-900">{c.full_name}</div>
@@ -99,6 +103,9 @@ export default function PartnerPortalPage() {
               ))}
             </tbody>
           </table>
+          <div className="px-5">
+            <Pagination page={page} totalPages={totalPages} onPageChange={setPage} total={total} pageSize={pageSize} />
+          </div>
         </div>
       )}
 

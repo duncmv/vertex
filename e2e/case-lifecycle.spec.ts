@@ -50,7 +50,8 @@ test.describe("Mobility case lifecycle (Phase 4)", () => {
     });
 
     await test.step("In-House advances the case to Verification with a deadline", async () => {
-      await page.getByRole("combobox").first().selectOption("verification");
+      await page.getByRole("combobox").first().click();
+      await page.getByRole("option", { name: "Verification" }).click();
       await page.getByPlaceholder("Notes (optional)").fill("Docs look complete, moving to verification.");
       await page.getByRole("button", { name: "Update Stage" }).click();
 

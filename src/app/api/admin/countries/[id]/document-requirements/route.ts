@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getAuthUser, requireAdmin, requireRole } from "@/lib/api-auth";
 import { updateCountryDocumentRequirementsSchema } from "@/lib/validations";
@@ -47,12 +48,22 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     );
   }
 
-  await prisma.$transaction([
-    prisma.countryDocumentRequirement.deleteMany({ where: { country_id: id } }),
-    prisma.countryDocumentRequirement.createMany({
-      data: parsed.data.document_types.map((document_type) => ({ country_id: id, document_type })),
-    }),
-  ]);
+  try {
+    await prisma.$transaction([
+      prisma.countryDocumentRequirement.deleteMany({ where: { country_id: id } }),
+      prisma.countryDocumentRequirement.createMany({
+        data: parsed.data.document_types.map((document_type) => ({ country_id: id, document_type })),
+      }),
+    ]);
+  } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2003") {
+      return NextResponse.json(
+        { error: { code: "unknown_type", message: "One or more document types don't exist." } },
+        { status: 422 }
+      );
+    }
+    throw err;
+  }
 
   const requirements = await prisma.countryDocumentRequirement.findMany({ where: { country_id: id } });
   return NextResponse.json({ data: requirements });

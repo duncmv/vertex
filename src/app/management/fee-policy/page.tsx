@@ -3,6 +3,9 @@
 import { useEffect, useState } from "react";
 import PortalShell from "@/components/portal/PortalShell";
 import { MANAGEMENT_NAV_ITEMS } from "@/components/portal/managementNav";
+import SearchableSelect from "@/components/SearchableSelect";
+import Pagination from "@/components/Pagination";
+import { usePagination } from "@/lib/usePagination";
 
 interface FeePolicy {
   id: string;
@@ -42,6 +45,8 @@ export default function FeePolicyPage() {
   };
 
   useEffect(load, []);
+
+  const { page, setPage, totalPages, paged, total, pageSize } = usePagination(policies);
 
   const save = async () => {
     const res = await fetch("/api/fee-policy", {
@@ -83,10 +88,13 @@ export default function FeePolicyPage() {
             <div className="grid sm:grid-cols-3 lg:grid-cols-6 gap-3 items-end">
               <div>
                 <label className="block text-xs font-medium text-midnight-900/60 mb-1">Country</label>
-                <select value={countryId} onChange={(e) => setCountryId(e.target.value)} className="input-field text-sm">
-                  <option value="">Global default</option>
-                  {countries.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </select>
+                <SearchableSelect
+                  value={countryId}
+                  onChange={setCountryId}
+                  placeholder="Global default"
+                  className="input-field text-sm"
+                  options={[{ value: "", label: "Global default" }, ...countries.map((c) => ({ value: c.id, label: c.name }))]}
+                />
               </div>
               <div>
                 <label className="block text-xs font-medium text-midnight-900/60 mb-1">Documentation (Stage 1 · 20%)</label>
@@ -128,7 +136,7 @@ export default function FeePolicyPage() {
                 {policies.length === 0 && (
                   <tr><td colSpan={6} className="px-5 py-8 text-center text-midnight-900/40">No policies set yet — milestone payments are disabled everywhere by default.</td></tr>
                 )}
-                {policies.map((p) => (
+                {paged.map((p) => (
                   <tr key={p.id} className="border-b border-midnight-900/5 last:border-0">
                     <td className="px-5 py-4 font-medium text-midnight-900">{p.country?.name ?? "Global default"}</td>
                     <td className="px-5 py-4">{p.enabled ? <span className="badge-approved">Enabled</span> : <span className="badge-closed">Disabled</span>}</td>
@@ -140,6 +148,9 @@ export default function FeePolicyPage() {
                 ))}
               </tbody>
             </table>
+            <div className="px-5">
+              <Pagination page={page} totalPages={totalPages} onPageChange={setPage} total={total} pageSize={pageSize} />
+            </div>
           </div>
         </>
       )}

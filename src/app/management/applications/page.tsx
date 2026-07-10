@@ -6,6 +6,9 @@ import PortalShell from "@/components/portal/PortalShell";
 import { MANAGEMENT_NAV_ITEMS } from "@/components/portal/managementNav";
 import DocumentLink from "@/components/DocumentLink";
 import DocumentVerifyControls from "@/components/DocumentVerifyControls";
+import SearchableSelect from "@/components/SearchableSelect";
+import Pagination from "@/components/Pagination";
+import { usePagination } from "@/lib/usePagination";
 
 interface CandidateDocument { id: string; type: string; verification_status: string; }
 
@@ -29,6 +32,8 @@ export default function AdminApplicationsPage() {
       .then((res) => setApplications(Array.isArray(res) ? res : []))
       .finally(() => setLoading(false));
   }, []);
+
+  const { page, setPage, totalPages, paged, total, pageSize } = usePagination(applications);
 
   const handleStatusChange = async (appId: string, newStatus: string) => {
     const res = await fetch(`/api/applications/${appId}`, {
@@ -65,7 +70,7 @@ export default function AdminApplicationsPage() {
               </tr>
             </thead>
             <tbody>
-              {applications.map((app) => (
+              {paged.map((app) => (
                 <tr key={app.id} className="border-b border-midnight-900/5 last:border-0">
                   <td className="px-5 py-4">
                     <div className="font-medium text-midnight-900">{app.candidate.user?.full_name ?? app.candidate.full_name ?? "— unnamed lead —"}</div>
@@ -103,17 +108,18 @@ export default function AdminApplicationsPage() {
                   </td>
                   <td className="px-5 py-4">
                     <div className="flex flex-col gap-2">
-                      <select
+                      <SearchableSelect
                         value={app.application_status}
-                        onChange={(e) => handleStatusChange(app.id, e.target.value)}
+                        onChange={(value) => handleStatusChange(app.id, value)}
                         className="input-field py-2 text-xs w-40"
-                      >
-                        <option value="submitted">Submitted</option>
-                        <option value="under_review">Under Review</option>
-                        <option value="interview">Interview</option>
-                        <option value="rejected">Rejected</option>
-                        <option value="approved">Approved (Hired)</option>
-                      </select>
+                        options={[
+                          { value: "submitted", label: "Submitted" },
+                          { value: "under_review", label: "Under Review" },
+                          { value: "interview", label: "Interview" },
+                          { value: "rejected", label: "Rejected" },
+                          { value: "approved", label: "Approved (Hired)" },
+                        ]}
+                      />
                       <Link href={`/management/applications/${app.id}`} className="text-xs text-gold-600 hover:underline font-medium">
                         Detailed View & Notes →
                       </Link>
@@ -123,6 +129,9 @@ export default function AdminApplicationsPage() {
               ))}
             </tbody>
           </table>
+          <div className="px-5">
+            <Pagination page={page} totalPages={totalPages} onPageChange={setPage} total={total} pageSize={pageSize} />
+          </div>
         </div>
       )}
     </PortalShell>

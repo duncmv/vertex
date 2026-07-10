@@ -145,19 +145,6 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // Partner attribution (SRS FR-5.1) — staff-only; an anonymous self-service
-  // submission or a logged-in candidate can never attribute their own
-  // sourcing partner.
-  if (parsed.data.partner_id && !(user && isStaffRole(user.role))) {
-    return NextResponse.json({ error: "Only staff can attribute a candidate to a partner." }, { status: 403 });
-  }
-  const partner = parsed.data.partner_id
-    ? await prisma.partner.findUnique({ where: { id: parsed.data.partner_id } })
-    : null;
-  if (parsed.data.partner_id && !partner) {
-    return NextResponse.json({ error: "Partner not found." }, { status: 404 });
-  }
-
   // job_id stays for when real job matching exists — jobs aren't listed on
   // the platform yet, so this is optional and usually absent.
   let job = null;
@@ -238,10 +225,9 @@ export async function POST(req: NextRequest) {
         marital_status: parsed.data.marital_status,
         consent_given: true,
         consent_at: new Date(),
-        source: parsed.data.partner_id ? "partner_sourced" : isStaffSubmission ? "recruiter_sourced" : "self_registered",
+        source: isStaffSubmission ? "recruiter_sourced" : "self_registered",
         recruiter_id: recruiterId,
         country_id: parsed.data.current_location_country_id,
-        partner_id: parsed.data.partner_id ?? null,
         lifecycle_status: "identified",
       },
       include: { user: true, documents: { select: { type: true } } },

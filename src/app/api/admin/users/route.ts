@@ -1,19 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import crypto from "crypto";
 import { prisma } from "@/lib/prisma";
 import { auditedPrisma } from "@/lib/audit";
 import { getAuthUser, requireAdmin } from "@/lib/api-auth";
-import { hashPassword } from "@/lib/auth";
+import { hashPassword, generateTemporaryPassword } from "@/lib/auth";
 import { createStaffUserSchema } from "@/lib/validations";
 import { isStaffRole } from "@/lib/rbac";
 import type { Role } from "@prisma/client";
 
 const STAFF_ROLES: Role[] = ["regional_recruiter", "country_supervisor", "inhouse_supervisor", "director", "admin"];
-
-function generateTemporaryPassword(): string {
-  // 12 random bytes -> base64url, trimmed to a readable but strong length.
-  return crypto.randomBytes(12).toString("base64url");
-}
 
 // GET /api/admin/users?role=&q= — staff directory for role/supervisor/country
 // assignment (SRS FR-1.1, FR-1.3, FR-1.4). With no query, defaults to staff

@@ -21,6 +21,7 @@ const AUDITED_MODELS = new Set([
   "RetentionFollowUp",
   "Partner",
   "EmployerClient",
+  "PartnerCandidate",
 ]);
 const AUDITED_OPERATIONS = new Set(["create", "update", "delete"]);
 

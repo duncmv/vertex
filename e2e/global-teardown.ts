@@ -18,18 +18,24 @@ export default async function globalTeardown() {
     await prisma.candidate.deleteMany({
       where: { recruiter: { email: { startsWith: "e2e-", endsWith: "@test.local" } } },
     });
-    await prisma.user.deleteMany({ where: { email: { startsWith: "e2e-", endsWith: "@test.local" } } });
-    await prisma.country.deleteMany({ where: { name: "E2E Country" } });
-    await prisma.region.deleteMany({ where: { name: "E2E Region" } });
-    // Application rows cascade with the Job (onDelete: Cascade in schema).
-    await prisma.job.deleteMany({ where: { title: "E2E Test Job" } });
     // Same reasoning as the recruiter cleanup above — a candidate loses its
     // partner_id (SetNull) rather than being deleted when the partner is
     // removed, so sweep candidates first (belt-and-braces: the recruiter
     // cleanup above should already have caught it via round-robin
     // assignment, but this covers the case where that assignment fails).
     await prisma.candidate.deleteMany({ where: { partner: { name: "E2E Test Partner" } } });
+    // PartnerCandidate.preferred_country_1/current_location_country are
+    // Restrict FKs (not SetNull/Cascade) — must go before Country/Region
+    // cleanup below, or deleting "E2E Country" fails with a constraint
+    // violation. Partner's own cascade would eventually clean these up too,
+    // but only after Country deletion has already run, which is too late.
+    await prisma.partnerCandidate.deleteMany({ where: { partner: { name: "E2E Test Partner" } } });
     await prisma.partner.deleteMany({ where: { name: "E2E Test Partner" } });
+    await prisma.user.deleteMany({ where: { email: { startsWith: "e2e-", endsWith: "@test.local" } } });
+    await prisma.country.deleteMany({ where: { name: "E2E Country" } });
+    await prisma.region.deleteMany({ where: { name: "E2E Region" } });
+    // Application rows cascade with the Job (onDelete: Cascade in schema).
+    await prisma.job.deleteMany({ where: { title: "E2E Test Job" } });
   } finally {
     await prisma.$disconnect();
   }

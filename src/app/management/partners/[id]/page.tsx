@@ -4,8 +4,7 @@ import { useEffect, useState, use } from "react";
 import Link from "next/link";
 import PortalShell from "@/components/portal/PortalShell";
 import { MANAGEMENT_NAV_ITEMS } from "@/components/portal/managementNav";
-import ApplicationForm from "@/components/ApplicationForm";
-import { Plus, X } from "@phosphor-icons/react";
+import { CheckCircle, Copy } from "@phosphor-icons/react";
 
 const PARTNER_TYPE_LABELS: Record<string, string> = {
   travel_agency: "Travel Agency",
@@ -17,7 +16,7 @@ const PARTNER_TYPE_LABELS: Record<string, string> = {
 const STATUS_OPTIONS = ["pending", "active", "suspended"] as const;
 const MOU_OPTIONS = ["none", "sent", "signed"] as const;
 
-interface PartnerCandidate {
+interface SourcedCandidateRow {
   id: string;
   full_name: string | null;
   lifecycle_status: string;
@@ -39,19 +38,23 @@ interface PartnerDetail {
   mou_status: string;
   mou_signed_at: string | null;
   notes: string | null;
-  candidates: PartnerCandidate[];
+  user_id: string | null;
+  candidates: SourcedCandidateRow[];
 }
 
-// Partner detail (SRS FR-5.1): status/MOU controls and the candidates it
-// has sourced. "Register Candidate" reuses the same Candidate Information
-// Form every other intake path uses, just pre-attributed to this partner.
+// Partner detail (SRS FR-5.1): status/MOU controls and the candidates
+// this partner has been bridged into Vertex's own pipeline for (empty
+// until the future job-assignment/bridging step ships — the partner
+// submits and manages its own candidates from its own portal).
 export default function PartnerDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const [partner, setPartner] = useState<PartnerDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
-  const [showRegister, setShowRegister] = useState(false);
+  const [provisioning, setProvisioning] = useState(false);
+  const [credentials, setCredentials] = useState<{ email: string; temporaryPassword: string } | null>(null);
+  const [copied, setCopied] = useState(false);
 
   const load = () => {
     setLoading(true);
@@ -86,6 +89,33 @@ export default function PartnerDetailPage({ params }: { params: Promise<{ id: st
     }
   };
 
+  const provisionAccount = async () => {
+    setProvisioning(true);
+    setError("");
+    try {
+      const res = await fetch(`/api/admin/partners/${id}/provision-account`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.error?.message || "Failed to create partner login.");
+      setCredentials({ email: body.data.contact_email ?? partner!.contact_email, temporaryPassword: body.temporaryPassword });
+      setPartner((prev) => (prev ? { ...prev, user_id: body.data.user_id } : prev));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to create partner login.");
+    } finally {
+      setProvisioning(false);
+    }
+  };
+
+  const copyTempPassword = () => {
+    if (!credentials) return;
+    navigator.clipboard.writeText(credentials.temporaryPassword);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
   if (loading) {
     return (
       <PortalShell roleLabel="Management" navItems={MANAGEMENT_NAV_ITEMS}>
@@ -118,6 +148,43 @@ export default function PartnerDetailPage({ params }: { params: Promise<{ id: st
       </div>
 
       {error && <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg p-4 text-sm mb-6">{error}</div>}
+
+      {credentials && (
+        <div className="card p-6 mb-6 border-l-4 border-gold-400">
+          <div className="flex items-start gap-3">
+            <CheckCircle size={22} weight="fill" className="text-gold-600 shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <h3 className="font-semibold text-midnight-900 mb-1">Partner login created</h3>
+              <p className="text-sm text-midnight-900/60 mb-3">
+                Share this temporary password with <span className="font-medium">{credentials.email}</span> now —
+                it will not be shown again.
+              </p>
+              <div className="flex items-center gap-3">
+                <code className="bg-ivory-100 border border-midnight-900/10 rounded-lg px-4 py-2 text-sm font-mono text-midnight-900">
+                  {credentials.temporaryPassword}
+                </code>
+                <button onClick={copyTempPassword} className="btn-secondary py-2 px-4 text-xs">
+                  <Copy size={14} weight="bold" /> {copied ? "Copied!" : "Copy"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="card p-6 mb-8 flex items-center justify-between">
+        <div>
+          <h2 className="text-xs font-semibold text-midnight-900/50 uppercase tracking-wider mb-1">Partner Login</h2>
+          <p className="text-sm text-midnight-900/60">
+            {partner.user_id ? "This partner can log in and submit candidates through its own portal." : "No login yet — this partner can't submit candidates until one is created."}
+          </p>
+        </div>
+        {!partner.user_id && (
+          <button onClick={provisionAccount} disabled={provisioning} className="btn-primary text-xs disabled:opacity-60">
+            {provisioning ? "Creating…" : "Create Partner Login"}
+          </button>
+        )}
+      </div>
 
       <div className="grid lg:grid-cols-3 gap-6 mb-8">
         <div className="card p-6">
@@ -164,12 +231,7 @@ export default function PartnerDetailPage({ params }: { params: Promise<{ id: st
         </div>
       </div>
 
-      <div className="flex items-center justify-between mb-3">
-        <h2 className="text-sm font-semibold text-midnight-900/50 uppercase tracking-wider">Candidates sourced</h2>
-        <button onClick={() => setShowRegister(true)} className="btn-primary text-xs">
-          <Plus size={16} weight="bold" /> Register Candidate
-        </button>
-      </div>
+      <h2 className="text-sm font-semibold text-midnight-900/50 uppercase tracking-wider mb-3">Candidates sourced</h2>
 
       {partner.candidates.length === 0 ? (
         <div className="card p-10 text-center text-midnight-900/50">No candidates sourced via this partner yet.</div>
@@ -199,27 +261,6 @@ export default function PartnerDetailPage({ params }: { params: Promise<{ id: st
               ))}
             </tbody>
           </table>
-        </div>
-      )}
-
-      {showRegister && (
-        <div className="fixed inset-0 z-[200] bg-midnight-950/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white max-w-2xl w-full max-h-[90vh] overflow-y-auto rounded-2xl shadow-2xl p-6 sm:p-8 relative">
-            <button type="button" onClick={() => setShowRegister(false)} className="absolute top-4 right-4 text-midnight-900/40 hover:text-midnight-900">
-              <X size={20} weight="bold" />
-            </button>
-            <h2 className="text-xl font-black text-midnight-900 mb-1">Candidate Information Form</h2>
-            <p className="text-sm text-midnight-900/50 mb-6">New candidate lead, sourced via {partner.name}.</p>
-            <ApplicationForm
-              includePersonalInfo
-              compact
-              partnerId={partner.id}
-              onSubmitted={() => {
-                setShowRegister(false);
-                load();
-              }}
-            />
-          </div>
         </div>
       )}
     </PortalShell>

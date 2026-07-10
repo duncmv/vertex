@@ -21,6 +21,11 @@ enum Role {
   // Operational Workflow) and deliberately kept out of STAFF_ROLES so it
   // doesn't incidentally inherit broader candidate/application access.
   marketing
+  // An external agency/partner's own login (SRS FR-5.1), admin-provisioned
+  // — not internal staff, so deliberately kept out of STAFF_ROLES same as
+  // marketing. Submits candidates through its own portal; never enters the
+  // internal recruiter/screening/verification funnel.
+  partner
 }
 
 enum ApplicationStatus {
@@ -58,15 +63,17 @@ model User {
   assigned_country    Country? @relation(fields: [assigned_country_id], references: [id], onDelete: SetNull)
 
   candidate          Candidate?
+  partner            Partner?
   payments           Payment[]
   sourced_candidates Candidate[] @relation("RecruiterCandidates")
   submitted_reports  Report[]    @relation("SubmittedReports")
   campaigns_created  Campaign[]  @relation("CampaignCreator")
 
-  case_stage_events_owned CaseStageEvent[] @relation("CaseStageOwner")
-  case_payments_recorded  CasePayment[]    @relation("CasePaymentRecorder")
-  fee_policies_updated    FeePolicy[]      @relation("FeePolicyUpdater")
-  contracts_created       Contract[]       @relation("ContractCreator")
+  case_stage_events_owned     CaseStageEvent[]   @relation("CaseStageOwner")
+  case_payments_recorded      CasePayment[]      @relation("CasePaymentRecorder")
+  fee_policies_updated        FeePolicy[]        @relation("FeePolicyUpdater")
+  contracts_created           Contract[]         @relation("ContractCreator")
+  partner_candidates_reviewed PartnerCandidate[] @relation("PartnerCandidateReviewer")
 
   @@index([email])
   @@index([supervisor_id])
@@ -92,16 +99,20 @@ model Country {
   region_id String
   region    Region @relation(fields: [region_id], references: [id], onDelete: Restrict)
 
-  users                 User[]
-  candidates            Candidate[]
-  reports               Report[]
-  campaign_targets      CampaignTarget[]
-  fee_policies          FeePolicy[]
-  document_requirements CountryDocumentRequirement[]
-  preferred_by_1        Application[]                @relation("PreferredCountry1")
-  preferred_by_2        Application[]                @relation("PreferredCountry2")
-  preferred_by_3        Application[]                @relation("PreferredCountry3")
-  current_located_by    Application[]                @relation("CurrentLocationCountry")
+  users                      User[]
+  candidates                 Candidate[]
+  reports                    Report[]
+  campaign_targets           CampaignTarget[]
+  fee_policies               FeePolicy[]
+  document_requirements      CountryDocumentRequirement[]
+  preferred_by_1             Application[]                @relation("PreferredCountry1")
+  preferred_by_2             Application[]                @relation("PreferredCountry2")
+  preferred_by_3             Application[]                @relation("PreferredCountry3")
+  current_located_by         Application[]                @relation("CurrentLocationCountry")
+  partner_preferred_by_1     PartnerCandidate[]           @relation("PartnerPreferredCountry1")
+  partner_preferred_by_2     PartnerCandidate[]           @relation("PartnerPreferredCountry2")
+  partner_preferred_by_3     PartnerCandidate[]           @relation("PartnerPreferredCountry3")
+  partner_current_located_by PartnerCandidate[]           @relation("PartnerCurrentLocation")
 
   @@index([region_id])
 }
@@ -109,10 +120,11 @@ model Country {
 // Admin-managed "type of work" taxonomy (Candidate Information Form §1,
 // "Preferred Type of Work") — e.g. Warehouse, Agriculture, Hotel, Driving.
 model Sector {
-  id           String        @id @default(cuid())
-  name         String        @unique
-  created_at   DateTime      @default(now())
-  applications Application[]
+  id                 String             @id @default(cuid())
+  name               String             @unique
+  created_at         DateTime           @default(now())
+  applications       Application[]
+  partner_candidates PartnerCandidate[]
 }
 
 // Which documents a given destination country actually requires (form §3:
@@ -181,10 +193,10 @@ model Candidate {
   country          Country?                 @relation(fields: [country_id], references: [id], onDelete: SetNull)
   lifecycle_status CandidateLifecycleStatus @default(identified)
 
-  // Partner CRM attribution (SRS FR-5.1) — set only at creation time, when
-  // staff attribute a new lead to the agency that sourced them; same
-  // one-shot pattern as recruiter_id, not editable afterward via a general
-  // edit form.
+  // Partner CRM attribution (SRS FR-5.1) — set only when this Candidate is
+  // bridged from a partner's own PartnerCandidate submission (job-
+  // assignment step, not built yet — see PartnerCandidate below), never
+  // editable afterward via a general edit form.
   partner_id String?
   partner    Partner? @relation(fields: [partner_id], references: [id], onDelete: SetNull)
 
@@ -201,9 +213,13 @@ model Candidate {
   screening_result       Boolean?
   screening_evaluated_at DateTime?
 
-  user         User?         @relation(fields: [user_id], references: [id], onDelete: Cascade)
-  applications Application[]
-  documents    Document[]
+  user                     User?             @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  applications             Application[]
+  documents                Document[]
+  // Set once this Candidate was bridged from a partner's own submission
+  // (future job-assignment step, not exercised yet) rather than created
+  // directly.
+  partner_candidate_origin PartnerCandidate?
 
   @@index([user_id])
   @@index([recruiter_id])
@@ -630,11 +646,12 @@ model Contract {
 }
 
 // ── Phase 5: Partner CRM (SRS FR-5.1, FR-5.2) ───────────────────────────
-// Staff-managed only — no partner self-service portal (agencies keep
-// submitting the Agency Application Form by email; Vertex staff re-key it
-// via the same Candidate Information Form flow, now attributing the
-// sourcing partner). See docs/PLATFORM_ARCHITECTURE.md for the confirmed-
-// deferred FR-5.3-5.9 integrations this phase deliberately excludes.
+// Partners get their own admin-provisioned login and submit candidates
+// themselves through their own portal (PartnerCandidate, below) — they do
+// their own screening/verification/documents, so these candidates never
+// enter Vertex's internal recruiter/screening/verification funnel
+// (Candidate/CandidateLifecycleStatus). See docs/PLATFORM_ARCHITECTURE.md
+// for the confirmed-deferred FR-5.3-5.9 integrations this phase excludes.
 
 enum PartnerType {
   travel_agency
@@ -675,8 +692,90 @@ model Partner {
   created_at                   DateTime      @default(now())
   updated_at                   DateTime      @updatedAt
 
-  candidates Candidate[]
+  // The partner's own login (SRS FR-5.1) — nullable until admin
+  // provisions one, same shape as Candidate.user_id.
+  user_id String? @unique
+  user    User?   @relation(fields: [user_id], references: [id], onDelete: SetNull)
 
+  candidates         Candidate[]
+  partner_candidates PartnerCandidate[]
+
+  @@index([status])
+}
+
+enum PartnerCandidateStatus {
+  submitted
+  under_review
+  job_assigned
+  rejected
+}
+
+// A candidate a partner submits through its own portal — deliberately
+// separate from Candidate/Application (not the same funnel): the partner
+// has already screened/verified them, so none of Vertex's internal
+// CandidateLifecycleStatus stages apply. Mirrors the Agency Application
+// Form's Sections 2-6 (Section 1, Agency Information, is already captured
+// on the Partner record above, not per-submission).
+model PartnerCandidate {
+  id         String                 @id @default(cuid())
+  partner_id String
+  partner    Partner                @relation(fields: [partner_id], references: [id], onDelete: Cascade)
+  status     PartnerCandidateStatus @default(submitted)
+
+  // Section 3 — Candidate Personal Information
+  full_name          String
+  date_of_birth      DateTime
+  nationality        String
+  second_nationality String?
+  passport_number    String
+  passport_expiry    DateTime
+  current_occupation String?
+  highest_education  String?
+  home_address       String?  @db.Text
+  phone              String
+  whatsapp_number    String?
+  email              String
+  marital_status     String?
+
+  // Section 2 — Programme Selection
+  preferred_country_1_id String
+  preferred_country_1    Country  @relation("PartnerPreferredCountry1", fields: [preferred_country_1_id], references: [id], onDelete: Restrict)
+  preferred_country_2_id String?
+  preferred_country_2    Country? @relation("PartnerPreferredCountry2", fields: [preferred_country_2_id], references: [id], onDelete: SetNull)
+  preferred_country_3_id String?
+  preferred_country_3    Country? @relation("PartnerPreferredCountry3", fields: [preferred_country_3_id], references: [id], onDelete: SetNull)
+  preferred_sector_id    String
+  preferred_sector       Sector   @relation(fields: [preferred_sector_id], references: [id], onDelete: Restrict)
+  earliest_travel_date   DateTime
+  prior_eu_visa_applied  String?  @db.Text
+
+  // Section 4 — Document Checklist (self-reported, same list as the CIF's)
+  documents_available DocumentType[]
+
+  // Section 5 — Payment Plan Acknowledgement
+  payment_plan_acknowledged Boolean @default(false)
+
+  // Section 6 — Visa & Travel Readiness
+  current_location_country_id       String
+  current_location_country          Country         @relation("PartnerCurrentLocation", fields: [current_location_country_id], references: [id], onDelete: Restrict)
+  holds_schengen_visa               String?         @db.Text
+  prior_visa_refusals               String?         @db.Text
+  available_for_embassy_appointment Boolean         @default(false)
+  willing_to_start_within_30_days   Boolean         @default(false)
+  preferred_contact_channel         ContactChannel?
+
+  // Vertex-side review/assignment — groundwork for the future job-
+  // assignment step (SRS FR-5.1); not exercised by any code path yet.
+  reviewed_by          String?
+  reviewer             User?      @relation("PartnerCandidateReviewer", fields: [reviewed_by], references: [id], onDelete: SetNull)
+  rejection_reason     String?    @db.Text
+  bridged_candidate_id String?    @unique
+  bridged_candidate    Candidate? @relation(fields: [bridged_candidate_id], references: [id], onDelete: SetNull)
+
+  submitted_at DateTime @default(now())
+  updated_at   DateTime @updatedAt
+
+  @@index([partner_id])
   @@index([status])
 }
 

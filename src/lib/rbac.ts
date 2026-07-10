@@ -13,6 +13,7 @@ export const PORTAL_ACCESS: Record<string, Role[]> = {
   "/supervisor": ["country_supervisor", "admin"],
   "/management": ["inhouse_supervisor", "director", "admin"],
   "/marketing": ["marketing", "admin"],
+  "/partner": ["partner", "admin"],
   "/admin": ["admin"],
 };
 
@@ -24,14 +25,17 @@ export const ROLE_HOME: Record<Role, string> = {
   inhouse_supervisor: "/management",
   director: "/management",
   marketing: "/marketing/jobs",
+  partner: "/partner",
   admin: "/admin",
 };
 
 // Roles that manage other staff (used for supervisor-assignment validation,
-// SRS FR-1.3) — the three-tier operational hierarchy only. "marketing" is
-// deliberately excluded: it's solely responsible for job postings, not part
-// of this hierarchy, and shouldn't incidentally inherit the broader
-// candidate/application access several checks gate on isStaffRole().
+// SRS FR-1.3) — the three-tier operational hierarchy only. "marketing" and
+// "partner" are deliberately excluded: marketing is solely responsible for
+// job postings and partner is an external agency's own login (SRS
+// FR-5.1) — neither is part of this hierarchy, and shouldn't incidentally
+// inherit the broader candidate/application access several checks gate on
+// isStaffRole().
 export const STAFF_ROLES: Role[] = [
   "regional_recruiter",
   "country_supervisor",
@@ -58,7 +62,7 @@ export function homeFor(role: Role): string {
 // their own PortalShell chrome and should NOT also get the public marketing
 // Navbar/Footer/chat widgets. /dashboard is deliberately excluded — it's the
 // candidate's own page and was already designed around the public chrome.
-const INTERNAL_PORTAL_PREFIXES = ["/admin", "/recruiter", "/supervisor", "/management", "/marketing"];
+const INTERNAL_PORTAL_PREFIXES = ["/admin", "/recruiter", "/supervisor", "/management", "/marketing", "/partner"];
 
 export function isInternalPortalPath(pathname: string): boolean {
   return INTERNAL_PORTAL_PREFIXES.some((p) => pathname.startsWith(p));

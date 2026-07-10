@@ -275,3 +275,37 @@ export async function sendCaseStageUpdateEmail(to: string, name: string, jobTitl
     console.error("Error sending case stage update:", error);
   }
 }
+
+// Staff-facing notification (SRS FR-5.1) — a partner submitted a candidate
+// through its own portal. This candidate never enters Vertex's internal
+// recruiter/screening funnel, so this email (plus the record itself) is
+// currently the only signal staff have that one exists. Recipient is a
+// business-provided address, not yet supplied — no-ops with a console note
+// until PARTNER_SUBMISSION_NOTIFY_EMAIL is set, rather than throwing.
+export async function sendPartnerCandidateSubmittedEmail(partnerName: string, candidateName: string) {
+  const to = process.env.PARTNER_SUBMISSION_NOTIFY_EMAIL;
+  if (!to) {
+    console.log(`[partner-candidate] ${partnerName} submitted ${candidateName} — no PARTNER_SUBMISSION_NOTIFY_EMAIL configured, skipping notification email.`);
+    return;
+  }
+
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;">
+      <div style="background-color: #0f172a; padding: 24px; text-align: center;">
+        <h1 style="color: #ffffff; margin: 0; font-size: 22px;">New Partner Candidate Submission</h1>
+      </div>
+      <div style="padding: 32px; background-color: #ffffff;">
+        <p style="font-size: 16px; color: #334155; margin-bottom: 16px;">
+          <strong>${partnerName}</strong> submitted a new candidate: <strong>${candidateName}</strong>.
+        </p>
+        <p style="font-size: 16px; color: #334155;">Review it in the admin candidates list.</p>
+      </div>
+    </div>
+  `;
+
+  try {
+    await transporter.sendMail({ from: FROM, to, subject: `New partner candidate: ${candidateName}`, html });
+  } catch (error) {
+    console.error("Error sending partner-candidate submission notification:", error);
+  }
+}

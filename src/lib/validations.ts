@@ -80,10 +80,6 @@ export const submitApplicationSchema = z.object({
   // (SRS FR-2.1) — otherwise the authenticated candidate's own profile is
   // used, or (if neither applies) a brand-new Candidate is created.
   candidate_id: z.string().cuid().optional(),
-  // Attributes a brand-new candidate to the sourcing partner/agency (SRS
-  // FR-5.1) — staff-only, never honored for an anonymous self-service
-  // submission (a candidate can't attribute their own partner).
-  partner_id: z.string().cuid().optional(),
 
   // Section 2 — Candidate Personal Information. Required only when this
   // submission creates a brand-new Candidate.
@@ -356,7 +352,9 @@ export const completeRetentionFollowUpSchema = z.object({
 });
 
 // Phase 5: Partner CRM (SRS FR-5.1) — travel agencies, visa consultancies,
-// manpower suppliers. Staff-managed only; no partner self-service portal.
+// manpower suppliers. Partners get their own admin-provisioned login and
+// submit candidates themselves (see provisionPartnerAccountSchema and
+// submitPartnerCandidateSchema below).
 const PARTNER_TYPES = ["travel_agency", "visa_consultancy", "manpower_supplier", "other"] as const;
 export const createPartnerSchema = z.object({
   name: z.string().min(2, "Name is required").max(150),
@@ -380,6 +378,55 @@ export const updatePartnerSchema = z.object({
   status: z.enum(["pending", "active", "suspended"]).optional(),
   mou_status: z.enum(["none", "sent", "signed"]).optional(),
   notes: z.string().max(2000).nullish(),
+});
+
+// Admin provisions a Partner's own login (SRS FR-5.1) — email defaults to
+// the Partner's contact_email but can be overridden (e.g. a different
+// person handles the account than the primary business contact).
+export const provisionPartnerAccountSchema = z.object({
+  email: z.string().email().optional(),
+});
+
+// A partner submitting a candidate through its own portal (SRS FR-5.1) —
+// the Agency Application Form's Sections 2-6 (Section 1, Agency
+// Information, is already on file on the Partner record itself, not
+// per-submission). Every field here is for a brand-new candidate — unlike
+// submitApplicationSchema, there's no "existing candidate resubmitting"
+// case, so personal-info fields are required, not conditional.
+export const submitPartnerCandidateSchema = z.object({
+  full_name: z.string().min(2, "Full name is required").max(100),
+  nationality: z.string().min(2, "Nationality is required").max(100),
+  date_of_birth: z.string().min(1, "Date of birth is required"),
+  passport_number: z.string().min(1, "Passport number is required"),
+  passport_expiry: z.string().min(1, "Passport expiry date is required"),
+  phone: z.string().min(1, "Phone number is required"),
+  email: z.string().email("A valid email is required"),
+  second_nationality: z.string().max(100).optional(),
+  current_occupation: z.string().max(150).optional(),
+  highest_education: z.string().max(150).optional(),
+  home_address: z.string().max(500).optional(),
+  whatsapp_number: z.string().max(30).optional(),
+  marital_status: z.string().max(50).optional(),
+
+  preferred_country_1_id: z.string().cuid("Select the candidate's preferred country"),
+  preferred_country_2_id: z.string().cuid().optional(),
+  preferred_country_3_id: z.string().cuid().optional(),
+  preferred_sector_id: z.string().cuid("Select the candidate's preferred type of work"),
+  earliest_travel_date: z.string().min(1, "Earliest possible travel date is required"),
+  prior_eu_visa_applied: z.string().max(500).optional(),
+
+  documents_available: z.array(z.enum(DOCUMENT_TYPES)).default([]),
+
+  payment_plan_acknowledged: z.literal(true, {
+    message: "You must acknowledge the payment plan to submit.",
+  }),
+
+  current_location_country_id: z.string().cuid("Select the candidate's current location"),
+  holds_schengen_visa: z.string().max(200).optional(),
+  prior_visa_refusals: z.string().max(500).optional(),
+  available_for_embassy_appointment: z.boolean().default(false),
+  willing_to_start_within_30_days: z.boolean().default(false),
+  preferred_contact_channel: z.enum(["email", "whatsapp", "phone"]).optional(),
 });
 
 // Phase 5: Employer/Client CRM (SRS FR-5.2) — the employer a vacancy is

@@ -43,30 +43,37 @@ See [Test accounts](#test-accounts) at the bottom for passwords and full detail.
 
 ## Regional Recruiter
 
-**Portal:** `/recruiter` — **My Candidates**, **Applications**, **Cases**, **Reports**
+**Portal:** `/recruiter` — **Overview**, **My Candidates**, **Applications**, **Cases**, **Reports**
+
+**Revised in the recruiter review batch:** a candidate row no longer edits inline in the table — it links to a full detail page with the whole Candidate Information Form submission and every action in one place. The candidate list is now searchable (name/contact) and filterable by lifecycle status. Reports gained real structure per type, a per-recruiter target (allocated by the Country Supervisor from a country's campaign target), and a new Overview landing tab.
 
 | Page | What it's for |
 |---|---|
-| `/recruiter` | Candidates this recruiter sourced; register a new walk-in lead via the Candidate Information Form |
+| `/recruiter/overview` | New landing tab — this month's target vs actual, candidate/conversion/screening stats, a reports-due banner, and any supervisor feedback on returned reports |
+| `/recruiter` | Candidates this recruiter sourced (searchable, status-filterable); register a new walk-in lead via the Candidate Information Form; click a row for the full detail page |
+| `/recruiter/candidates/[id]` | Full CIF submission (personal info + Section 1/3/5 answers) with lifecycle status, edit, document upload, and consent actions — replaces the old inline dropdown editor |
 | `/recruiter/applications` | Read-only view of applications tied to their own candidates |
 | `/recruiter/cases` | Cases for their approved candidates — can advance stage forward only |
-| `/recruiter/reports` | Submit daily/weekly activity reports to their supervisor |
+| `/recruiter/reports` | Submit reports to their supervisor — daily is a quick note; weekly/monthly auto-populate from the date range picked (see below) |
 
 **What they can do:**
 - Register a brand-new candidate lead (`POST /api/applications`, no `candidate_id`) — becomes the attributed recruiter automatically
-- Advance a candidate's lifecycle **forward only**, up to and including `reported` (`identified → screened → reported`) — cannot move a candidate backward, cannot manually set `guided_to_apply` or `submitted` (both are system-only, fired by invite-claim and document-upload respectively), cannot verify or approve
-- View/scope candidates, applications, cases, and documents to only the ones they sourced (`scopeCandidatesToRequester`)
+- Advance a candidate's lifecycle **forward only**, up to and including `reported` (`identified → screened → reported`) — cannot move a candidate backward, cannot manually set `guided_to_apply` or `submitted` (both are system-only, fired by invite-claim and document-upload respectively), cannot verify or approve. These actions now live on the candidate detail page, not the list row.
+- View/scope candidates, applications, cases, and documents to only the ones they sourced (`scopeCandidatesToRequester`); the candidate list also supports `period_start`/`period_end` query params (used by the reports flow) to narrow to candidates created in a date range
 - Advance a Case's stage forward (`POST /api/cases/[id]/stage`), issue a Contract (`POST /api/cases/[id]/contract`), record a milestone payment (`POST /api/cases/[id]/payments`), complete a retention follow-up
-- Submit a daily/weekly report (`POST /api/reports`), resubmit one a supervisor returned
+- Submit a report (`POST /api/reports`), resubmit one a supervisor returned. Weekly reports snapshot a full candidate list (name/region/role/contact/screening result/status/date of application) for the selected period; monthly reports snapshot an aggregated summary (totals, by-status breakdown, screening pass rate) instead. Both include the recruiter's own target-vs-actual progress and free-text Challenges/Performance Updates fields — daily reports are unchanged (a single notes field).
+- Read their own target-vs-actual (`GET /api/recruiter-targets`, `GET /api/recruiter-targets/progress`) — the target itself is set by their Country Supervisor, allocated from a country-scoped Campaign target In-House set
 - Edit a candidate's personal details and record consent (`PATCH /api/candidates/[id]`) — worth flagging: this specific endpoint allows `regional_recruiter`/`country_supervisor`/`admin` **but not `inhouse_supervisor`/`director`**, unlike almost every other candidate-related permission in the system
 
-**Cannot do:** verify or approve a candidate, return a candidate to an earlier stage, verify a peer's report, see another recruiter's pipeline, access Campaigns/KPI/Fee Policy/Partners/Employer Clients/Jobs management, or the System Admin or Marketing portals.
+**Cannot do:** verify or approve a candidate, return a candidate to an earlier stage, verify a peer's report, see another recruiter's pipeline, set their own target (read-only for them), access Campaigns/KPI/Fee Policy/Partners/Employer Clients/Jobs management, or the System Admin or Marketing portals.
 
 ---
 
 ## Country Supervisor
 
-**Portal:** `/supervisor` — **Country Overview**, **Applications**, **Cases**, **Reports**
+**Portal:** `/supervisor` — **Country Overview**, **Applications**, **Cases**, **Reports**, **Team Targets**
+
+**Note:** `/supervisor/targets` (Team Targets) was added ahead of this role's own review-batch pass — it exists only because the recruiter's reports needed real target data to show against. Treat it as a placeholder to revisit properly once the Country Supervisor phase of the review starts, not a finished design.
 
 | Page | What it's for |
 |---|---|
@@ -74,14 +81,16 @@ See [Test accounts](#test-accounts) at the bottom for passwords and full detail.
 | `/supervisor/applications` | Applications scoped to their country |
 | `/supervisor/cases` | Cases for their country's candidates |
 | `/supervisor/reports` | Verify recruiter reports; consolidate into a weekly country report for In-House |
+| `/supervisor/targets` | Allocate their country's active Campaign target(s) across their own recruiters, one target value per recruiter |
 
 **What they can do:**
 - Verify or **return** a candidate (`reported → verified`, or return to an earlier stage with a required reason) for anyone in their assigned country — but **cannot approve** and cannot touch a candidate already at/beyond `approved`
 - Verify a recruiter's submitted report or return it with a reason (`POST /api/reports/[id]/verify`, `/return`)
 - Consolidate multiple recruiter reports into one country-level report for In-House
+- Set a personal target for each of their own recruiters (`POST /api/recruiter-targets`), allocated from one of their country's active Campaign targets — checked server-side against both "do you actually supervise this recruiter" and "is this target scoped to your country," not left to the UI
 - Everything a recruiter can do operationally within their country (advance case stages, issue contracts, record payments, retention follow-ups) — scoped to `assigned_country_id`
 
-**Cannot do:** approve a candidate or reverse an approval ("Only In-House can approve a candidate, or reverse an approval" — enforced in `candidateLifecycle.ts`), act on a candidate before a recruiter has reported them, see another country's data, access Campaigns/KPI/Fee Policy/Partners/Employer Clients/Jobs management, or System Admin/Marketing portals.
+**Cannot do:** approve a candidate or reverse an approval ("Only In-House can approve a candidate, or reverse an approval" — enforced in `candidateLifecycle.ts`), act on a candidate before a recruiter has reported them, see another country's data, set a target using a campaign target not scoped to their own country, access Campaigns/KPI/Fee Policy/Partners/Employer Clients/Jobs management, or System Admin/Marketing portals.
 
 ---
 

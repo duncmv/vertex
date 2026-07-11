@@ -92,6 +92,8 @@ test.describe("Candidate pre-application lifecycle (Phase 2)", () => {
     });
 
     await test.step("recruiter advances to screened; the gate passes since the CIF was complete", async () => {
+      await page.getByRole("link", { name: candidateName }).click();
+      await page.waitForURL(/\/recruiter\/candidates\/.+/);
       await page.getByRole("button", { name: /Advance to Screened/ }).click();
       await expect(page.getByText("screened", { exact: true })).toBeVisible({ timeout: 25_000 });
 
@@ -134,6 +136,8 @@ test.describe("Candidate pre-application lifecycle (Phase 2)", () => {
       await expect(page).toHaveURL(/\/recruiter$/);
 
       await expect(page.getByText("submitted", { exact: true })).toBeVisible({ timeout: 25_000 });
+      await page.getByRole("link", { name: candidateName }).click();
+      await page.waitForURL(/\/recruiter\/candidates\/.+/);
       await page.getByRole("button", { name: /Advance to Reported/ }).click();
       await expect(page.getByText("reported", { exact: true })).toBeVisible();
       await expect(page.getByText("Awaiting supervisor action")).toBeVisible();
@@ -144,9 +148,10 @@ test.describe("Candidate pre-application lifecycle (Phase 2)", () => {
       await login(page, "e2e-supervisor@test.local", PASSWORD);
       await expect(page).toHaveURL(/\/supervisor$/);
 
-      await expect(page.getByText(candidateName)).toBeVisible({ timeout: 25_000 });
-      await page.getByRole("button", { name: "Return" }).click();
-      await pickOption(page, page.getByRole("combobox"), "Return to Submitted");
+      const candidateRow = page.locator("tr", { hasText: candidateName });
+      await expect(candidateRow).toBeVisible({ timeout: 25_000 });
+      await candidateRow.getByRole("button", { name: "Return" }).click();
+      await pickOption(page, candidateRow.getByRole("combobox"), "Return to Submitted");
       await page.getByPlaceholder("Reason for return (required)…").fill("Please double-check the passport number.");
       await page.getByRole("button", { name: "Confirm Return" }).click();
 
@@ -158,6 +163,8 @@ test.describe("Candidate pre-application lifecycle (Phase 2)", () => {
       await logout(page);
       await login(page, "e2e-recruiter@test.local", PASSWORD);
 
+      await page.getByRole("link", { name: candidateName }).click();
+      await page.waitForURL(/\/recruiter\/candidates\/.+/);
       await page.getByRole("button", { name: /Advance to Reported/ }).click();
       await expect(page.getByText("reported", { exact: true })).toBeVisible();
 

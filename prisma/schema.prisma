@@ -74,6 +74,8 @@ model User {
   fee_policies_updated        FeePolicy[]        @relation("FeePolicyUpdater")
   contracts_created           Contract[]         @relation("ContractCreator")
   partner_candidates_reviewed PartnerCandidate[] @relation("PartnerCandidateReviewer")
+  recruiter_targets_received  RecruiterTarget[]  @relation("RecruiterTargetRecruiter")
+  recruiter_targets_set       RecruiterTarget[]  @relation("RecruiterTargetSetter")
 
   @@index([email])
   @@index([supervisor_id])
@@ -393,9 +395,33 @@ model CampaignTarget {
   target_value Float
   created_at   DateTime       @default(now())
 
+  recruiter_targets RecruiterTarget[]
+
   @@index([campaign_id])
   @@index([country_id])
   @@index([region_id])
+}
+
+// A Country Supervisor's personal allocation of a country-scoped
+// CampaignTarget across their own recruiters — the campaign target is
+// the team-wide number In-House set; this is how much of it a specific
+// recruiter is on the hook for. Deliberately tied to one CampaignTarget
+// row (not a freestanding number) so a recruiter's target always traces
+// back to a real, currently-active campaign goal, not an orphaned figure.
+model RecruiterTarget {
+  id                 String         @id @default(cuid())
+  campaign_target_id String
+  campaign_target    CampaignTarget @relation(fields: [campaign_target_id], references: [id], onDelete: Cascade)
+  recruiter_id       String
+  recruiter          User           @relation("RecruiterTargetRecruiter", fields: [recruiter_id], references: [id], onDelete: Cascade)
+  target_value       Float
+  set_by             String
+  setter             User           @relation("RecruiterTargetSetter", fields: [set_by], references: [id], onDelete: SetNull)
+  created_at         DateTime       @default(now())
+  updated_at         DateTime       @updatedAt
+
+  @@unique([campaign_target_id, recruiter_id])
+  @@index([recruiter_id])
 }
 
 model Job {

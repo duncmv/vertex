@@ -288,6 +288,14 @@ export const createCampaignTargetSchema = z
     message: "A target can be scoped to a country or a region, not both.",
   });
 
+// A Country Supervisor's personal allocation of a country CampaignTarget
+// across their own recruiters — upserted one recruiter at a time.
+export const upsertRecruiterTargetSchema = z.object({
+  campaign_target_id: z.string().cuid(),
+  recruiter_id: z.string().cuid(),
+  target_value: z.number().positive(),
+});
+
 // Reporting cycle (SRS FR-3.4) — a recruiter submits daily/weekly reports;
 // a supervisor consolidates verified recruiter reports (child_report_ids)
 // into a country report. `content` is free-form JSON since it snapshots

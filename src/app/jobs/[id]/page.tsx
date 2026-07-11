@@ -1,6 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import {
+  MapPin, Tag, CurrencyCircleDollar, Users, CalendarBlank, CaretRight,
+  IdentificationCard, Clock, ShieldCheck, CheckCircle, ArrowRight,
+} from "@phosphor-icons/react/dist/ssr";
 export const dynamic = "force-dynamic";
 
 interface Job {
@@ -59,144 +63,175 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
   const job = await getJob(id);
   if (!job) notFound();
 
+  const isActive = job.status === "active";
+
+  const ApplyButton = ({ className }: { className?: string }) =>
+    isActive ? (
+      <Link href={`/apply?job=${job.id}`} className={`btn-gold ${className ?? ""}`}>
+        Apply Now <ArrowRight size={16} weight="bold" />
+      </Link>
+    ) : (
+      <div className="bg-midnight-900/5 text-midnight-900/50 rounded-full px-6 py-3.5 text-sm text-center">
+        No longer accepting applications
+      </div>
+    );
+
   return (
-    <div className="bg-slate-50 min-h-screen">
+    <div className="bg-ivory-50 min-h-screen">
       {/* Breadcrumb */}
-      <div className="bg-white border-b border-slate-100">
-        <div className="max-w-4xl mx-auto px-4 py-3 text-sm flex items-center gap-2">
-          <Link href="/jobs" className="text-slate-500 hover:text-emerald-700 font-medium">Jobs</Link>
-          <span className="text-slate-300">›</span>
-          <span className="text-slate-800 font-medium truncate">{job.title}</span>
+      <div className="bg-white border-b border-midnight-900/10">
+        <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-4 text-sm flex items-center gap-2">
+          <Link href="/jobs" className="text-midnight-900/50 hover:text-gold-600 font-medium transition-colors">
+            Opportunities
+          </Link>
+          <CaretRight size={11} weight="bold" className="text-midnight-900/25" />
+          <span className="text-midnight-900 font-medium truncate">{job.title}</span>
         </div>
       </div>
 
-      <div className="max-w-4xl mx-auto px-4 py-8 md:py-12">
-        <div className="bg-white rounded-2xl p-6 md:p-10 shadow-sm border border-slate-100 relative overflow-hidden">
-          {/* Header */}
-          <div className="flex flex-col md:flex-row md:items-start justify-between gap-6 mb-8">
-            <div className="flex-1">
-              <h1 className="text-3xl md:text-4xl font-black text-slate-900 mb-4 leading-tight">{job.title}</h1>
-              <div className="flex flex-wrap items-center gap-3 text-sm">
-                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-slate-100 text-slate-700 font-medium">
-                  📍 {job.city}, {job.country}
-                </span>
-                {job.category && (
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-emerald-50 text-emerald-700 font-medium border border-emerald-100">
-                    🏷️ {job.category}
-                  </span>
-                )}
-                {job.salary_range && (
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-green-50 text-green-700 font-medium border border-green-100">
-                    💰 {job.salary_range}
-                  </span>
-                )}
-                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-slate-500 font-medium border border-slate-200">
-                  👥 {job._count.applications} applied
-                </span>
-                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-slate-500 font-medium border border-slate-200">
-                  📅 {new Date(job.created_at).toLocaleDateString()}
-                </span>
-              </div>
-            </div>
-            <div className="flex-shrink-0">
-              <span className={`badge-${job.status} text-sm px-4 py-1.5 shadow-sm inline-block`}>{job.status}</span>
-            </div>
+      {/* Hero */}
+      <section className="bg-midnight-950 text-ivory-50 py-14 md:py-16">
+        <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8">
+          <p className="eyebrow-dark mb-5">
+            <span className="eyebrow-rule" />
+            {job.country} · {job.city}
+          </p>
+          <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+            <h1 className="text-3xl md:text-5xl font-semibold tracking-tight leading-[1.05] max-w-3xl">
+              {job.title}
+            </h1>
+            <span className={`badge-${job.status} flex-shrink-0`}>{job.status}</span>
           </div>
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-2 mt-6 text-ivory-50/55 text-sm font-light">
+            {job.category && (
+              <span className="inline-flex items-center gap-1.5">
+                <Tag size={15} weight="regular" /> {job.category}
+              </span>
+            )}
+            {job.salary_range && (
+              <span className="inline-flex items-center gap-1.5 text-gold-300 font-medium">
+                <CurrencyCircleDollar size={15} weight="regular" /> {job.salary_range}
+              </span>
+            )}
+            <span className="inline-flex items-center gap-1.5">
+              <Users size={15} weight="regular" /> {job._count.applications} applied
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <CalendarBlank size={15} weight="regular" /> Posted {new Date(job.created_at).toLocaleDateString()}
+            </span>
+          </div>
+        </div>
+      </section>
 
-          {/* Apply button */}
-          {job.status === "active" ? (
-            <Link href={`/apply?job=${job.id}`} className="btn-gold w-full sm:w-auto mb-8 text-base py-3.5">
-              Apply for This Position
-            </Link>
-          ) : (
-            <div className="bg-slate-100 text-slate-500 rounded-lg p-4 mb-8 text-sm">
-              This position is no longer accepting applications.
-            </div>
-          )}
-
-          {/* Programme details */}
-          {(job.visa_type || job.duration_permit || job.processing_time || job.service_fee_gbp != null) && (
-            <div className="grid sm:grid-cols-3 gap-4 mb-8">
-              {job.visa_type && (
-                <div className="bg-slate-50 border border-slate-200 rounded-lg p-4">
-                  <div className="text-xs uppercase tracking-wide text-slate-400 font-semibold mb-1">Visa Type</div>
-                  <div className="text-slate-800 font-medium">{job.visa_type}</div>
+      {/* Content */}
+      <section className="py-12 md:py-16">
+        <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 grid lg:grid-cols-3 gap-8 lg:gap-10 items-start">
+          {/* Main column */}
+          <div className="lg:col-span-2 space-y-6">
+            {/* Programme facts */}
+            {(job.visa_type || job.duration_permit || job.processing_time) && (
+              <div className="bg-white rounded-2xl border border-midnight-900/10 p-6 md:p-8">
+                <h2 className="text-lg font-semibold text-midnight-900 tracking-tight mb-5">Programme Facts</h2>
+                <div className="grid sm:grid-cols-3 gap-5">
+                  {job.visa_type && (
+                    <div>
+                      <div className="flex items-center gap-1.5 text-xs uppercase tracking-[0.1em] text-midnight-900/40 font-semibold mb-1.5">
+                        <IdentificationCard size={14} weight="regular" /> Visa Type
+                      </div>
+                      <div className="text-midnight-900 font-medium">{job.visa_type}</div>
+                    </div>
+                  )}
+                  {job.duration_permit && (
+                    <div>
+                      <div className="flex items-center gap-1.5 text-xs uppercase tracking-[0.1em] text-midnight-900/40 font-semibold mb-1.5">
+                        <CalendarBlank size={14} weight="regular" /> Duration / Permit
+                      </div>
+                      <div className="text-midnight-900 font-medium">{job.duration_permit}</div>
+                    </div>
+                  )}
+                  {job.processing_time && (
+                    <div>
+                      <div className="flex items-center gap-1.5 text-xs uppercase tracking-[0.1em] text-midnight-900/40 font-semibold mb-1.5">
+                        <Clock size={14} weight="regular" /> Processing Time
+                      </div>
+                      <div className="text-midnight-900 font-medium">{job.processing_time}</div>
+                    </div>
+                  )}
                 </div>
-              )}
-              {job.duration_permit && (
-                <div className="bg-slate-50 border border-slate-200 rounded-lg p-4">
-                  <div className="text-xs uppercase tracking-wide text-slate-400 font-semibold mb-1">Duration / Permit</div>
-                  <div className="text-slate-800 font-medium">{job.duration_permit}</div>
-                </div>
-              )}
-              {job.processing_time && (
-                <div className="bg-slate-50 border border-slate-200 rounded-lg p-4">
-                  <div className="text-xs uppercase tracking-wide text-slate-400 font-semibold mb-1">Processing Time</div>
-                  <div className="text-slate-800 font-medium">{job.processing_time}</div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Service fee */}
-          {job.service_fee_gbp != null && (
-            <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-6 mb-8">
-              <div className="flex flex-wrap items-baseline justify-between gap-2 mb-4">
-                <h2 className="text-xl font-bold text-slate-800">Service Fee</h2>
-                <span className="text-2xl font-black text-emerald-800">{job.service_fee_gbp.toLocaleString()} GBP</span>
               </div>
-              <div className="grid sm:grid-cols-3 gap-3 mb-3">
-                {feeStages(job.service_fee_gbp).map((stage) => (
-                  <div key={stage.label} className="bg-white rounded-lg p-3 text-center border border-emerald-100">
-                    <div className="font-bold text-emerald-700 text-sm mb-1">{stage.label}</div>
-                    <div className="text-slate-800 font-semibold">{stage.amount.toLocaleString()} GBP</div>
-                    <div className="text-slate-500 text-xs mt-1">{stage.note}</div>
-                  </div>
-                ))}
+            )}
+
+            {/* Visa success rate */}
+            {job.visa_success_rates && (
+              <div className="bg-white rounded-2xl border border-midnight-900/10 p-6 md:p-8">
+                <h2 className="flex items-center gap-2 text-lg font-semibold text-midnight-900 tracking-tight mb-3">
+                  <ShieldCheck size={18} weight="regular" className="text-gold-600" /> Visa Success Rate by Region
+                </h2>
+                <p className="text-midnight-900/60 font-light leading-relaxed">{job.visa_success_rates}</p>
               </div>
-              <p className="text-xs text-slate-500">
-                Air tickets and embassy fees are not included and are payable separately. Accommodation is provided
-                (may be deducted from salary).
+            )}
+
+            {/* Description */}
+            <div className="bg-white rounded-2xl border border-midnight-900/10 p-6 md:p-8">
+              <h2 className="text-lg font-semibold text-midnight-900 tracking-tight mb-3">Overview</h2>
+              <p className="text-midnight-900/65 font-light leading-relaxed whitespace-pre-wrap">
+                {job.job_description}
               </p>
             </div>
-          )}
 
-          {/* Visa success rate */}
-          {job.visa_success_rates && (
-            <div className="mb-8">
-              <h2 className="text-xl font-bold text-slate-800 mb-3">Visa Success Rate by Region</h2>
-              <p className="text-slate-600">{job.visa_success_rates}</p>
-            </div>
-          )}
-
-          {/* Description */}
-          <div className="prose prose-slate max-w-none">
-            <h2 className="text-xl font-bold text-slate-800 mb-3">Job Description</h2>
-            <div className="text-slate-600 leading-relaxed whitespace-pre-wrap mb-8">
-              {job.job_description}
+            {/* Requirements */}
+            <div className="bg-white rounded-2xl border border-midnight-900/10 p-6 md:p-8">
+              <h2 className="flex items-center gap-2 text-lg font-semibold text-midnight-900 tracking-tight mb-3">
+                <CheckCircle size={18} weight="regular" className="text-gold-600" /> Required Documents
+              </h2>
+              <p className="text-midnight-900/65 font-light leading-relaxed whitespace-pre-wrap">
+                {job.requirements}
+              </p>
             </div>
 
-            <h2 className="text-xl font-bold text-slate-800 mb-3">Requirements</h2>
-            <div className="text-slate-600 leading-relaxed whitespace-pre-wrap">
-              {job.requirements}
+            {/* Mobile apply (sidebar is hidden below lg) */}
+            <div className="lg:hidden">
+              <ApplyButton className="w-full text-base py-4" />
             </div>
           </div>
 
-          {/* Bottom apply */}
-          {job.status === "active" && (
-            <div className="mt-10 pt-8 border-t border-slate-100 text-center">
-              <p className="text-slate-500 mb-4">Interested in this role?</p>
-              <Link href={`/apply?job=${job.id}`} className="btn-primary px-8 py-3.5 text-base">
-                Apply Now
-              </Link>
+          {/* Sidebar */}
+          <aside className="hidden lg:block lg:sticky lg:top-28 space-y-6">
+            <div className="bg-white rounded-2xl border border-midnight-900/10 p-6">
+              <ApplyButton className="w-full text-base py-4" />
+              <p className="text-xs text-midnight-900/40 text-center mt-3">
+                Takes about 10 minutes · country &amp; type of work pre-filled
+              </p>
             </div>
-          )}
-        </div>
 
-        <div className="text-center mt-6">
-          <Link href="/jobs" className="text-sm text-slate-500 hover:text-emerald-700">← Back to All Jobs</Link>
+            {job.service_fee_gbp != null && (
+              <div className="bg-midnight-950 text-ivory-50 rounded-2xl p-6">
+                <div className="flex items-baseline justify-between gap-2 mb-5">
+                  <h2 className="text-sm font-semibold uppercase tracking-[0.1em] text-ivory-50/60">Service Fee</h2>
+                  <span className="text-2xl font-semibold text-gold-300">
+                    {job.service_fee_gbp.toLocaleString()} <span className="text-sm font-medium">GBP</span>
+                  </span>
+                </div>
+                <div className="space-y-2.5 mb-5">
+                  {feeStages(job.service_fee_gbp).map((stage) => (
+                    <div key={stage.label} className="flex items-center justify-between gap-3 bg-white/5 rounded-lg px-3.5 py-2.5">
+                      <div>
+                        <div className="text-xs font-semibold text-gold-300">{stage.label}</div>
+                        <div className="text-ivory-50/45 text-xs mt-0.5">{stage.note}</div>
+                      </div>
+                      <div className="font-semibold text-ivory-50 whitespace-nowrap">{stage.amount.toLocaleString()} GBP</div>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-xs text-ivory-50/40 leading-relaxed">
+                  Air tickets and embassy fees are not included and are payable separately. Accommodation is
+                  provided (may be deducted from salary).
+                </p>
+              </div>
+            )}
+          </aside>
         </div>
-      </div>
+      </section>
     </div>
   );
 }

@@ -5,6 +5,13 @@ import { z } from "zod";
 // an untouched form input, since .optional() only short-circuits undefined.
 const optionalEmail = z.preprocess((val) => (val === "" ? undefined : val), z.string().email().optional());
 
+// Same "" → undefined treatment for an optional date-input field. Without
+// this, an untouched <input type="date"> sends "" (passes .optional() the
+// same way), which then reaches Prisma as a raw string for a DateTime?
+// column and crashes ("premature end of input. Expected ISO-8601
+// DateTime") instead of just leaving the column alone.
+const optionalDateString = z.preprocess((val) => (val === "" ? undefined : val), z.string().optional());
+
 // Auth
 export const registerSchema = z.object({
   full_name: z.string().min(2, "Full name must be at least 2 characters").max(100),
@@ -31,10 +38,10 @@ export const loginSchema = z.object({
 // ("Candidate Personal Information"), self-service edit path.
 export const candidateProfileSchema = z.object({
   passport_number: z.string().optional(),
-  date_of_birth: z.string().optional(),
+  date_of_birth: optionalDateString,
   nationality: z.string().optional(),
   second_nationality: z.string().max(100).optional(),
-  passport_expiry: z.string().optional(),
+  passport_expiry: optionalDateString,
   current_occupation: z.string().max(150).optional(),
   highest_education: z.string().max(150).optional(),
   home_address: z.string().max(500).optional(),

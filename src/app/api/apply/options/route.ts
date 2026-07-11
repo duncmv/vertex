@@ -15,7 +15,7 @@ export const dynamic = "force-dynamic";
 // entirely from admin-managed data — a type/requirement admin adds shows
 // up here immediately, no code change needed.
 export async function GET() {
-  const [countries, locationCountries, sectors, documentTypes, documentRequirements] = await Promise.all([
+  const [countries, locationCountries, sectors, documentTypes, documentRequirements, intakeModeSetting] = await Promise.all([
     prisma.country.findMany({
       where: { region: { name: "Europe" } },
       select: { id: true, name: true },
@@ -36,7 +36,14 @@ export async function GET() {
     prisma.countryDocumentRequirement.findMany({
       select: { country_id: true, document_type: true },
     }),
+    // Defaults "email" (not "crm") when unset — the site is meant to be
+    // deployable to the main domain before the CRM's staff workflows are
+    // signed off, so an unconfigured deployment must fail safe toward not
+    // touching the CRM, not the other way around.
+    prisma.systemSetting.findUnique({ where: { key: "intake_mode" } }),
   ]);
 
-  return NextResponse.json({ countries, locationCountries, sectors, documentTypes, documentRequirements });
+  const intakeMode = intakeModeSetting?.value === "crm" ? "crm" : "email";
+
+  return NextResponse.json({ countries, locationCountries, sectors, documentTypes, documentRequirements, intakeMode });
 }

@@ -19,6 +19,9 @@ interface Job {
   job_description?: string;
   status: string;
   created_at: string;
+  visa_type?: string;
+  duration_permit?: string;
+  service_fee_gbp?: number;
   _count: { applications: number };
 }
 
@@ -52,9 +55,11 @@ export default async function JobsPage({
   const { jobs, total, pages } = await getJobs(params);
   const currentPage = Number(params.page || 1);
 
+  // Matches the Sector list seeded in prisma/seed.ts — every work-permit
+  // programme's category is one of these.
   const categories = [
-    "Technology", "Healthcare", "Engineering", "Operations",
-    "Sales & Marketing", "Finance", "Education", "Other"
+    "Warehouse & Logistics", "Agriculture", "Hospitality & Hotel",
+    "Driving", "Construction", "Manufacturing", "General Labour"
   ];
 
   return (
@@ -142,9 +147,22 @@ export default async function JobsPage({
                     <span className={`badge-${job.status} flex-shrink-0`}>{job.status}</span>
                   </div>
 
-                  <p className="text-midnight-900/60 text-sm font-light mb-8 line-clamp-2 leading-relaxed flex-grow">
+                  <p className="text-midnight-900/60 text-sm font-light mb-6 line-clamp-2 leading-relaxed flex-grow">
                     {job.job_description || "Click to view full description and requirements for this role."}
                   </p>
+
+                  {job.service_fee_gbp != null && (
+                    <div className="flex flex-wrap items-center gap-2 mb-6">
+                      <span className="inline-flex items-center gap-1.5 rounded-full bg-gold-500/10 text-gold-700 border border-gold-500/30 px-3 py-1 text-xs font-semibold">
+                        Service fee: {job.service_fee_gbp.toLocaleString()} GBP
+                      </span>
+                      {job.duration_permit && (
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-midnight-900/5 text-midnight-900/60 px-3 py-1 text-xs font-medium">
+                          {job.duration_permit}
+                        </span>
+                      )}
+                    </div>
+                  )}
 
                   <div className="flex items-center justify-between pt-6 border-t border-midnight-900/10 mt-auto">
                     <div className="flex items-center gap-5 text-xs text-midnight-900/40 uppercase tracking-[0.1em]">
@@ -153,12 +171,22 @@ export default async function JobsPage({
                         <Users size={14} weight="regular" /> {job._count?.applications || 0} applied
                       </span>
                     </div>
-                    <Link
-                      href={`/jobs/${job.id}`}
-                      className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.15em] text-midnight-800 hover:text-gold-600 transition-colors"
-                    >
-                      View details <ArrowRight size={14} weight="bold" />
-                    </Link>
+                    <div className="flex items-center gap-5">
+                      <Link
+                        href={`/jobs/${job.id}`}
+                        className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.15em] text-midnight-800 hover:text-gold-600 transition-colors"
+                      >
+                        View details <ArrowRight size={14} weight="bold" />
+                      </Link>
+                      {job.status === "active" && (
+                        <Link
+                          href={`/apply?job=${job.id}`}
+                          className="btn-primary text-xs py-2.5 px-5"
+                        >
+                          Apply
+                        </Link>
+                      )}
+                    </div>
                   </div>
                 </div>
               ))}

@@ -1,10 +1,11 @@
 "use client";
 export const dynamic = "force-dynamic";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import ApplicationForm from "@/components/ApplicationForm";
-import CandidateProfileForm from "@/components/CandidateProfileForm";
+import CandidateProfileForm, { type CandidateProfileFormHandle } from "@/components/CandidateProfileForm";
 
 interface Profile {
   nationality?: string | null;
@@ -19,7 +20,25 @@ interface Profile {
   marital_status?: string | null;
 }
 
+interface OpportunityJob {
+  id: string;
+  title: string;
+  country: string;
+  category?: string | null;
+}
+
 export default function ApplyPage() {
+  return (
+    <Suspense fallback={<div className="bg-slate-50 min-h-screen" />}>
+      <ApplyPageInner />
+    </Suspense>
+  );
+}
+
+function ApplyPageInner() {
+  const searchParams = useSearchParams();
+  const jobId = searchParams.get("job") || undefined;
+
   const [authState, setAuthState] = useState<"loading" | "signed_out" | "signed_in">("loading");
   const [profile, setProfile] = useState<Profile | null>(null);
   // Mirrors the server's own duplicate-application check (POST
@@ -27,6 +46,21 @@ export default function ApplyPage() {
   // shown only to fail on submit — but a candidate whose only prior
   // application was rejected can still see and resubmit it.
   const [hasActiveApplication, setHasActiveApplication] = useState(false);
+  // Set when arriving via /apply?job=... from a specific /jobs opportunity
+  // — resolved to its country/category so ApplicationForm can preselect
+  // the matching Section 1 fields.
+  const [opportunity, setOpportunity] = useState<OpportunityJob | null>(null);
+  // Lets ApplicationForm trigger Section 2's own save as part of one
+  // "Submit Application" click, rather than a separate mid-form button.
+  const profileFormRef = useRef<CandidateProfileFormHandle>(null);
+
+  useEffect(() => {
+    if (!jobId) return;
+    fetch(`/api/jobs/${jobId}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => setOpportunity(data?.id ? data : null))
+      .catch(() => {});
+  }, [jobId]);
 
   useEffect(() => {
     fetch("/api/candidates/profile")
@@ -74,11 +108,25 @@ export default function ApplyPage() {
           </p>
         </div>
 
+        {opportunity && (
+          <div className="bg-emerald-50 border border-emerald-200 rounded-lg px-4 py-3 mb-6 text-sm text-emerald-800">
+            Applying for <span className="font-semibold">{opportunity.title}</span> — we've preselected its country
+            {opportunity.category ? " and type of work" : ""} below.
+          </div>
+        )}
+
         {authState === "loading" && <p className="text-center text-slate-400 py-10">Loading…</p>}
 
         {authState === "signed_out" && (
           <div className="card p-8">
-            <ApplicationForm includePersonalInfo onSubmitted={() => {}} />
+            <ApplicationForm
+              includePersonalInfo
+              onSubmitted={() => {}}
+              jobId={jobId}
+              initialCountryName={opportunity?.country}
+              initialSectorName={opportunity?.category ?? undefined}
+              useEmailIntakeIfConfigured
+            />
             <p className="text-center text-xs text-slate-400 mt-4">
               Already submitted and have an account? <Link href="/auth/login?redirect=/apply" className="underline">Log in</Link> to check your status.
             </p>
@@ -94,19 +142,24 @@ export default function ApplyPage() {
                 <Link href="/dashboard" className="btn-primary text-sm py-2.5 px-6">View Dashboard</Link>
               </div>
             ) : (
-              <>
-                <div className="card p-8 mb-6">
-                  <h2 className="text-xl font-black text-slate-800 mb-4">Section 2 — Your Personal Information</h2>
-                  <CandidateProfileForm
-                    initial={profile}
-                    onSaved={() => fetch("/api/candidates/profile").then((r) => r.json()).then(setProfile)}
-                  />
-                </div>
-
-                <div className="card p-8">
-                  <ApplicationForm onSubmitted={() => fetch("/api/candidates/profile").then((r) => r.json()).then(setProfile)} />
-                </div>
-              </>
+              <div className="card p-8">
+                <ApplicationForm
+                  onSubmitted={() => fetch("/api/candidates/profile").then((r) => r.json()).then(setProfile)}
+                  jobId={jobId}
+                  initialCountryName={opportunity?.country}
+                  initialSectorName={opportunity?.category ?? undefined}
+                  useEmailIntakeIfConfigured
+                  onBeforeSubmit={() => profileFormRef.current?.save() ?? Promise.resolve(true)}
+                  personalInfoSlot={
+                    <CandidateProfileForm
+                      ref={profileFormRef}
+                      hideSaveButton
+                      initial={profile}
+                      onSaved={() => fetch("/api/candidates/profile").then((r) => r.json()).then(setProfile)}
+                    />
+                  }
+                />
+              </div>
             )}
           </>
         )}

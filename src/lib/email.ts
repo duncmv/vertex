@@ -309,3 +309,139 @@ export async function sendPartnerCandidateSubmittedEmail(partnerName: string, ca
     console.error("Error sending partner-candidate submission notification:", error);
   }
 }
+
+// --- Public-forms email bridge ---
+// The site is being deployed to the main domain ahead of the CRM's staff
+// workflows being fully signed off. Until an admin flips SystemSetting
+// "intake_mode" to "crm" (src/app/api/public-intake/application/route.ts,
+// src/app/api/contact/route.ts), the public Candidate Information Form and
+// Contact form don't touch the CRM at all — they email a human directly.
+// Unlike sendPartnerCandidateSubmittedEmail, a failure here throws instead
+// of being swallowed: for these two routes the email *is* the entire
+// submission, so the caller must know if it didn't go out.
+
+export interface PublicIntakeEmailData {
+  fullName: string;
+  email: string;
+  phone?: string;
+  nationality?: string;
+  passportNumber?: string;
+  jobTitle?: string;
+  preferredCountry1: string;
+  preferredCountry2?: string;
+  preferredCountry3?: string;
+  preferredSector: string;
+  earliestTravelDate: string;
+  priorEuVisaApplied?: string;
+  documentsAvailable: string[];
+  currentLocationCountry: string;
+  holdsSchengenVisa?: string;
+  priorVisaRefusals?: string;
+  availableForEmbassyAppointment: boolean;
+  willingToStartWithin30Days: boolean;
+  preferredContactChannel?: string;
+  coverLetter?: string;
+}
+
+const row = (label: string, value?: string | null) =>
+  value ? `<tr><td style="padding:6px 12px;color:#64748b;font-size:13px;white-space:nowrap;">${label}</td><td style="padding:6px 12px;color:#1e293b;font-size:13px;">${value}</td></tr>` : "";
+
+export async function sendPublicIntakeEmail(data: PublicIntakeEmailData) {
+  const to = process.env.PUBLIC_FORMS_NOTIFY_EMAIL;
+  if (!to) {
+    // Unlike sendPartnerCandidateSubmittedEmail (a secondary notification
+    // for a record that already exists in the DB either way), there is no
+    // fallback record here at all — an unconfigured inbox means the
+    // submission is gone with no trace. Throw so the caller returns a real
+    // error instead of a false "success".
+    throw new Error("PUBLIC_FORMS_NOTIFY_EMAIL is not configured.");
+  }
+
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 640px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;">
+      <div style="background-color: #0f172a; padding: 24px; text-align: center;">
+        <h1 style="color: #ffffff; margin: 0; font-size: 22px;">New Candidate Information Form Submission</h1>
+        <p style="color: #94a3b8; margin: 8px 0 0; font-size: 13px;">Emailed directly — the CRM intake pipeline isn't live yet (Admin Settings → Public Form Intake Mode).</p>
+      </div>
+      <div style="padding: 24px 8px; background-color: #ffffff;">
+        <table style="width: 100%; border-collapse: collapse;">
+          ${row("Applying for", data.jobTitle)}
+          ${row("Full name", data.fullName)}
+          ${row("Email", data.email)}
+          ${row("Phone", data.phone)}
+          ${row("Nationality", data.nationality)}
+          ${row("Passport number", data.passportNumber)}
+          ${row("Preferred country (1)", data.preferredCountry1)}
+          ${row("Preferred country (2)", data.preferredCountry2)}
+          ${row("Preferred country (3)", data.preferredCountry3)}
+          ${row("Preferred type of work", data.preferredSector)}
+          ${row("Earliest travel date", data.earliestTravelDate)}
+          ${row("Prior EU visa applied", data.priorEuVisaApplied)}
+          ${row("Documents available", data.documentsAvailable.join(", "))}
+          ${row("Current location", data.currentLocationCountry)}
+          ${row("Holds Schengen/EU visa", data.holdsSchengenVisa)}
+          ${row("Prior visa refusals", data.priorVisaRefusals)}
+          ${row("Available for embassy appointment", data.availableForEmbassyAppointment ? "Yes" : "No")}
+          ${row("Willing to start within 30 days", data.willingToStartWithin30Days ? "Yes" : "No")}
+          ${row("Preferred contact channel", data.preferredContactChannel)}
+          ${row("Additional notes", data.coverLetter)}
+        </table>
+      </div>
+    </div>
+  `;
+
+  await transporter.sendMail({ from: FROM, to, subject: `New CIF submission: ${data.fullName}${data.jobTitle ? ` — ${data.jobTitle}` : ""}`, html });
+}
+
+export async function sendPublicIntakeConfirmationEmail(to: string, fullName: string) {
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      <div style="background:#1a365d;padding:24px;text-align:center;">
+        <h1 style="color:#fff;margin:0;font-size:24px;">Vertex International</h1>
+      </div>
+      <div style="padding:32px;background:#f7fafc;">
+        <h2 style="color:#1a365d;">Thank you, ${fullName}.</h2>
+        <p style="color:#4a5568;line-height:1.6;">
+          We've received your Candidate Information Form. A member of our team will review it and
+          get in touch within 1–2 business days to confirm your programme and next steps.
+        </p>
+      </div>
+    </div>
+  `;
+  await transporter.sendMail({ from: FROM, to, subject: "We've received your application — Vertex International", html });
+}
+
+export interface ContactMessageData {
+  name: string;
+  email: string;
+  subject: string;
+  message: string;
+}
+
+export async function sendContactMessageEmail(data: ContactMessageData) {
+  const to = process.env.PUBLIC_FORMS_NOTIFY_EMAIL;
+  if (!to) {
+    // Same reasoning as sendPublicIntakeEmail: no DB fallback record
+    // exists for a contact message, so an unconfigured inbox must fail
+    // loudly rather than silently discard the message.
+    throw new Error("PUBLIC_FORMS_NOTIFY_EMAIL is not configured.");
+  }
+
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;">
+      <div style="background-color: #0f172a; padding: 24px; text-align: center;">
+        <h1 style="color: #ffffff; margin: 0; font-size: 22px;">New Contact Form Message</h1>
+      </div>
+      <div style="padding: 32px; background-color: #ffffff;">
+        <table style="width: 100%; border-collapse: collapse; margin-bottom: 16px;">
+          ${row("From", `${data.name} &lt;${data.email}&gt;`)}
+          ${row("Subject", data.subject)}
+        </table>
+        <p style="font-size: 14px; color: #64748b; margin-bottom: 4px;">Message:</p>
+        <p style="font-size: 15px; color: #1e293b; white-space: pre-wrap; line-height: 1.6;">${data.message}</p>
+      </div>
+    </div>
+  `;
+
+  await transporter.sendMail({ from: FROM, to, replyTo: data.email, subject: `[Contact] ${data.subject}`, html });
+}

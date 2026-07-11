@@ -14,8 +14,22 @@ interface Job {
   requirements: string;
   status: string;
   created_at: string;
+  visa_type?: string;
+  duration_permit?: string;
+  processing_time?: string;
+  service_fee_gbp?: number;
+  visa_success_rates?: string;
   _count: { applications: number };
 }
+
+// Every work-permit programme in the Service & Pricing List follows the
+// same fixed three-stage split of the total service fee — only the total
+// is stored (Job.service_fee_gbp), so the stage amounts are derived here.
+const feeStages = (totalGbp: number) => [
+  { label: "Stage 1 · 20%", note: "On engagement — documentation", amount: Math.round(totalGbp * 0.2) },
+  { label: "Stage 2 · 40%", note: "After the work permit is issued", amount: Math.round(totalGbp * 0.4) },
+  { label: "Stage 3 · 40%", note: "After the visa is granted", amount: Math.round(totalGbp * 0.4) },
+];
 
 async function getJob(id: string): Promise<Job | null> {
   try {
@@ -97,6 +111,61 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
           ) : (
             <div className="bg-slate-100 text-slate-500 rounded-lg p-4 mb-8 text-sm">
               This position is no longer accepting applications.
+            </div>
+          )}
+
+          {/* Programme details */}
+          {(job.visa_type || job.duration_permit || job.processing_time || job.service_fee_gbp != null) && (
+            <div className="grid sm:grid-cols-3 gap-4 mb-8">
+              {job.visa_type && (
+                <div className="bg-slate-50 border border-slate-200 rounded-lg p-4">
+                  <div className="text-xs uppercase tracking-wide text-slate-400 font-semibold mb-1">Visa Type</div>
+                  <div className="text-slate-800 font-medium">{job.visa_type}</div>
+                </div>
+              )}
+              {job.duration_permit && (
+                <div className="bg-slate-50 border border-slate-200 rounded-lg p-4">
+                  <div className="text-xs uppercase tracking-wide text-slate-400 font-semibold mb-1">Duration / Permit</div>
+                  <div className="text-slate-800 font-medium">{job.duration_permit}</div>
+                </div>
+              )}
+              {job.processing_time && (
+                <div className="bg-slate-50 border border-slate-200 rounded-lg p-4">
+                  <div className="text-xs uppercase tracking-wide text-slate-400 font-semibold mb-1">Processing Time</div>
+                  <div className="text-slate-800 font-medium">{job.processing_time}</div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Service fee */}
+          {job.service_fee_gbp != null && (
+            <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-6 mb-8">
+              <div className="flex flex-wrap items-baseline justify-between gap-2 mb-4">
+                <h2 className="text-xl font-bold text-slate-800">Service Fee</h2>
+                <span className="text-2xl font-black text-emerald-800">{job.service_fee_gbp.toLocaleString()} GBP</span>
+              </div>
+              <div className="grid sm:grid-cols-3 gap-3 mb-3">
+                {feeStages(job.service_fee_gbp).map((stage) => (
+                  <div key={stage.label} className="bg-white rounded-lg p-3 text-center border border-emerald-100">
+                    <div className="font-bold text-emerald-700 text-sm mb-1">{stage.label}</div>
+                    <div className="text-slate-800 font-semibold">{stage.amount.toLocaleString()} GBP</div>
+                    <div className="text-slate-500 text-xs mt-1">{stage.note}</div>
+                  </div>
+                ))}
+              </div>
+              <p className="text-xs text-slate-500">
+                Air tickets and embassy fees are not included and are payable separately. Accommodation is provided
+                (may be deducted from salary).
+              </p>
+            </div>
+          )}
+
+          {/* Visa success rate */}
+          {job.visa_success_rates && (
+            <div className="mb-8">
+              <h2 className="text-xl font-bold text-slate-800 mb-3">Visa Success Rate by Region</h2>
+              <p className="text-slate-600">{job.visa_success_rates}</p>
             </div>
           )}
 

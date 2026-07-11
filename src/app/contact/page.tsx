@@ -16,9 +16,23 @@ export default function ContactPage() {
     e.preventDefault();
     setStatus("loading");
     setError("");
-    // For now, simulate success (API route can be added later)
-    await new Promise((r) => setTimeout(r, 800));
-    setStatus("success");
+    try {
+      const res = await fetch("/api/contact", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setStatus("error");
+        setError(data.error || "Failed to send message. Please try again.");
+        return;
+      }
+      setStatus("success");
+    } catch {
+      setStatus("error");
+      setError("Failed to send message. Please try again.");
+    }
   };
 
   return (

@@ -6,7 +6,7 @@ import Pagination from "@/components/Pagination";
 import { usePagination } from "@/lib/usePagination";
 
 export default function AdminSettings() {
-  const [settings, setSettings] = useState<any>({ ai_enabled: "true", whatsapp_number: "" });
+  const [settings, setSettings] = useState<any>({ ai_enabled: "true", whatsapp_number: "", intake_mode: "email" });
   const [knowledge, setKnowledge] = useState<any[]>([]);
   const [emails, setEmails] = useState<any[]>([]);
   
@@ -100,6 +100,25 @@ export default function AdminSettings() {
               onChange={e => setSettings({ ...settings, whatsapp_number: e.target.value })}
               className="input-field"
             />
+          </div>
+          <div className="md:col-span-2">
+            <label className="block text-sm font-medium text-midnight-900/70 mb-2">Public Form Intake Mode</label>
+            <SearchableSelect
+              value={settings.intake_mode || "email"}
+              onChange={(value) => setSettings({ ...settings, intake_mode: value })}
+              options={[
+                { value: "email", label: "Email to Staff (CRM not yet live)" },
+                { value: "crm", label: "CRM Pipeline (recruiters assigned automatically)" },
+              ]}
+            />
+            <p className="text-xs text-midnight-900/45 mt-2">
+              While set to Email, the public Candidate Information Form (/apply) doesn&apos;t touch the CRM at
+              all — submissions are emailed straight to <code>PUBLIC_FORMS_NOTIFY_EMAIL</code> instead. Switch to
+              CRM Pipeline once staff are ready to work submissions inside the system (candidates get created,
+              recruiters are auto-assigned, as today). Doesn&apos;t affect staff-entered leads (recruiter portal,
+              partner portal) — those always go straight into the CRM. The Contact form always emails regardless
+              of this setting.
+            </p>
           </div>
         </div>
         <button onClick={saveSettings} className="btn-primary mt-4 py-2.5 px-6 text-xs">Save Global Settings</button>

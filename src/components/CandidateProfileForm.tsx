@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { forwardRef, useImperativeHandle, useState } from "react";
 
 interface ProfileFields {
   nationality?: string | null;
@@ -18,6 +18,19 @@ interface ProfileFields {
 interface Props {
   initial: ProfileFields;
   onSaved: () => void;
+  /**
+   * Hides the standalone "Save Personal Information" button — set by
+   * ApplicationForm when this is embedded as its Section 2, where saving
+   * is instead triggered via the imperative handle from the surrounding
+   * "Submit Application" click (one action, not two). The standalone
+   * /dashboard usage leaves this unset and keeps its own explicit button.
+   */
+  hideSaveButton?: boolean;
+}
+
+export interface CandidateProfileFormHandle {
+  /** Persists the form's current values; resolves false on failure (error state is already shown inline). */
+  save: () => Promise<boolean>;
 }
 
 const toDateInput = (v?: string | null) => (v ? v.slice(0, 10) : "");
@@ -28,7 +41,10 @@ const toDateInput = (v?: string | null) => (v ? v.slice(0, 10) : "");
  * separate from the recruiter-assisted CandidateEditDetails path since a
  * self-registered candidate has no recruiter to fill this in for them.
  */
-export default function CandidateProfileForm({ initial, onSaved }: Props) {
+const CandidateProfileForm = forwardRef<CandidateProfileFormHandle, Props>(function CandidateProfileForm(
+  { initial, onSaved, hideSaveButton },
+  ref
+) {
   const [form, setForm] = useState({
     nationality: initial.nationality ?? "",
     second_nationality: initial.second_nationality ?? "",
@@ -47,8 +63,7 @@ export default function CandidateProfileForm({ initial, onSaved }: Props) {
 
   const set = (key: keyof typeof form, value: string) => setForm((f) => ({ ...f, [key]: value }));
 
-  const submit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const save = async (): Promise<boolean> => {
     setSaving(true);
     setError("");
     setSaved(false);
@@ -61,22 +76,30 @@ export default function CandidateProfileForm({ initial, onSaved }: Props) {
       const body = await res.json();
       if (!res.ok) {
         setError(body.error ?? "Failed to save profile.");
-        return;
+        return false;
       }
       setSaved(true);
       onSaved();
+      return true;
     } catch {
       setError("Failed to save profile.");
+      return false;
     } finally {
       setSaving(false);
     }
   };
 
+  useImperativeHandle(ref, () => ({ save }));
+
   const labelCls = "block text-xs font-medium text-midnight-900/60 mb-1";
   const inputCls = "input-field text-sm";
 
   return (
-    <form onSubmit={submit} className="grid sm:grid-cols-2 gap-4">
+    // A <div>, not a <form> — this is embedded directly inside
+    // ApplicationForm's own <form> (as Section 2, between Section 1 and
+    // Section 3) when reached via /apply, and HTML doesn't allow nesting
+    // <form> elements.
+    <div className="grid sm:grid-cols-2 gap-4">
       <div>
         <label className={labelCls}>Nationality</label>
         <input value={form.nationality} onChange={(e) => set("nationality", e.target.value)} className={inputCls} />
@@ -121,11 +144,19 @@ export default function CandidateProfileForm({ initial, onSaved }: Props) {
       {error && <div className="sm:col-span-2 text-xs text-red-600">{error}</div>}
       {saved && !error && <div className="sm:col-span-2 text-xs text-emerald-700">Saved.</div>}
 
-      <div className="sm:col-span-2">
-        <button type="submit" disabled={saving} className="btn-primary text-xs py-2.5 px-5 disabled:opacity-60">
-          {saving ? "Saving…" : "Save Personal Information"}
-        </button>
-      </div>
-    </form>
+      {hideSaveButton ? (
+        <p className="sm:col-span-2 text-xs text-midnight-900/40">
+          Saved automatically when you submit your application below.
+        </p>
+      ) : (
+        <div className="sm:col-span-2">
+          <button type="button" onClick={save} disabled={saving} className="btn-primary text-xs py-2.5 px-5 disabled:opacity-60">
+            {saving ? "Saving…" : "Save Personal Information"}
+          </button>
+        </div>
+      )}
+    </div>
   );
-}
+});
+
+export default CandidateProfileForm;

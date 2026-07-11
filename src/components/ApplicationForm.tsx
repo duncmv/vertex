@@ -28,6 +28,41 @@ interface Props {
    * (personal info is already on file in that case).
    */
   includePersonalInfo?: boolean;
+  /**
+   * Set when arriving from a specific opportunity on /jobs (via
+   * /apply?job=...) — carried through to POST /api/applications as
+   * job_id, and used to preselect the matching country/sector below once
+   * the options list has loaded.
+   */
+  jobId?: string;
+  initialCountryName?: string;
+  initialSectorName?: string;
+  /**
+   * Section 2 for a signed-in candidate completing/editing their on-file
+   * profile (CandidateProfileForm) — rendered here, between Section 1 and
+   * Section 3, so the form reads in the same 1-2-3-4-5 order as the source
+   * document. Mutually exclusive with includePersonalInfo, which instead
+   * renders Section 2 inline for a brand-new candidate with no profile yet.
+   */
+  personalInfoSlot?: React.ReactNode;
+  /**
+   * Called before POST /api/applications fires — the caller's chance to
+   * persist personalInfoSlot's own data (a separate PUT, since Section 2
+   * lives on the Candidate record, not the Application) as part of one
+   * single "Submit Application" click rather than a second, separate save
+   * button. Submission is aborted if this resolves false.
+   */
+  onBeforeSubmit?: () => Promise<boolean>;
+  /**
+   * Only set by the public /apply page's two renders (signed-out and
+   * signed-in-candidate) — RegisterCandidateForm (recruiter walk-in lead)
+   * and PartnerCandidateForm never set this, so staff-entered submissions
+   * always go straight into the CRM regardless of the admin's Public Form
+   * Intake Mode setting. When set and the fetched mode is "email", submit
+   * posts to /api/public-intake/application (no CRM writes, straight to
+   * PUBLIC_FORMS_NOTIFY_EMAIL) instead of /api/applications.
+   */
+  useEmailIntakeIfConfigured?: boolean;
 }
 
 const emptyForm = {
@@ -80,12 +115,18 @@ const emptyForm = {
  * candidate on-behalf flow, since all three submit through the same
  * POST /api/applications.
  */
-export default function ApplicationForm({ candidateId, onSubmitted, compact, includePersonalInfo }: Props) {
+export default function ApplicationForm({ candidateId, onSubmitted, compact, includePersonalInfo, jobId, initialCountryName, initialSectorName, personalInfoSlot, onBeforeSubmit, useEmailIntakeIfConfigured }: Props) {
   const [countries, setCountries] = useState<Option[]>([]);
   const [locationCountries, setLocationCountries] = useState<Option[]>([]);
   const [sectors, setSectors] = useState<Option[]>([]);
   const [documentTypes, setDocumentTypes] = useState<DocumentTypeOption[]>([]);
   const [documentRequirements, setDocumentRequirements] = useState<{ country_id: string; document_type: string }[]>([]);
+  // Defaults "email" so that if useEmailIntakeIfConfigured is set and
+  // someone somehow submits before /api/apply/options resolves, the safe
+  // failure mode is "email PUBLIC_FORMS_NOTIFY_EMAIL", not "silently write
+  // into a CRM the business hasn't signed off on yet" — same fail-safe
+  // reasoning as that route's own server-side default.
+  const [intakeMode, setIntakeMode] = useState<"email" | "crm">("email");
   const [form, setForm] = useState(emptyForm);
   const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [message, setMessage] = useState("");
@@ -100,9 +141,30 @@ export default function ApplicationForm({ candidateId, onSubmitted, compact, inc
         setSectors(res.sectors ?? []);
         setDocumentTypes(res.documentTypes ?? []);
         setDocumentRequirements(res.documentRequirements ?? []);
+        setIntakeMode(res.intakeMode === "email" ? "email" : "crm");
       })
       .catch(() => {});
   }, []);
+
+  // Preselect the opportunity's country/sector once the real options have
+  // loaded — name-matched rather than passing IDs directly, since the
+  // caller (a /jobs page) only knows the Job's plain-text country/category
+  // strings, not Country/Sector row IDs.
+  useEffect(() => {
+    if (!initialCountryName && !initialSectorName) return;
+    setForm((f) => {
+      const next = { ...f };
+      if (initialCountryName && !f.preferred_country_1_id) {
+        const match = countries.find((c) => c.name.toLowerCase() === initialCountryName.toLowerCase());
+        if (match) next.preferred_country_1_id = match.id;
+      }
+      if (initialSectorName && !f.preferred_sector_id) {
+        const match = sectors.find((s) => s.name.toLowerCase() === initialSectorName.toLowerCase());
+        if (match) next.preferred_sector_id = match.id;
+      }
+      return next;
+    });
+  }, [countries, sectors, initialCountryName, initialSectorName]);
 
   // Section 3's checklist — a self-reported "can you provide this?" at
   // submission time, not the documents themselves (those are uploaded
@@ -140,12 +202,23 @@ export default function ApplicationForm({ candidateId, onSubmitted, compact, inc
     setMessage("");
     setFieldErrors({});
 
-    const res = await fetch("/api/applications", {
+    if (onBeforeSubmit) {
+      const ok = await onBeforeSubmit();
+      if (!ok) {
+        setStatus("error");
+        setMessage("Failed to save your personal information. Please check Section 2 and try again.");
+        return;
+      }
+    }
+
+    const useEmailIntake = useEmailIntakeIfConfigured && intakeMode === "email";
+    const res = await fetch(useEmailIntake ? "/api/public-intake/application" : "/api/applications", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         ...form,
         candidate_id: candidateId,
+        job_id: jobId,
         preferred_country_2_id: form.preferred_country_2_id || undefined,
         preferred_country_3_id: form.preferred_country_3_id || undefined,
         preferred_contact_channel: form.preferred_contact_channel || undefined,
@@ -244,6 +317,13 @@ export default function ApplicationForm({ candidateId, onSubmitted, compact, inc
           />
         </div>
       </section>
+
+      {personalInfoSlot && (
+        <section className="border-t border-slate-200 pt-5">
+          <h2 className="font-bold text-slate-800 mb-4">Section 2 — Your Personal Information</h2>
+          {personalInfoSlot}
+        </section>
+      )}
 
       {includePersonalInfo && (
         <section className="border-t border-slate-200 pt-5">

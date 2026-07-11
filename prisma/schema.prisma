@@ -412,6 +412,18 @@ model Job {
   created_at      DateTime  @default(now())
   updated_at      DateTime  @updatedAt
 
+  // Vertex's own work-permit programme pricing (Service & Pricing List),
+  // one row per opportunity — deliberately NOT keyed by country, since a
+  // single country (e.g. Czech Republic) can have several programmes at
+  // different price points. Every programme follows the same fixed 20% /
+  // 40% / 40% (documentation / permit / visa) split of service_fee_gbp, so
+  // only the total is stored; the stage amounts are derived on render.
+  visa_type          String?
+  duration_permit    String?
+  processing_time    String?
+  service_fee_gbp    Float?
+  visa_success_rates String? @db.Text
+
   // Which employer/client this vacancy is actually for (SRS FR-5.2) —
   // optional since not every posting is linked to an on-file client yet.
   employer_client_id String?

@@ -21,7 +21,11 @@ export async function PUT(req: NextRequest) {
   if (user!.role !== "admin") return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
 
   const body = await req.json();
-  const validKeys = ["ai_enabled", "whatsapp_number"];
+  const validKeys = ["ai_enabled", "whatsapp_number", "intake_mode"];
+
+  if (body.intake_mode !== undefined && !["email", "crm"].includes(body.intake_mode)) {
+    return NextResponse.json({ error: "intake_mode must be 'email' or 'crm'" }, { status: 400 });
+  }
 
   try {
     const upserts = Object.entries(body)

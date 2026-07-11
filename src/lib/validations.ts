@@ -47,11 +47,21 @@ export const createJobSchema = z.object({
   title: z.string().min(3).max(150),
   country: z.string().min(2).max(100),
   city: z.string().min(2).max(100),
+  category: z.string().optional(),
   salary_range: z.string().optional(),
   job_description: z.string().min(50, "Job description must be at least 50 characters"),
   requirements: z.string().min(20, "Requirements must be at least 20 characters"),
   status: z.enum(["active", "closed", "draft"]).default("active"),
   employer_client_id: z.string().cuid().optional(),
+  // Work-permit programme / pricing fields (Service & Pricing List) — all
+  // optional since a plain employer job posting (SRS FR-5.2) has none of
+  // these. service_fee_gbp is the total; the 20/40/40 stage split is
+  // derived at render time, not stored (see prisma/seed.ts).
+  visa_type: z.string().optional(),
+  duration_permit: z.string().optional(),
+  processing_time: z.string().optional(),
+  service_fee_gbp: z.number().positive().optional(),
+  visa_success_rates: z.string().optional(),
 });
 
 // Applications — the Candidate Information Form: the first thing a
@@ -457,6 +467,16 @@ export const updateEmployerClientSchema = z.object({
   contact_phone: z.string().min(3).max(30).optional(),
   status: z.enum(["active", "inactive"]).optional(),
   notes: z.string().max(2000).nullish(),
+});
+
+// Public contact form (/contact) — always emails PUBLIC_FORMS_NOTIFY_EMAIL
+// regardless of the intake_mode setting; there's no CRM-side equivalent of
+// a general enquiry to gate.
+export const contactMessageSchema = z.object({
+  name: z.string().min(2, "Name is required").max(150),
+  email: z.string().email("A valid email is required"),
+  subject: z.string().min(2, "Subject is required").max(200),
+  message: z.string().min(10, "Message is required").max(5000),
 });
 
 export type RegisterInput = z.infer<typeof registerSchema>;

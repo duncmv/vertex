@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import type { Prisma, CandidateLifecycleStatus, CampaignMetric, CampaignTarget } from "@prisma/client";
+import type { Prisma, CandidateLifecycleStatus, CampaignMetric, CampaignTarget, RecruiterTarget } from "@prisma/client";
 
 export interface KpiFilters {
   countryId?: string;
@@ -212,6 +212,60 @@ export async function computeTargetsVsActuals(campaignId: string, filters: Pick<
         countryId: target.country_id,
         regionId: target.region_id,
         targetValue: target.target_value,
+        actualValue,
+      };
+    })
+  );
+}
+
+export interface RecruiterTargetVsActual {
+  recruiterTargetId: string;
+  metric: CampaignMetric;
+  campaignName: string;
+  targetValue: number;
+  actualValue: number;
+}
+
+/**
+ * A recruiter's personal target-vs-actual for a given report period —
+ * "actual" is measured over the report's own date range (not the parent
+ * campaign's full duration), same recruiterId-scoped KPI functions
+ * already used elsewhere, just narrowed to one recruiter's allocations.
+ */
+export async function computeRecruiterTargetsVsActuals(
+  recruiterId: string,
+  filters: Pick<KpiFilters, "periodStart" | "periodEnd">
+): Promise<RecruiterTargetVsActual[]> {
+  const targets = await prisma.recruiterTarget.findMany({
+    where: { recruiter_id: recruiterId },
+    include: { campaign_target: { include: { campaign: { select: { name: true } } } } },
+  });
+
+  return Promise.all(
+    targets.map(async (rt: RecruiterTarget & { campaign_target: CampaignTarget & { campaign: { name: string } } }) => {
+      const scoped: KpiFilters = { ...filters, recruiterId };
+
+      let actualValue: number;
+      switch (rt.campaign_target.metric) {
+        case "agent_signups":
+          actualValue = await computeAgentSignups(scoped);
+          break;
+        case "conversion_rate":
+          actualValue = (await computeConversionRates(scoped)).overall;
+          break;
+        case "applicant_flow":
+        default: {
+          const flow = await computeApplicantFlow(scoped);
+          actualValue = Object.values(flow).reduce((a, b) => a + b, 0);
+          break;
+        }
+      }
+
+      return {
+        recruiterTargetId: rt.id,
+        metric: rt.campaign_target.metric,
+        campaignName: rt.campaign_target.campaign.name,
+        targetValue: rt.target_value,
         actualValue,
       };
     })

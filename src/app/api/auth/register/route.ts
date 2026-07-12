@@ -7,6 +7,53 @@ import { registerSchema } from "@/lib/validations";
 import { rateLimit } from "@/lib/rate-limit";
 import { verifyCandidateInviteToken } from "@/lib/jwt";
 
+// GET /api/auth/register?invite=<token> — lets the register page prefill
+// itself from the Candidate Information Form data already on file, so a
+// screened candidate only has to set a password rather than retype
+// everything a recruiter/the candidate themself already submitted.
+// Public (no session yet) — the invite token itself is the credential.
+export async function GET(req: NextRequest) {
+  const token = req.nextUrl.searchParams.get("invite");
+  if (!token) {
+    return NextResponse.json({ error: "Missing invite token." }, { status: 400 });
+  }
+
+  let candidateId: string;
+  try {
+    ({ candidateId } = verifyCandidateInviteToken(token));
+  } catch {
+    return NextResponse.json({ error: "This invite link is invalid or has expired." }, { status: 400 });
+  }
+
+  const candidate = await prisma.candidate.findUnique({
+    where: { id: candidateId },
+    select: {
+      user_id: true,
+      full_name: true,
+      email: true,
+      phone: true,
+      applications: {
+        orderBy: { submitted_at: "desc" },
+        take: 1,
+        select: { current_location_country: { select: { name: true } } },
+      },
+    },
+  });
+
+  if (!candidate || candidate.user_id) {
+    return NextResponse.json({ error: "This invite has already been used or is no longer valid." }, { status: 410 });
+  }
+
+  return NextResponse.json({
+    data: {
+      full_name: candidate.full_name ?? "",
+      email: candidate.email ?? "",
+      phone: candidate.phone ?? "",
+      country: candidate.applications[0]?.current_location_country?.name ?? "",
+    },
+  });
+}
+
 export async function POST(req: NextRequest) {
   // Rate limit: 5 registrations per minute per IP
   const ip = req.headers.get("x-forwarded-for") ?? "unknown";

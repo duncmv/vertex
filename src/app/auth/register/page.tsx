@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { EnvelopeSimple } from "@phosphor-icons/react";
@@ -35,6 +35,31 @@ function RegisterForm() {
   const [errors, setErrors] = useState<Record<string, string[]>>({});
   const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [message, setMessage] = useState("");
+
+  // When arriving via a screening invite, the Candidate Information Form
+  // already has this person's details on file — pull them in so all
+  // that's left to do is set a password, instead of retyping everything.
+  // "checking" -> "prefilled" (streamlined view) or "unavailable" (invite
+  // expired/already used — falls back to the normal full form below).
+  const [inviteState, setInviteState] = useState<"checking" | "prefilled" | "unavailable" | "none">(invite ? "checking" : "none");
+
+  useEffect(() => {
+    if (!invite) return;
+    fetch(`/api/auth/register?invite=${encodeURIComponent(invite)}`)
+      .then(async (res) => {
+        if (!res.ok) throw new Error();
+        const body = await res.json();
+        setForm((prev) => ({
+          ...prev,
+          full_name: body.data.full_name,
+          email: body.data.email,
+          phone: body.data.phone,
+          country: body.data.country,
+        }));
+        setInviteState("prefilled");
+      })
+      .catch(() => setInviteState("unavailable"));
+  }, [invite]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
@@ -109,45 +134,69 @@ function RegisterForm() {
               <p className="text-midnight-900/55 font-light mb-6">{message}</p>
               <Link href="/auth/login" className="btn-primary">Go to Login</Link>
             </div>
+          ) : inviteState === "checking" ? (
+            <div className="py-10 text-center text-midnight-900/40 text-sm">Loading your details…</div>
           ) : (
             <div className="space-y-5">
-              {/* Google Button */}
-              <GoogleButton />
+              {inviteState === "unavailable" && (
+                <div className="bg-amber-50 border border-amber-200 text-amber-800 rounded-lg px-4 py-3 text-sm">
+                  This invite link has expired or has already been used. You can still create an account below.
+                </div>
+              )}
 
-              {/* Divider */}
-              <div className="flex items-center gap-3">
-                <div className="flex-1 h-px bg-midnight-900/10" />
-                <span className="text-xs font-medium text-midnight-900/35 uppercase tracking-wider">or register with email</span>
-                <div className="flex-1 h-px bg-midnight-900/10" />
-              </div>
+              {inviteState !== "prefilled" && (
+                <>
+                  {/* Google Button */}
+                  <GoogleButton />
+
+                  {/* Divider */}
+                  <div className="flex items-center gap-3">
+                    <div className="flex-1 h-px bg-midnight-900/10" />
+                    <span className="text-xs font-medium text-midnight-900/35 uppercase tracking-wider">or register with email</span>
+                    <div className="flex-1 h-px bg-midnight-900/10" />
+                  </div>
+                </>
+              )}
 
               <form onSubmit={handleSubmit} className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-midnight-900/70 mb-1.5">Full Name *</label>
-                  <input id="reg-fullname" name="full_name" value={form.full_name} onChange={handleChange} required className="input-field" placeholder="John Doe" />
-                  {errors.full_name && <p className="text-red-500 text-xs mt-1">{errors.full_name[0]}</p>}
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-midnight-900/70 mb-1.5">Email Address *</label>
-                  <input id="reg-email" name="email" type="email" value={form.email} onChange={handleChange} required className="input-field" placeholder="john@example.com" />
-                  {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email[0]}</p>}
-                </div>
-                <div className="grid sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-midnight-900/70 mb-1.5">Phone</label>
-                    <input id="reg-phone" name="phone" value={form.phone} onChange={handleChange} className="input-field" placeholder="+251 9..." />
+                {inviteState === "prefilled" ? (
+                  <div className="bg-ivory-100 rounded-lg p-4 space-y-1">
+                    <p className="text-xs font-semibold text-midnight-900/45 uppercase tracking-wider mb-2">Your details on file</p>
+                    <p className="text-sm text-midnight-900"><span className="text-midnight-900/50">Name:</span> {form.full_name}</p>
+                    <p className="text-sm text-midnight-900"><span className="text-midnight-900/50">Email:</span> {form.email}</p>
+                    {form.phone && <p className="text-sm text-midnight-900"><span className="text-midnight-900/50">Phone:</span> {form.phone}</p>}
+                    {form.country && <p className="text-sm text-midnight-900"><span className="text-midnight-900/50">Country:</span> {form.country}</p>}
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-midnight-900/70 mb-1.5">Country</label>
-                    <SearchableSelect
-                      id="reg-country"
-                      value={form.country}
-                      onChange={(value) => { setForm((prev) => ({ ...prev, country: value })); setErrors((prev) => ({ ...prev, country: [] })); }}
-                      placeholder="Select country"
-                      options={COUNTRIES.map((c) => ({ value: c, label: c }))}
-                    />
-                  </div>
-                </div>
+                ) : (
+                  <>
+                    <div>
+                      <label className="block text-sm font-medium text-midnight-900/70 mb-1.5">Full Name *</label>
+                      <input id="reg-fullname" name="full_name" value={form.full_name} onChange={handleChange} required className="input-field" placeholder="John Doe" />
+                      {errors.full_name && <p className="text-red-500 text-xs mt-1">{errors.full_name[0]}</p>}
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-midnight-900/70 mb-1.5">Email Address *</label>
+                      <input id="reg-email" name="email" type="email" value={form.email} onChange={handleChange} required className="input-field" placeholder="john@example.com" />
+                      {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email[0]}</p>}
+                    </div>
+                    <div className="grid sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-midnight-900/70 mb-1.5">Phone</label>
+                        <input id="reg-phone" name="phone" value={form.phone} onChange={handleChange} className="input-field" placeholder="+251 9..." />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-midnight-900/70 mb-1.5">Country</label>
+                        <SearchableSelect
+                          id="reg-country"
+                          value={form.country}
+                          onChange={(value) => { setForm((prev) => ({ ...prev, country: value })); setErrors((prev) => ({ ...prev, country: [] })); }}
+                          placeholder="Select country"
+                          options={COUNTRIES.map((c) => ({ value: c, label: c }))}
+                        />
+                      </div>
+                    </div>
+                  </>
+                )}
                 <div>
                   <label className="block text-sm font-medium text-midnight-900/70 mb-1.5">Password *</label>
                   <PasswordInput id="reg-password" name="password" value={form.password} onChange={handleChange} required placeholder="Min 8 chars, 1 uppercase, 1 number" />
@@ -164,7 +213,7 @@ function RegisterForm() {
                 )}
 
                 <button type="submit" id="register-submit-btn" disabled={status === "loading"} className="btn-primary w-full py-3.5 text-base mt-2 disabled:opacity-60">
-                  {status === "loading" ? "Creating Account..." : "Create Account"}
+                  {status === "loading" ? "Creating Account..." : inviteState === "prefilled" ? "Set Password & Create Account" : "Create Account"}
                 </button>
 
                 <p className="text-center text-sm text-midnight-900/50 mt-4">

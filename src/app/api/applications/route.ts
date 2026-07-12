@@ -303,7 +303,7 @@ export async function POST(req: NextRequest) {
   if (recipientEmail && recipientName) {
     try {
       const { sendApplicationConfirmationEmail } = await import("@/lib/email");
-      await sendApplicationConfirmationEmail(recipientEmail, recipientName, job?.title ?? "your Vertex programme");
+      await sendApplicationConfirmationEmail(recipientEmail, recipientName, job?.title ?? "your Vertex programme", !!activeCandidate.user);
     } catch (err) {
       console.error("Failed to trigger confirmation email.", err);
     }

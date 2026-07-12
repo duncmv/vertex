@@ -168,14 +168,24 @@ export async function sendCandidateInviteEmail(candidateId: string, to: string, 
   await transporter.sendMail({ from: FROM, to, subject: config.subject, html: finalHtml });
 }
 
-export async function sendApplicationConfirmationEmail(to: string, name: string, jobTitle: string) {
+// hasAccount distinguishes a brand-new Candidate Information Form
+// submission (no account exists yet — accounts are only created later,
+// via the screening invite) from a re-submission by a candidate who
+// already registered. Only the latter has anywhere to sign in to, so
+// only it gets a dashboard link.
+export async function sendApplicationConfirmationEmail(to: string, name: string, jobTitle: string, hasAccount: boolean) {
   const defaultHtml = emailLayout({
     eyebrow: "Candidate Information Form",
     title: "Application received",
-    bodyHtml: `
+    bodyHtml: hasAccount
+      ? `
       ${p(`Hello {{name}}, thank you for applying for <strong>{{jobTitle}}</strong> through Vertex International Recruitment.`)}
       ${p("We've successfully received your application and documentation. Our team is reviewing it now — you can track its status at any time from your candidate dashboard.")}
       ${goldButton(`${APP_URL}/dashboard`, "View Dashboard")}
+    `
+      : `
+      ${p(`Hello {{name}}, thank you for applying for <strong>{{jobTitle}}</strong> through Vertex International Recruitment.`)}
+      ${p("We've successfully received your application. Your submission is now under review — there's nothing further for you to do at this stage. Once our team has reviewed your details, we'll be in touch by email with next steps.")}
     `,
   });
 

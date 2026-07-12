@@ -1,11 +1,10 @@
 "use client";
 export const dynamic = "force-dynamic";
 
-import { Suspense, useEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import ApplicationForm from "@/components/ApplicationForm";
-import CandidateProfileForm, { type CandidateProfileFormHandle } from "@/components/CandidateProfileForm";
 
 interface Profile {
   nationality?: string | null;
@@ -18,6 +17,10 @@ interface Profile {
   home_address?: string | null;
   whatsapp_number?: string | null;
   marital_status?: string | null;
+  // Authoritative full_name/email/phone live on the linked User once an
+  // account exists — prefilled into the CIF's Section 2 alongside the
+  // Candidate-only fields above, same fallback used elsewhere in the app.
+  user?: { full_name?: string | null; email?: string | null; phone?: string | null } | null;
 }
 
 interface OpportunityJob {
@@ -50,9 +53,6 @@ function ApplyPageInner() {
   // — resolved to its country/category so ApplicationForm can preselect
   // the matching Section 1 fields.
   const [opportunity, setOpportunity] = useState<OpportunityJob | null>(null);
-  // Lets ApplicationForm trigger Section 2's own save as part of one
-  // "Submit Application" click, rather than a separate mid-form button.
-  const profileFormRef = useRef<CandidateProfileFormHandle>(null);
 
   useEffect(() => {
     if (!jobId) return;
@@ -144,20 +144,27 @@ function ApplyPageInner() {
             ) : (
               <div className="card p-8">
                 <ApplicationForm
+                  includePersonalInfo
                   onSubmitted={() => fetch("/api/candidates/profile").then((r) => r.json()).then(setProfile)}
                   jobId={jobId}
                   initialCountryName={opportunity?.country}
                   initialSectorName={opportunity?.category ?? undefined}
                   useEmailIntakeIfConfigured
-                  onBeforeSubmit={() => profileFormRef.current?.save() ?? Promise.resolve(true)}
-                  personalInfoSlot={
-                    <CandidateProfileForm
-                      ref={profileFormRef}
-                      hideSaveButton
-                      initial={profile}
-                      onSaved={() => fetch("/api/candidates/profile").then((r) => r.json()).then(setProfile)}
-                    />
-                  }
+                  initialProfile={{
+                    full_name: profile.user?.full_name ?? undefined,
+                    email: profile.user?.email ?? undefined,
+                    phone: profile.user?.phone ?? undefined,
+                    nationality: profile.nationality ?? undefined,
+                    second_nationality: profile.second_nationality ?? undefined,
+                    date_of_birth: profile.date_of_birth?.slice(0, 10),
+                    passport_number: profile.passport_number ?? undefined,
+                    passport_expiry: profile.passport_expiry?.slice(0, 10),
+                    current_occupation: profile.current_occupation ?? undefined,
+                    highest_education: profile.highest_education ?? undefined,
+                    home_address: profile.home_address ?? undefined,
+                    whatsapp_number: profile.whatsapp_number ?? undefined,
+                    marital_status: profile.marital_status ?? undefined,
+                  }}
                 />
               </div>
             )}

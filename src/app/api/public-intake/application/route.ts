@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { submitApplicationSchema, newCandidatePersonalInfoSchema } from "@/lib/validations";
-import { getAuthUser } from "@/lib/api-auth";
 import { rateLimit } from "@/lib/rate-limit";
 import { sendPublicIntakeEmail, sendPublicIntakeConfirmationEmail } from "@/lib/email";
 
@@ -29,43 +28,23 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Validation failed", details: parsed.error.flatten().fieldErrors }, { status: 422 });
   }
 
-  // Identity: a signed-in candidate's details come from their own Candidate
-  // record (already on file), never from the request body. Anyone else
-  // (anonymous, or any non-candidate role landing on this public route)
-  // must supply Section 2 themselves, same as a brand-new CIF submission.
-  const user = await getAuthUser(req);
-  let fullName: string;
-  let email: string;
-  let phone: string | undefined;
-  let nationality: string | undefined;
-  let passportNumber: string | undefined;
-
-  if (user?.role === "candidate") {
-    // full_name/email/phone on Candidate itself are only authoritative
-    // pre-registration (user_id null) — once a User is linked, that
-    // record wins instead (same fallback used across the app, e.g.
-    // POST /api/applications' confirmation-email recipient lookup).
-    const candidate = await prisma.candidate.findUnique({ where: { user_id: user.userId }, include: { user: true } });
-    if (!candidate) return NextResponse.json({ error: "Candidate profile not found." }, { status: 404 });
-    fullName = candidate.user?.full_name ?? candidate.full_name ?? "";
-    email = candidate.user?.email ?? candidate.email ?? "";
-    phone = candidate.user?.phone ?? candidate.phone ?? undefined;
-    nationality = candidate.nationality ?? undefined;
-    passportNumber = candidate.passport_number ?? undefined;
-  } else {
-    const infoParsed = newCandidatePersonalInfoSchema.safeParse(parsed.data);
-    if (!infoParsed.success) {
-      return NextResponse.json(
-        { error: "Validation failed", details: infoParsed.error.flatten().fieldErrors },
-        { status: 422 }
-      );
-    }
-    fullName = infoParsed.data.full_name;
-    email = infoParsed.data.email;
-    phone = infoParsed.data.phone;
-    nationality = infoParsed.data.nationality;
-    passportNumber = infoParsed.data.passport_number;
+  // Section 2 always comes from the request body — the same fields a
+  // brand-new CIF submission collects — whether or not the submitter is
+  // signed in. This route never reads or writes the Candidate/User
+  // records at all (its entire point is zero CRM touches), so there's no
+  // "already on file" shortcut to take here.
+  const infoParsed = newCandidatePersonalInfoSchema.safeParse(parsed.data);
+  if (!infoParsed.success) {
+    return NextResponse.json(
+      { error: "Validation failed", details: infoParsed.error.flatten().fieldErrors },
+      { status: 422 }
+    );
   }
+  const fullName = infoParsed.data.full_name;
+  const email = infoParsed.data.email;
+  const phone = infoParsed.data.phone;
+  const nationality = infoParsed.data.nationality;
+  const passportNumber = infoParsed.data.passport_number;
 
   const [job, country1, country2, country3, sector, currentLocationCountry] = await Promise.all([
     parsed.data.job_id ? prisma.job.findUnique({ where: { id: parsed.data.job_id } }) : Promise.resolve(null),

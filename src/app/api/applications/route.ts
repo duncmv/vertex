@@ -113,8 +113,16 @@ export async function POST(req: NextRequest) {
     isNewCandidate = true;
   }
 
-  let newCandidateInfo: ReturnType<typeof newCandidatePersonalInfoSchema.parse> | null = null;
-  if (isNewCandidate) {
+  // The CIF collects Section 2 (personal info) every time it's a genuine
+  // public self-service submission — not just for a brand-new Candidate,
+  // but also a signed-in candidate completing/reviewing their own form.
+  // Treated as fresh submitted data folded into this one POST, not a
+  // separate PUT against an existing row beforehand (which is fragile
+  // exactly when there's nothing on file yet — the common case right
+  // after registering).
+  const needsPersonalInfo = isNewCandidate || (!!user && user.role === "candidate");
+  let personalInfo: ReturnType<typeof newCandidatePersonalInfoSchema.parse> | null = null;
+  if (needsPersonalInfo) {
     if (!user) {
       const ip = req.headers.get("x-forwarded-for") ?? "unknown";
       const rl = rateLimit(`applications-new:${ip}`, { max: 5, windowMs: 60_000 });
@@ -129,7 +137,7 @@ export async function POST(req: NextRequest) {
         { status: 422 }
       );
     }
-    newCandidateInfo = infoParsed.data;
+    personalInfo = infoParsed.data;
   }
 
   // A candidate already mid-pipeline shouldn't be able to submit a second,
@@ -193,7 +201,7 @@ export async function POST(req: NextRequest) {
 
   const db = auditedPrisma(user?.userId ?? null);
 
-  if (isNewCandidate && newCandidateInfo) {
+  if (isNewCandidate && personalInfo) {
     const isStaffSubmission = !!user && isStaffRole(user.role);
     // Only an actual Regional Recruiter self-assigns as the owner; any
     // other staff role (a supervisor stepping in, say) triggers the same
@@ -210,18 +218,18 @@ export async function POST(req: NextRequest) {
 
     candidate = await db.candidate.create({
       data: {
-        full_name: newCandidateInfo.full_name,
-        nationality: newCandidateInfo.nationality,
-        date_of_birth: new Date(newCandidateInfo.date_of_birth),
-        passport_number: newCandidateInfo.passport_number,
-        passport_expiry: new Date(newCandidateInfo.passport_expiry),
+        full_name: personalInfo.full_name,
+        nationality: personalInfo.nationality,
+        date_of_birth: new Date(personalInfo.date_of_birth),
+        passport_number: personalInfo.passport_number,
+        passport_expiry: new Date(personalInfo.passport_expiry),
         second_nationality: parsed.data.second_nationality,
         current_occupation: parsed.data.current_occupation,
         highest_education: parsed.data.highest_education,
         home_address: parsed.data.home_address,
-        phone: newCandidateInfo.phone,
+        phone: personalInfo.phone,
         whatsapp_number: parsed.data.whatsapp_number,
-        email: newCandidateInfo.email,
+        email: personalInfo.email,
         marital_status: parsed.data.marital_status,
         consent_given: true,
         consent_at: new Date(),
@@ -229,6 +237,31 @@ export async function POST(req: NextRequest) {
         recruiter_id: recruiterId,
         country_id: parsed.data.current_location_country_id,
         lifecycle_status: "identified",
+      },
+      include: { user: true, documents: { select: { type: true } } },
+    });
+  } else if (user?.role === "candidate" && personalInfo) {
+    // Signed-in candidate submitting the CIF for the first time (or
+    // reviewing/completing it) — the same Section 2 fields as a brand-new
+    // Candidate, folded into this one POST rather than a prerequisite PUT.
+    candidate = await db.candidate.update({
+      where: { id: candidate!.id },
+      data: {
+        full_name: personalInfo.full_name,
+        nationality: personalInfo.nationality,
+        date_of_birth: new Date(personalInfo.date_of_birth),
+        passport_number: personalInfo.passport_number,
+        passport_expiry: new Date(personalInfo.passport_expiry),
+        second_nationality: parsed.data.second_nationality,
+        current_occupation: parsed.data.current_occupation,
+        highest_education: parsed.data.highest_education,
+        home_address: parsed.data.home_address,
+        phone: personalInfo.phone,
+        whatsapp_number: parsed.data.whatsapp_number,
+        email: personalInfo.email,
+        marital_status: parsed.data.marital_status,
+        consent_given: true,
+        consent_at: new Date(),
       },
       include: { user: true, documents: { select: { type: true } } },
     });

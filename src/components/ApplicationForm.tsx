@@ -22,10 +22,14 @@ interface Props {
   /** Renders a compact layout for embedding inside a portal panel rather than the full public page. */
   compact?: boolean;
   /**
-   * Whether this submission creates a brand-new Candidate — true for an
-   * anonymous self-service submitter or a recruiter entering a walk-in
-   * lead, false when completing/resubmitting an existing candidate's form
-   * (personal info is already on file in that case).
+   * Whether to render Section 2 (Personal Information) and the Candidate
+   * Declaration inline — true for every genuine public self-service
+   * submitter (anonymous, or a signed-in candidate) and a recruiter
+   * entering a walk-in lead. False only for the narrower staff-on-behalf-
+   * of-an-existing-candidate flow (candidateId set), where personal info
+   * isn't collected by this form at all. Section 2's data is submitted as
+   * part of this same POST either way — see initialProfile for prefilling
+   * it from what's already on file.
    */
   includePersonalInfo?: boolean;
   /**
@@ -38,21 +42,29 @@ interface Props {
   initialCountryName?: string;
   initialSectorName?: string;
   /**
-   * Section 2 for a signed-in candidate completing/editing their on-file
-   * profile (CandidateProfileForm) — rendered here, between Section 1 and
-   * Section 3, so the form reads in the same 1-2-3-4-5 order as the source
-   * document. Mutually exclusive with includePersonalInfo, which instead
-   * renders Section 2 inline for a brand-new candidate with no profile yet.
+   * Pre-fills Section 2 for a signed-in candidate from whatever's already
+   * on file (registration details, or a prior partial save) — still
+   * editable, and still submitted as part of this same POST alongside
+   * Sections 1/3/4/5. The CIF treats every public self-service submitter
+   * as supplying fresh Section 2 data every time, whether or not they
+   * already have an account; there's no separate "update my profile"
+   * request involved.
    */
-  personalInfoSlot?: React.ReactNode;
-  /**
-   * Called before POST /api/applications fires — the caller's chance to
-   * persist personalInfoSlot's own data (a separate PUT, since Section 2
-   * lives on the Candidate record, not the Application) as part of one
-   * single "Submit Application" click rather than a second, separate save
-   * button. Submission is aborted if this resolves false.
-   */
-  onBeforeSubmit?: () => Promise<boolean>;
+  initialProfile?: Partial<{
+    full_name: string;
+    nationality: string;
+    date_of_birth: string;
+    passport_number: string;
+    passport_expiry: string;
+    second_nationality: string;
+    current_occupation: string;
+    highest_education: string;
+    home_address: string;
+    phone: string;
+    whatsapp_number: string;
+    email: string;
+    marital_status: string;
+  }>;
   /**
    * Only set by the public /apply page's two renders (signed-out and
    * signed-in-candidate) — RegisterCandidateForm (recruiter walk-in lead)
@@ -104,18 +116,22 @@ const emptyForm = {
 /**
  * The Candidate Information Form, in the same section order as the
  * original document (1, 2, 3, 4, 5, Declaration). Section 2 (Personal
- * Information) and the Candidate Declaration only render when this
- * submission is creating a brand-new Candidate — the form is the first
- * thing anyone fills in, before an account or documents exist, so there's
- * nothing "already on file" yet in that case. Section 3 only records
- * which documents the candidate can provide (checkboxes, self-reported)
- * — actually uploading them happens later, from the candidate's own
- * dashboard, once an account exists. Shared by the public /apply page,
- * the recruiter's new-lead entry point, and the narrower existing-
- * candidate on-behalf flow, since all three submit through the same
- * POST /api/applications.
+ * Information) and the Candidate Declaration render whenever this is a
+ * genuine public self-service submission (includePersonalInfo) — a signed-
+ * in candidate is treated the same as a brand-new one here: their Section
+ * 2 answers are submitted fresh as part of this one POST (pre-filled from
+ * initialProfile if anything's already on file), not fetched-then-PUT
+ * against an existing row beforehand, which is fragile exactly when
+ * there's nothing on file yet (right after registering, the common case).
+ * Section 3 only records which documents the candidate can provide
+ * (checkboxes, self-reported) — actually uploading them happens later,
+ * from the candidate's own dashboard, once an account exists. Shared by
+ * the public /apply page, the recruiter's new-lead entry point, and the
+ * narrower existing-candidate on-behalf flow, since all three submit
+ * through the same POST /api/applications (or, while the CRM isn't live
+ * yet for public traffic, POST /api/public-intake/application).
  */
-export default function ApplicationForm({ candidateId, onSubmitted, compact, includePersonalInfo, jobId, initialCountryName, initialSectorName, personalInfoSlot, onBeforeSubmit, useEmailIntakeIfConfigured }: Props) {
+export default function ApplicationForm({ candidateId, onSubmitted, compact, includePersonalInfo, jobId, initialCountryName, initialSectorName, initialProfile, useEmailIntakeIfConfigured }: Props) {
   const [countries, setCountries] = useState<Option[]>([]);
   const [locationCountries, setLocationCountries] = useState<Option[]>([]);
   const [sectors, setSectors] = useState<Option[]>([]);
@@ -127,7 +143,21 @@ export default function ApplicationForm({ candidateId, onSubmitted, compact, inc
   // into a CRM the business hasn't signed off on yet" — same fail-safe
   // reasoning as that route's own server-side default.
   const [intakeMode, setIntakeMode] = useState<"email" | "crm">("email");
-  const [form, setForm] = useState(emptyForm);
+  const [form, setForm] = useState(() => {
+    // A plain {...emptyForm, ...initialProfile} spread would overwrite a
+    // field with `undefined` whenever initialProfile has that key at all
+    // (e.g. { full_name: profile.user?.full_name ?? undefined } always
+    // has the key) — turning a controlled input's value from "" into
+    // undefined and triggering React's controlled/uncontrolled warning.
+    // Only fields with a real defined value should override emptyForm's "".
+    const merged = { ...emptyForm };
+    if (initialProfile) {
+      for (const [key, value] of Object.entries(initialProfile)) {
+        if (value !== undefined) (merged as Record<string, unknown>)[key] = value;
+      }
+    }
+    return merged;
+  });
   const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [message, setMessage] = useState("");
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({});
@@ -201,15 +231,6 @@ export default function ApplicationForm({ candidateId, onSubmitted, compact, inc
     setStatus("loading");
     setMessage("");
     setFieldErrors({});
-
-    if (onBeforeSubmit) {
-      const ok = await onBeforeSubmit();
-      if (!ok) {
-        setStatus("error");
-        setMessage("Failed to save your personal information. Please check Section 2 and try again.");
-        return;
-      }
-    }
 
     const useEmailIntake = useEmailIntakeIfConfigured && intakeMode === "email";
     const res = await fetch(useEmailIntake ? "/api/public-intake/application" : "/api/applications", {
@@ -317,13 +338,6 @@ export default function ApplicationForm({ candidateId, onSubmitted, compact, inc
           />
         </div>
       </section>
-
-      {personalInfoSlot && (
-        <section className="border-t border-slate-200 pt-5">
-          <h2 className="font-bold text-slate-800 mb-4">Section 2 — Your Personal Information</h2>
-          {personalInfoSlot}
-        </section>
-      )}
 
       {includePersonalInfo && (
         <section className="border-t border-slate-200 pt-5">

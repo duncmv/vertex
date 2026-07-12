@@ -26,35 +26,92 @@ async function getEmailConfig(event: string, defaultSubject: string, defaultHtml
   return { subject: defaultSubject, html: defaultHtml };
 }
 
+// --- Brand shell ------------------------------------------------------
+// Every email in the app renders through this — matches the site's own
+// midnight/gold/ivory palette (globals.css) rather than a generic
+// slate/blue template. Table-based structural bits (section headers,
+// field rows) instead of flexbox/grid, since Outlook desktop's Word
+// rendering engine doesn't support either; border-radius/box-shadow are
+// used freely since they degrade gracefully there (square corners, no
+// shadow) rather than breaking layout.
+const BRAND = {
+  midnight950: "#03120d",
+  midnight900: "#062119",
+  midnight800: "#0a3326",
+  midnight700: "#104f36",
+  ivory50: "#fbf9f4",
+  ivory100: "#f5f1e8",
+  gold300: "#e6cd85",
+  gold400: "#d4af5c",
+  gold600: "#a98634",
+};
+const FONT = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif";
+
+function emailLayout({ eyebrow, title, subtitle, bodyHtml }: { eyebrow?: string; title: string; subtitle?: string; bodyHtml: string }) {
+  return `
+  <div style="background:${BRAND.ivory100};padding:32px 16px;font-family:${FONT};">
+    <div style="max-width:600px;margin:0 auto;background:#ffffff;border-radius:16px;overflow:hidden;border:1px solid rgba(6,33,25,0.08);">
+      <div style="background:${BRAND.midnight950};padding:36px 40px 32px;">
+        <table role="presentation" style="border-collapse:collapse;">
+          <tr>
+            <td style="vertical-align:middle;padding-right:10px;">
+              <img src="${APP_URL}/vertex-logo.png" width="26" height="26" alt="" style="display:block;border-radius:6px;" />
+            </td>
+            <td style="vertical-align:middle;">
+              <span style="font-size:14px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:${BRAND.ivory50};">VERTEX <span style="color:${BRAND.gold400};">INTERNATIONAL</span></span>
+            </td>
+          </tr>
+        </table>
+        ${eyebrow ? `<div style="margin-top:24px;font-size:11px;font-weight:700;letter-spacing:0.25em;text-transform:uppercase;color:${BRAND.gold400};">${eyebrow}</div>` : ""}
+        <div style="margin-top:${eyebrow ? "10" : "24"}px;font-size:24px;font-weight:600;letter-spacing:-0.01em;color:${BRAND.ivory50};line-height:1.25;">${title}</div>
+        ${subtitle ? `<div style="margin-top:8px;font-size:14px;color:rgba(251,249,244,0.6);font-weight:300;">${subtitle}</div>` : ""}
+      </div>
+      <div style="padding:36px 40px;background:#ffffff;">
+        ${bodyHtml}
+      </div>
+      <div style="padding:24px 40px;background:${BRAND.ivory100};border-top:1px solid rgba(6,33,25,0.08);">
+        <div style="font-size:12px;color:rgba(6,33,25,0.55);line-height:1.6;">
+          Vertex International Recruitment Ltd.<br />5 Brayford Square, London, E1 0SG, United Kingdom
+        </div>
+        <div style="font-size:11px;color:rgba(6,33,25,0.4);margin-top:10px;">
+          © ${new Date().getFullYear()} Vertex International Recruitment. All rights reserved.
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function goldButton(href: string, label: string) {
+  return `<div style="text-align:center;margin:28px 0 8px;">
+    <a href="${href}" style="display:inline-block;background:${BRAND.gold400};color:${BRAND.midnight950};padding:14px 32px;border-radius:999px;text-decoration:none;font-weight:600;font-size:13px;letter-spacing:0.1em;text-transform:uppercase;">${label}</a>
+  </div>`;
+}
+
+function statPill(label: string, value: string, tone: "ivory" | "green" = "ivory") {
+  const bg = tone === "green" ? "#eef7f1" : BRAND.ivory100;
+  const valueColor = tone === "green" ? BRAND.midnight700 : BRAND.midnight950;
+  return `<div style="background:${bg};border-radius:10px;padding:18px;text-align:center;margin-bottom:24px;">
+    <div style="font-size:11px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:${BRAND.gold600};">${label}</div>
+    <div style="font-size:19px;font-weight:700;color:${valueColor};margin-top:6px;">${value}</div>
+  </div>`;
+}
+
+const p = (html: string) => `<p style="font-size:15px;color:${BRAND.midnight900};line-height:1.65;margin:0 0 20px;">${html}</p>`;
+const small = (html: string) => `<p style="font-size:13px;color:rgba(6,33,25,0.55);line-height:1.5;margin:0;">${html}</p>`;
+
 export async function sendVerificationEmail(userId: string, email: string, fullName: string) {
   const token = signEmailToken({ userId, email, type: "email_verification" });
   const verifyUrl = `${APP_URL}/auth/verify-email?token=${token}`;
 
-  const defaultHtml = `
-      <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;">
-        <div style="background:#1a365d;padding:24px;text-align:center;">
-          <h1 style="color:#fff;margin:0;font-size:24px;">Vertex International</h1>
-          <p style="color:#90cdf4;margin:4px 0 0;">Recruitment Platform</p>
-        </div>
-        <div style="padding:32px;background:#f7fafc;">
-          <h2 style="color:#1a365d;">Welcome, {{fullName}}!</h2>
-          <p style="color:#4a5568;line-height:1.6;">
-            Thank you for registering with Vertex International Recruitment.
-            Please verify your email address to activate your account.
-          </p>
-          <div style="text-align:center;margin:32px 0;">
-            <a href="{{verifyUrl}}"
-               style="background:#1a365d;color:#fff;padding:14px 32px;border-radius:6px;text-decoration:none;font-weight:bold;font-size:16px;">
-              Verify Email Address
-            </a>
-          </div>
-          <p style="color:#718096;font-size:14px;">This link expires in 24 hours. If you did not create an account, you can ignore this email.</p>
-        </div>
-        <div style="background:#edf2f7;padding:16px;text-align:center;">
-          <p style="color:#718096;font-size:12px;margin:0;">© ${new Date().getFullYear()} Vertex International Recruitment. All rights reserved.</p>
-        </div>
-      </div>
-  `;
+  const defaultHtml = emailLayout({
+    eyebrow: "Account Verification",
+    title: "Welcome, {{fullName}}.",
+    bodyHtml: `
+      ${p("Thank you for registering with Vertex International Recruitment. Please verify your email address to activate your account.")}
+      ${goldButton("{{verifyUrl}}", "Verify Email Address")}
+      ${small("This link expires in 24 hours. If you did not create an account, you can ignore this email.")}
+    `,
+  });
 
   const config = await getEmailConfig("welcome", "Verify your Vertex International account", defaultHtml);
   const finalHtml = config.html
@@ -68,24 +125,15 @@ export async function sendPasswordResetEmail(userId: string, email: string, full
   const token = signEmailToken({ userId, email, type: "password_reset" });
   const resetUrl = `${APP_URL}/auth/reset-password?token=${token}`;
 
-  const defaultHtml = `
-      <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;">
-        <div style="background:#1a365d;padding:24px;text-align:center;">
-          <h1 style="color:#fff;margin:0;font-size:24px;">Vertex International</h1>
-        </div>
-        <div style="padding:32px;background:#f7fafc;">
-          <h2 style="color:#1a365d;">Password Reset</h2>
-          <p style="color:#4a5568;">Hi {{fullName}}, click the button below to reset your password.</p>
-          <div style="text-align:center;margin:32px 0;">
-            <a href="{{resetUrl}}"
-               style="background:#c53030;color:#fff;padding:14px 32px;border-radius:6px;text-decoration:none;font-weight:bold;">
-              Reset Password
-            </a>
-          </div>
-          <p style="color:#718096;font-size:14px;">This link expires in 24 hours.</p>
-        </div>
-      </div>
-  `;
+  const defaultHtml = emailLayout({
+    eyebrow: "Account Security",
+    title: "Reset your password",
+    bodyHtml: `
+      ${p("Hi {{fullName}}, click the button below to reset your password.")}
+      ${goldButton("{{resetUrl}}", "Reset Password")}
+      ${small("This link expires in 24 hours. If you didn't request this, you can safely ignore this email.")}
+    `,
+  });
 
   const config = await getEmailConfig("reset_password", "Reset your Vertex International password", defaultHtml);
   const finalHtml = config.html
@@ -104,24 +152,15 @@ export async function sendCandidateInviteEmail(candidateId: string, to: string, 
   const token = signCandidateInviteToken(candidateId);
   const registerUrl = `${APP_URL}/auth/register?invite=${token}`;
 
-  const defaultHtml = `
-    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;">
-      <div style="background-color: #0f172a; padding: 24px; text-align: center;">
-        <h1 style="color: #ffffff; margin: 0; font-size: 24px;">You're a Step Closer</h1>
-      </div>
-      <div style="padding: 32px; background-color: #ffffff;">
-        <p style="font-size: 16px; color: #334155; margin-bottom: 24px;">Hello {{name}},</p>
-        <p style="font-size: 16px; color: #334155; margin-bottom: 24px;">
-          Your Vertex International recruiter has reviewed your details and confirmed you're ready for the next
-          step. Create your own free account to browse available positions and submit your application directly.
-        </p>
-        <div style="text-align: center; margin: 32px 0;">
-          <a href="${registerUrl}" style="background-color: #2563eb; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">Create My Account</a>
-        </div>
-        <p style="font-size: 13px; color: #94a3b8;">This link expires in 7 days. If you're not ready yet, your recruiter can still submit an application on your behalf.</p>
-      </div>
-    </div>
-  `;
+  const defaultHtml = emailLayout({
+    eyebrow: "Next Step",
+    title: "You're a step closer, {{name}}.",
+    bodyHtml: `
+      ${p("Your Vertex International recruiter has reviewed your details and confirmed you're ready for the next step. Create your own free account to browse available programmes and submit your application directly.")}
+      ${goldButton("{{registerUrl}}", "Create My Account")}
+      ${small("This link expires in 7 days. If you're not ready yet, your recruiter can still submit an application on your behalf.")}
+    `,
+  });
 
   const config = await getEmailConfig("candidate_invite", "You're ready to apply — create your Vertex account", defaultHtml);
   const finalHtml = config.html.replace(/\{\{name\}\}/g, name).replace(/\{\{registerUrl\}\}/g, registerUrl);
@@ -130,26 +169,15 @@ export async function sendCandidateInviteEmail(candidateId: string, to: string, 
 }
 
 export async function sendApplicationConfirmationEmail(to: string, name: string, jobTitle: string) {
-  const defaultHtml = `
-    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;">
-      <div style="background-color: #0f172a; padding: 24px; text-align: center;">
-        <h1 style="color: #ffffff; margin: 0; font-size: 24px;">Application Received</h1>
-      </div>
-      <div style="padding: 32px; background-color: #ffffff;">
-        <p style="font-size: 16px; color: #334155; margin-bottom: 24px;">Hello {{name}},</p>
-        <p style="font-size: 16px; color: #334155; margin-bottom: 24px;">
-          Thank you for applying for the <strong>{{jobTitle}}</strong> position through Vertex International Recruitment.
-        </p>
-        <p style="font-size: 16px; color: #334155; margin-bottom: 24px;">
-          We have successfully received your application, CV, and documentation. Our team is currently reviewing it.
-          You can track your application status at any time from your candidate dashboard.
-        </p>
-        <div style="text-align: center; margin: 32px 0;">
-          <a href="${process.env.NEXT_PUBLIC_APP_URL}/dashboard" style="background-color: #2563eb; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">View Dashboard</a>
-        </div>
-      </div>
-    </div>
-  `;
+  const defaultHtml = emailLayout({
+    eyebrow: "Candidate Information Form",
+    title: "Application received",
+    bodyHtml: `
+      ${p(`Hello {{name}}, thank you for applying for <strong>{{jobTitle}}</strong> through Vertex International Recruitment.`)}
+      ${p("We've successfully received your application and documentation. Our team is reviewing it now — you can track its status at any time from your candidate dashboard.")}
+      ${goldButton(`${APP_URL}/dashboard`, "View Dashboard")}
+    `,
+  });
 
   const config = await getEmailConfig("application_received", `Application Received: ${jobTitle}`, defaultHtml);
   const finalHtml = config.html
@@ -165,26 +193,15 @@ export async function sendApplicationConfirmationEmail(to: string, name: string,
 
 export async function sendStatusUpdateEmail(to: string, name: string, jobTitle: string, newStatus: string) {
   const friendlyStatus = newStatus.replace("_", " ").toUpperCase();
-  const defaultHtml = `
-    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;">
-      <div style="background-color: #0f172a; padding: 24px; text-align: center;">
-        <h1 style="color: #ffffff; margin: 0; font-size: 24px;">Application Update</h1>
-      </div>
-      <div style="padding: 32px; background-color: #ffffff;">
-        <p style="font-size: 16px; color: #334155; margin-bottom: 24px;">Hello {{name}},</p>
-        <p style="font-size: 16px; color: #334155; margin-bottom: 24px;">
-          There has been an update regarding your application for the <strong>{{jobTitle}}</strong> position.
-        </p>
-        <div style="background-color: #f1f5f9; padding: 16px; border-radius: 6px; text-align: center; margin-bottom: 24px;">
-          <span style="font-size: 14px; color: #64748b; text-transform: uppercase; font-weight: bold;">New Status</span>
-          <div style="font-size: 20px; color: #0f172a; font-weight: bold; margin-top: 4px;">{{friendlyStatus}}</div>
-        </div>
-        <div style="text-align: center; margin: 32px 0;">
-          <a href="${process.env.NEXT_PUBLIC_APP_URL}/dashboard" style="background-color: #2563eb; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">View Dashboard</a>
-        </div>
-      </div>
-    </div>
-  `;
+  const defaultHtml = emailLayout({
+    eyebrow: "Application Update",
+    title: "Your application has moved",
+    bodyHtml: `
+      ${p(`Hello {{name}}, there's an update on your application for <strong>{{jobTitle}}</strong>.`)}
+      ${statPill("New Status", "{{friendlyStatus}}")}
+      ${goldButton(`${APP_URL}/dashboard`, "View Dashboard")}
+    `,
+  });
 
   const config = await getEmailConfig("application_status", `Update on your application: ${jobTitle}`, defaultHtml);
   const finalHtml = config.html
@@ -200,30 +217,17 @@ export async function sendStatusUpdateEmail(to: string, name: string, jobTitle: 
 }
 
 export async function sendInterviewInvitationEmail(to: string, name: string, jobTitle: string, interviewDate: Date) {
-  const formattedDate = new Date(interviewDate).toLocaleString('en-US', { dateStyle: 'full', timeStyle: 'short' });
-  const defaultHtml = `
-    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;">
-      <div style="background-color: #0f172a; padding: 24px; text-align: center;">
-        <h1 style="color: #ffffff; margin: 0; font-size: 24px;">Interview Invitation</h1>
-      </div>
-      <div style="padding: 32px; background-color: #ffffff;">
-        <p style="font-size: 16px; color: #334155; margin-bottom: 24px;">Hello {{name}},</p>
-        <p style="font-size: 16px; color: #334155; margin-bottom: 24px;">
-          We are pleased to invite you to an interview for the <strong>{{jobTitle}}</strong> position.
-        </p>
-        <div style="background-color: #f0fdf4; border: 1px solid #bbf7d0; padding: 16px; border-radius: 6px; text-align: center; margin-bottom: 24px;">
-          <span style="font-size: 14px; color: #166534; text-transform: uppercase; font-weight: bold;">Scheduled For</span>
-          <div style="font-size: 20px; color: #14532d; font-weight: bold; margin-top: 4px;">{{formattedDate}}</div>
-        </div>
-        <p style="font-size: 16px; color: #334155; margin-bottom: 24px;">
-          Please log in to your dashboard for more details or reply to this email if you need to reschedule.
-        </p>
-        <div style="text-align: center; margin: 32px 0;">
-          <a href="${process.env.NEXT_PUBLIC_APP_URL}/dashboard" style="background-color: #2563eb; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">View Dashboard</a>
-        </div>
-      </div>
-    </div>
-  `;
+  const formattedDate = new Date(interviewDate).toLocaleString("en-US", { dateStyle: "full", timeStyle: "short" });
+  const defaultHtml = emailLayout({
+    eyebrow: "Interview Invitation",
+    title: "You're invited to interview",
+    bodyHtml: `
+      ${p(`Hello {{name}}, we're pleased to invite you to an interview for <strong>{{jobTitle}}</strong>.`)}
+      ${statPill("Scheduled For", "{{formattedDate}}", "green")}
+      ${p("Please log in to your dashboard for more details, or reply to this email if you need to reschedule.")}
+      ${goldButton(`${APP_URL}/dashboard`, "View Dashboard")}
+    `,
+  });
 
   const config = await getEmailConfig("interview_invitation", `Interview Invitation: ${jobTitle}`, defaultHtml);
   const finalHtml = config.html
@@ -242,26 +246,15 @@ export async function sendInterviewInvitationEmail(to: string, name: string, job
 // mobility-case stage change.
 export async function sendCaseStageUpdateEmail(to: string, name: string, jobTitle: string, newStage: string) {
   const friendlyStage = newStage.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
-  const defaultHtml = `
-    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;">
-      <div style="background-color: #03120d; padding: 24px; text-align: center;">
-        <h1 style="color: #ffffff; margin: 0; font-size: 24px;">Your Case Has Moved Forward</h1>
-      </div>
-      <div style="padding: 32px; background-color: #ffffff;">
-        <p style="font-size: 16px; color: #334155; margin-bottom: 24px;">Hello {{name}},</p>
-        <p style="font-size: 16px; color: #334155; margin-bottom: 24px;">
-          Your placement case for the <strong>{{jobTitle}}</strong> position has moved to a new stage.
-        </p>
-        <div style="background-color: #fbf9f4; padding: 16px; border-radius: 6px; text-align: center; margin-bottom: 24px;">
-          <span style="font-size: 14px; color: #64748b; text-transform: uppercase; font-weight: bold;">Current Stage</span>
-          <div style="font-size: 20px; color: #03120d; font-weight: bold; margin-top: 4px;">{{friendlyStage}}</div>
-        </div>
-        <div style="text-align: center; margin: 32px 0;">
-          <a href="${APP_URL}/dashboard" style="background-color: #d4af5c; color: #03120d; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">View Your Case</a>
-        </div>
-      </div>
-    </div>
-  `;
+  const defaultHtml = emailLayout({
+    eyebrow: "Case Update",
+    title: "Your case has moved forward",
+    bodyHtml: `
+      ${p(`Hello {{name}}, your placement case for <strong>{{jobTitle}}</strong> has moved to a new stage.`)}
+      ${statPill("Current Stage", "{{friendlyStage}}", "green")}
+      ${goldButton(`${APP_URL}/dashboard`, "View Your Case")}
+    `,
+  });
 
   const config = await getEmailConfig("case_stage_update", `Update on your placement: ${jobTitle}`, defaultHtml);
   const finalHtml = config.html
@@ -289,19 +282,14 @@ export async function sendPartnerCandidateSubmittedEmail(partnerName: string, ca
     return;
   }
 
-  const html = `
-    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;">
-      <div style="background-color: #0f172a; padding: 24px; text-align: center;">
-        <h1 style="color: #ffffff; margin: 0; font-size: 22px;">New Partner Candidate Submission</h1>
-      </div>
-      <div style="padding: 32px; background-color: #ffffff;">
-        <p style="font-size: 16px; color: #334155; margin-bottom: 16px;">
-          <strong>${partnerName}</strong> submitted a new candidate: <strong>${candidateName}</strong>.
-        </p>
-        <p style="font-size: 16px; color: #334155;">Review it in the admin candidates list.</p>
-      </div>
-    </div>
-  `;
+  const html = emailLayout({
+    eyebrow: "Partner Portal",
+    title: "New partner candidate submission",
+    bodyHtml: `
+      ${p(`<strong>${partnerName}</strong> submitted a new candidate: <strong>${candidateName}</strong>.`)}
+      ${small("Sign in to your Vertex portal to review it.")}
+    `,
+  });
 
   try {
     await transporter.sendMail({ from: FROM, to, subject: `New partner candidate: ${candidateName}`, html });
@@ -343,8 +331,48 @@ export interface PublicIntakeEmailData {
   coverLetter?: string;
 }
 
-const row = (label: string, value?: string | null) =>
-  value ? `<tr><td style="padding:6px 12px;color:#64748b;font-size:13px;white-space:nowrap;">${label}</td><td style="padding:6px 12px;color:#1e293b;font-size:13px;">${value}</td></tr>` : "";
+// Renders the CIF submission as an actual formatted document (numbered
+// sections matching the real form's own 1-5 structure) rather than a flat
+// notification table — this email *is* the record staff work from while
+// intake_mode is "email", so it should read like the document itself,
+// populated, not like an alert that one was filled in.
+function docSectionHeader(num: string, title: string) {
+  return `
+    <table role="presentation" style="border-collapse:collapse;margin-bottom:2px;">
+      <tr>
+        <td style="width:24px;vertical-align:middle;">
+          <div style="width:20px;height:20px;line-height:20px;text-align:center;font-size:11px;font-weight:700;color:${BRAND.ivory50};background:${BRAND.midnight950};border-radius:10px;">${num}</div>
+        </td>
+        <td style="vertical-align:middle;padding-left:8px;">
+          <span style="font-size:12px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:${BRAND.midnight900};">${title}</span>
+        </td>
+      </tr>
+    </table>
+    <div style="border-bottom:2px solid ${BRAND.gold400};margin:8px 0 14px;"></div>
+  `;
+}
+
+function docField(label: string, value?: string | null) {
+  if (!value) return "";
+  return `
+    <tr>
+      <td style="padding:7px 0;border-bottom:1px solid ${BRAND.ivory100};vertical-align:top;width:46%;">
+        <span style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;color:${BRAND.gold600};">${label}</span>
+      </td>
+      <td style="padding:7px 0;border-bottom:1px solid ${BRAND.ivory100};vertical-align:top;font-size:14px;color:${BRAND.midnight900};font-weight:500;">${value}</td>
+    </tr>
+  `;
+}
+
+function docSection(num: string, title: string, rowsHtml: string) {
+  if (!rowsHtml.trim()) return "";
+  return `
+    <div style="margin-bottom:26px;">
+      ${docSectionHeader(num, title)}
+      <table role="presentation" style="width:100%;border-collapse:collapse;">${rowsHtml}</table>
+    </div>
+  `;
+}
 
 export async function sendPublicIntakeEmail(data: PublicIntakeEmailData) {
   const to = process.env.PUBLIC_FORMS_NOTIFY_EMAIL;
@@ -357,57 +385,77 @@ export async function sendPublicIntakeEmail(data: PublicIntakeEmailData) {
     throw new Error("PUBLIC_FORMS_NOTIFY_EMAIL is not configured.");
   }
 
-  const html = `
-    <div style="font-family: Arial, sans-serif; max-width: 640px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;">
-      <div style="background-color: #0f172a; padding: 24px; text-align: center;">
-        <h1 style="color: #ffffff; margin: 0; font-size: 22px;">New Candidate Information Form Submission</h1>
-        <p style="color: #94a3b8; margin: 8px 0 0; font-size: 13px;">Emailed directly — the CRM intake pipeline isn't live yet (Admin Settings → Public Form Intake Mode).</p>
-      </div>
-      <div style="padding: 24px 8px; background-color: #ffffff;">
-        <table style="width: 100%; border-collapse: collapse;">
-          ${row("Applying for", data.jobTitle)}
-          ${row("Full name", data.fullName)}
-          ${row("Email", data.email)}
-          ${row("Phone", data.phone)}
-          ${row("Nationality", data.nationality)}
-          ${row("Passport number", data.passportNumber)}
-          ${row("Preferred country (1)", data.preferredCountry1)}
-          ${row("Preferred country (2)", data.preferredCountry2)}
-          ${row("Preferred country (3)", data.preferredCountry3)}
-          ${row("Preferred type of work", data.preferredSector)}
-          ${row("Earliest travel date", data.earliestTravelDate)}
-          ${row("Prior EU visa applied", data.priorEuVisaApplied)}
-          ${row("Documents available", data.documentsAvailable.join(", "))}
-          ${row("Current location", data.currentLocationCountry)}
-          ${row("Holds Schengen/EU visa", data.holdsSchengenVisa)}
-          ${row("Prior visa refusals", data.priorVisaRefusals)}
-          ${row("Available for embassy appointment", data.availableForEmbassyAppointment ? "Yes" : "No")}
-          ${row("Willing to start within 30 days", data.willingToStartWithin30Days ? "Yes" : "No")}
-          ${row("Preferred contact channel", data.preferredContactChannel)}
-          ${row("Additional notes", data.coverLetter)}
-        </table>
+  const documentsHtml = data.documentsAvailable.length
+    ? data.documentsAvailable.map((d) => `<div style="font-size:14px;color:${BRAND.midnight900};padding:3px 0;">✓ ${d}</div>`).join("")
+    : `<div style="font-size:13px;color:rgba(6,33,25,0.45);font-style:italic;">None selected</div>`;
+
+  const bodyHtml = `
+    <div style="background:${BRAND.ivory100};border-radius:10px;padding:14px 18px;margin-bottom:28px;">
+      <span style="font-size:12px;color:${BRAND.midnight900};">Emailed directly — the CRM intake pipeline isn't live yet
+      (Admin Settings → Public Form Intake Mode).</span>
+    </div>
+
+    ${docSection("1", "Programme Selection", `
+      ${docField("Applying for", data.jobTitle)}
+      ${docField("Preferred country — option 1", data.preferredCountry1)}
+      ${docField("Preferred country — option 2", data.preferredCountry2)}
+      ${docField("Preferred country — option 3", data.preferredCountry3)}
+      ${docField("Preferred type of work", data.preferredSector)}
+      ${docField("Earliest possible travel date", data.earliestTravelDate)}
+      ${docField("Previously applied for an EU visa?", data.priorEuVisaApplied)}
+    `)}
+
+    ${docSection("2", "Candidate Personal Information", `
+      ${docField("Full name", data.fullName)}
+      ${docField("Email address", data.email)}
+      ${docField("Phone number", data.phone)}
+      ${docField("Nationality", data.nationality)}
+      ${docField("Passport number", data.passportNumber)}
+    `)}
+
+    <div style="margin-bottom:26px;">
+      ${docSectionHeader("3", "Document Checklist")}
+      ${documentsHtml}
+    </div>
+
+    <div style="margin-bottom:26px;">
+      ${docSectionHeader("4", "Payment Plan Acknowledgement")}
+      <div style="display:inline-block;background:${BRAND.midnight800};color:${BRAND.gold300};font-size:12px;font-weight:600;padding:9px 18px;border-radius:999px;">
+        ✓ Payment plan acknowledged (20% documentation / 40% permit / 40% visa)
       </div>
     </div>
+
+    ${docSection("5", "Visa &amp; Travel Readiness", `
+      ${docField("Current location", data.currentLocationCountry)}
+      ${docField("Holds Schengen / EU visa?", data.holdsSchengenVisa)}
+      ${docField("Prior visa refusals", data.priorVisaRefusals)}
+      ${docField("Available for embassy appointment?", data.availableForEmbassyAppointment ? "Yes" : "No")}
+      ${docField("Willing to start within 30 days?", data.willingToStartWithin30Days ? "Yes" : "No")}
+      ${docField("Preferred contact channel", data.preferredContactChannel)}
+    `)}
+
+    ${data.coverLetter ? `<div style="margin-bottom:4px;">
+      ${docSectionHeader("—", "Additional Notes")}
+      <p style="font-size:14px;color:${BRAND.midnight900};line-height:1.6;white-space:pre-wrap;margin:0;">${data.coverLetter}</p>
+    </div>` : ""}
   `;
+
+  const html = emailLayout({
+    eyebrow: "Candidate Information Form",
+    title: data.fullName,
+    subtitle: "European Work Permit &amp; Visa Application" + (data.jobTitle ? ` · ${data.jobTitle}` : ""),
+    bodyHtml,
+  });
 
   await transporter.sendMail({ from: FROM, to, subject: `New CIF submission: ${data.fullName}${data.jobTitle ? ` — ${data.jobTitle}` : ""}`, html });
 }
 
 export async function sendPublicIntakeConfirmationEmail(to: string, fullName: string) {
-  const html = `
-    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-      <div style="background:#1a365d;padding:24px;text-align:center;">
-        <h1 style="color:#fff;margin:0;font-size:24px;">Vertex International</h1>
-      </div>
-      <div style="padding:32px;background:#f7fafc;">
-        <h2 style="color:#1a365d;">Thank you, ${fullName}.</h2>
-        <p style="color:#4a5568;line-height:1.6;">
-          We've received your Candidate Information Form. A member of our team will review it and
-          get in touch within 1–2 business days to confirm your programme and next steps.
-        </p>
-      </div>
-    </div>
-  `;
+  const html = emailLayout({
+    eyebrow: "Candidate Information Form",
+    title: `Thank you, ${fullName}.`,
+    bodyHtml: p("We've received your Candidate Information Form. A member of our team will review it and get in touch within 1–2 business days to confirm your programme and next steps."),
+  });
   await transporter.sendMail({ from: FROM, to, subject: "We've received your application — Vertex International", html });
 }
 
@@ -427,21 +475,15 @@ export async function sendContactMessageEmail(data: ContactMessageData) {
     throw new Error("PUBLIC_FORMS_NOTIFY_EMAIL is not configured.");
   }
 
-  const html = `
-    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;">
-      <div style="background-color: #0f172a; padding: 24px; text-align: center;">
-        <h1 style="color: #ffffff; margin: 0; font-size: 22px;">New Contact Form Message</h1>
-      </div>
-      <div style="padding: 32px; background-color: #ffffff;">
-        <table style="width: 100%; border-collapse: collapse; margin-bottom: 16px;">
-          ${row("From", `${data.name} &lt;${data.email}&gt;`)}
-          ${row("Subject", data.subject)}
-        </table>
-        <p style="font-size: 14px; color: #64748b; margin-bottom: 4px;">Message:</p>
-        <p style="font-size: 15px; color: #1e293b; white-space: pre-wrap; line-height: 1.6;">${data.message}</p>
-      </div>
-    </div>
-  `;
+  const html = emailLayout({
+    eyebrow: "Contact Form",
+    title: data.subject,
+    subtitle: `From ${data.name} · ${data.email}`,
+    bodyHtml: `
+      <p style="font-size:13px;color:rgba(6,33,25,0.5);margin:0 0 6px;text-transform:uppercase;letter-spacing:0.06em;font-weight:600;">Message</p>
+      <p style="font-size:15px;color:${BRAND.midnight900};white-space:pre-wrap;line-height:1.65;margin:0;">${data.message}</p>
+    `,
+  });
 
   await transporter.sendMail({ from: FROM, to, replyTo: data.email, subject: `[Contact] ${data.subject}`, html });
 }

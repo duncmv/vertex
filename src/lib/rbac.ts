@@ -11,7 +11,8 @@ export const PORTAL_ACCESS: Record<string, Role[]> = {
   "/dashboard": ["candidate"],
   "/recruiter": ["regional_recruiter", "admin"],
   "/supervisor": ["country_supervisor", "admin"],
-  "/management": ["inhouse_supervisor", "director", "admin"],
+  "/inhouse": ["inhouse_supervisor", "admin"],
+  "/management": ["director", "admin"],
   "/marketing": ["marketing", "admin"],
   "/partner": ["partner", "admin"],
   "/admin": ["admin"],
@@ -22,7 +23,7 @@ export const ROLE_HOME: Record<Role, string> = {
   candidate: "/dashboard",
   regional_recruiter: "/recruiter",
   country_supervisor: "/supervisor",
-  inhouse_supervisor: "/management",
+  inhouse_supervisor: "/inhouse",
   director: "/management",
   marketing: "/marketing/jobs",
   partner: "/partner",
@@ -62,7 +63,7 @@ export function homeFor(role: Role): string {
 // their own PortalShell chrome and should NOT also get the public marketing
 // Navbar/Footer/chat widgets. /dashboard is deliberately excluded — it's the
 // candidate's own page and was already designed around the public chrome.
-const INTERNAL_PORTAL_PREFIXES = ["/admin", "/recruiter", "/supervisor", "/management", "/marketing", "/partner"];
+const INTERNAL_PORTAL_PREFIXES = ["/admin", "/recruiter", "/supervisor", "/inhouse", "/management", "/marketing", "/partner"];
 
 export function isInternalPortalPath(pathname: string): boolean {
   return INTERNAL_PORTAL_PREFIXES.some((p) => pathname.startsWith(p));

@@ -4,12 +4,15 @@ import { auditedPrisma } from "@/lib/audit";
 import { updateFeePolicySchema } from "@/lib/validations";
 import { getAuthUser, requireRole } from "@/lib/api-auth";
 
-const FEE_POLICY_MANAGER_ROLES = ["inhouse_supervisor", "director", "admin"] as const;
+// Pricing now lives per-Job (the opportunities catalog's service_fee_gbp
+// etc.), not a separate country-level policy an In-House Supervisor
+// manages — confirmed with the business, In-House no longer edits this
+// (kept Director/admin-only). Still readable by every staff role below.
+const FEE_POLICY_MANAGER_ROLES = ["director", "admin"] as const;
 
 // GET /api/fee-policy — readable by any staff role (a recruiter recording
-// a payment needs to know whether it's enabled), editable by In-House
-// Supervisor/Director (admin retains override) — "sets policy & criteria"
-// is In-House's mandate (Regional Supervisory Operational Workflow p.3).
+// a payment needs to know whether it's enabled), editable by Director
+// (admin retains override) — see the FEE_POLICY_MANAGER_ROLES note above.
 export async function GET(req: NextRequest) {
   const user = await getAuthUser(req);
   const guardRes = requireRole(user, ["regional_recruiter", "country_supervisor", "inhouse_supervisor", "director", "admin"]);

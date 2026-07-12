@@ -5,7 +5,9 @@ import { getAuthUser, requireRole } from "@/lib/api-auth";
 import { updateCampaignSchema } from "@/lib/validations";
 
 const STAFF_ROLES = ["regional_recruiter", "country_supervisor", "inhouse_supervisor", "director", "admin"] as const;
-const CAMPAIGN_MANAGER_ROLES = ["inhouse_supervisor", "director", "admin"] as const;
+// Campaign-level authoring (not per-country targets) is Director/admin
+// only — see the matching comment in /api/campaigns/route.ts.
+const CAMPAIGN_MANAGER_ROLES = ["director", "admin"] as const;
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const user = await getAuthUser(req);

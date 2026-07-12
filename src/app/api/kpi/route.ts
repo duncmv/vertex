@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
 import { getAuthUser, requireRole } from "@/lib/api-auth";
 import { computeKpiSummary, computeTargetsVsActuals, computePartnerPerformance, type KpiFilters } from "@/server/services/kpi";
 
@@ -19,11 +20,22 @@ export async function GET(req: NextRequest) {
   const periodEnd = periodEndParam ? new Date(periodEndParam) : new Date();
   const periodStart = periodStartParam ? new Date(periodStartParam) : new Date(periodEnd.getTime() - 90 * 24 * 60 * 60 * 1000);
 
+  // In-House Supervisor is assigned to one specific country — their own
+  // assigned_country_id wins regardless of what a client passes, the same
+  // fail-closed posture as scope.ts. Director/admin remain unrestricted.
+  let countryId = searchParams.get("country_id") ?? undefined;
+  let regionId = searchParams.get("region_id") ?? undefined;
+  if (user!.role === "inhouse_supervisor") {
+    const supervisor = await prisma.user.findUnique({ where: { id: user!.userId }, select: { assigned_country_id: true } });
+    countryId = supervisor?.assigned_country_id ?? "__none__";
+    regionId = undefined;
+  }
+
   const filters: KpiFilters = {
     periodStart,
     periodEnd,
-    countryId: searchParams.get("country_id") ?? undefined,
-    regionId: searchParams.get("region_id") ?? undefined,
+    countryId,
+    regionId,
     recruiterId: searchParams.get("recruiter_id") ?? undefined,
   };
 

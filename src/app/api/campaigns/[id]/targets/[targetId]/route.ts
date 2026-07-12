@@ -16,6 +16,13 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     return NextResponse.json({ error: { code: "not_found", message: "Target not found." } }, { status: 404 });
   }
 
+  if (user!.role === "inhouse_supervisor") {
+    const supervisor = await prisma.user.findUnique({ where: { id: user!.userId }, select: { assigned_country_id: true } });
+    if (!supervisor?.assigned_country_id || target.country_id !== supervisor.assigned_country_id) {
+      return NextResponse.json({ error: { code: "forbidden", message: "You can only remove targets for your own assigned country." } }, { status: 403 });
+    }
+  }
+
   await prisma.campaignTarget.delete({ where: { id: targetId } });
   return NextResponse.json({ data: { id: targetId } });
 }

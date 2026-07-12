@@ -4,13 +4,15 @@ import { auditedPrisma } from "@/lib/audit";
 import { getAuthUser, requireRole } from "@/lib/api-auth";
 import { createEmployerClientSchema } from "@/lib/validations";
 
-const EMPLOYER_CLIENT_MANAGER_ROLES = ["inhouse_supervisor", "director", "admin"] as const;
+// In-House Supervisor no longer manages Employer Clients — confirmed with
+// the business, kept Director/admin-only.
+const EMPLOYER_CLIENT_MANAGER_ROLES = ["director", "admin"] as const;
 
 // GET /api/admin/employer-clients — readable by Marketing too (needs the
 // list to link a job posting to a client), not just management.
 export async function GET(req: NextRequest) {
   const user = await getAuthUser(req);
-  const guardRes = requireRole(user, ["marketing", "inhouse_supervisor", "director", "admin"]);
+  const guardRes = requireRole(user, ["marketing", "director", "admin"]);
   if (guardRes) return guardRes;
 
   const employerClients = await prisma.employerClient.findMany({

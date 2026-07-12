@@ -4,6 +4,7 @@ import { getAuthUser, requireRole } from "@/lib/api-auth";
 import { createCampaignTargetSchema } from "@/lib/validations";
 
 const CAMPAIGN_MANAGER_ROLES = ["inhouse_supervisor", "director", "admin"] as const;
+const CROSS_COUNTRY_ROLES = ["director", "admin"] as const;
 
 // POST /api/campaigns/:id/targets — cascades a numeric target to a
 // country, a region, or the whole campaign (SRS FR-3.3 "cascade them to
@@ -37,8 +38,23 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     );
   }
 
+  // In-House Supervisor is assigned to one specific country — can only set
+  // a target scoped to their own country, never a region or another
+  // country. Director/admin keep the full cross-country/region reach.
+  let targetData = parsed.data;
+  if (!CROSS_COUNTRY_ROLES.includes(user!.role as (typeof CROSS_COUNTRY_ROLES)[number])) {
+    const supervisor = await prisma.user.findUnique({ where: { id: user!.userId }, select: { assigned_country_id: true } });
+    if (!supervisor?.assigned_country_id) {
+      return NextResponse.json({ error: { code: "no_country", message: "You must be assigned a country first." } }, { status: 422 });
+    }
+    if ((parsed.data.country_id && parsed.data.country_id !== supervisor.assigned_country_id) || parsed.data.region_id) {
+      return NextResponse.json({ error: { code: "forbidden", message: "You can only set targets for your own assigned country." } }, { status: 403 });
+    }
+    targetData = { ...parsed.data, country_id: supervisor.assigned_country_id, region_id: undefined };
+  }
+
   const target = await prisma.campaignTarget.create({
-    data: { ...parsed.data, campaign_id: campaignId },
+    data: { ...targetData, campaign_id: campaignId },
     select: {
       id: true,
       metric: true,

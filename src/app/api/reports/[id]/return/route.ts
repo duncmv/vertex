@@ -48,6 +48,13 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     }
   }
 
+  if (report.scope_level === "country" && user!.role === "inhouse_supervisor") {
+    const supervisor = await prisma.user.findUnique({ where: { id: user!.userId }, select: { assigned_country_id: true } });
+    if (supervisor?.assigned_country_id !== report.country_id) {
+      return NextResponse.json({ error: { code: "forbidden", message: "This report is not in your assigned country." } }, { status: 403 });
+    }
+  }
+
   if (report.status !== "submitted") {
     return NextResponse.json({ error: { code: "invalid_transition", message: `A report in '${report.status}' status cannot be returned.` } }, { status: 422 });
   }

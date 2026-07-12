@@ -5,10 +5,13 @@ import { getAuthUser, requireRole } from "@/lib/api-auth";
 import { createCampaignSchema } from "@/lib/validations";
 
 const STAFF_ROLES = ["regional_recruiter", "country_supervisor", "inhouse_supervisor", "director", "admin"] as const;
-// SRS §2.2: "In-House Supervisor — sets criteria/targets, approves and
-// controls campaigns" — campaign set-up is their (and Director/admin's)
-// responsibility, not the recruiter/supervisor's.
-const CAMPAIGN_MANAGER_ROLES = ["inhouse_supervisor", "director", "admin"] as const;
+// SRS §2.2's "In-House Supervisor — sets criteria/targets" narrowed in
+// practice (confirmed with the business) to per-country *targets* only —
+// In-House is assigned to one specific country, so authoring a campaign
+// that can span every country/region is Director/admin's call. In-House
+// still sets/edits their own country's CampaignTarget rows (see
+// /api/campaigns/[id]/targets) and can still view every campaign (STAFF_ROLES below).
+const CAMPAIGN_MANAGER_ROLES = ["director", "admin"] as const;
 
 // GET /api/campaigns — every staff role can view (a recruiter needs to see
 // what campaign targets apply to their work), only management can create.

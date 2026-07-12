@@ -4,12 +4,12 @@ import { auditedPrisma } from "@/lib/audit";
 import { getAuthUser, requireRole } from "@/lib/api-auth";
 import { updateEmployerClientSchema } from "@/lib/validations";
 
-const EMPLOYER_CLIENT_MANAGER_ROLES = ["inhouse_supervisor", "director", "admin"] as const;
+const EMPLOYER_CLIENT_MANAGER_ROLES = ["director", "admin"] as const;
 
 // GET /api/admin/employer-clients/:id — detail, including its linked jobs.
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const user = await getAuthUser(req);
-  const guardRes = requireRole(user, ["marketing", "inhouse_supervisor", "director", "admin"]);
+  const guardRes = requireRole(user, ["marketing", "director", "admin"]);
   if (guardRes) return guardRes;
 
   const { id } = await params;

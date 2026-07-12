@@ -27,7 +27,19 @@ export async function scopeCandidatesToRequester(
         : { id: "__none__" };
     }
 
-    case "inhouse_supervisor":
+    // In-House Supervisor is assigned to one specific country, same as
+    // Country Supervisor — narrows their scope to it rather than treating
+    // them as a global overseer like director/admin.
+    case "inhouse_supervisor": {
+      const supervisor = await prisma.user.findUnique({
+        where: { id: user.userId },
+        select: { assigned_country_id: true },
+      });
+      return supervisor?.assigned_country_id
+        ? { country_id: supervisor.assigned_country_id }
+        : { id: "__none__" };
+    }
+
     case "director":
     case "admin":
       return {};
@@ -71,7 +83,15 @@ export async function canAccessCandidate(
       return supervisor?.assigned_country_id === candidate.country_id;
     }
 
-    case "inhouse_supervisor":
+    case "inhouse_supervisor": {
+      if (!candidate.country_id) return false;
+      const supervisor = await prisma.user.findUnique({
+        where: { id: user.userId },
+        select: { assigned_country_id: true },
+      });
+      return supervisor?.assigned_country_id === candidate.country_id;
+    }
+
     case "director":
     case "admin":
       return true;

@@ -40,8 +40,18 @@ export async function GET(req: NextRequest) {
       }
       break;
     }
+    // In-House Supervisor is assigned to one specific country (same as
+    // Country Supervisor) — sees that country's own recruiter-level
+    // reports (daily-submission visibility) and its country-level reports
+    // (the ones they're the controlling reviewer for), never other
+    // countries'.
+    case "inhouse_supervisor": {
+      const supervisor = await prisma.user.findUnique({ where: { id: user!.userId }, select: { assigned_country_id: true } });
+      where = supervisor?.assigned_country_id ? { country_id: supervisor.assigned_country_id } : { id: "__none__" };
+      break;
+    }
     default:
-      where = {}; // inhouse_supervisor, director, admin — unrestricted
+      where = {}; // director, admin — unrestricted
   }
 
   const reports = await prisma.report.findMany({

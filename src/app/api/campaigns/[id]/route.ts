@@ -5,9 +5,12 @@ import { getAuthUser, requireRole } from "@/lib/api-auth";
 import { updateCampaignSchema } from "@/lib/validations";
 
 const STAFF_ROLES = ["regional_recruiter", "country_supervisor", "inhouse_supervisor", "director", "admin"] as const;
-// Campaign-level authoring (not per-country targets) is Director/admin
-// only — see the matching comment in /api/campaigns/route.ts.
-const CAMPAIGN_MANAGER_ROLES = ["director", "admin"] as const;
+// See the matching comment in /api/campaigns/route.ts — In-House creates
+// campaigns for their own country. An In-House Supervisor may only edit/
+// delete a campaign they themselves created (checked below), not another
+// country's; Director/admin can touch any.
+const CAMPAIGN_MANAGER_ROLES = ["inhouse_supervisor", "director", "admin"] as const;
+const CROSS_CAMPAIGN_ROLES = ["director", "admin"] as const;
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const user = await getAuthUser(req);
@@ -70,6 +73,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     return NextResponse.json({ error: { code: "not_found", message: "Campaign not found." } }, { status: 404 });
   }
 
+  if (!CROSS_CAMPAIGN_ROLES.includes(user!.role as (typeof CROSS_CAMPAIGN_ROLES)[number]) && existing.created_by !== user!.userId) {
+    return NextResponse.json({ error: { code: "forbidden", message: "You can only edit campaigns you created." } }, { status: 403 });
+  }
+
   const { start_date, end_date, ...rest } = parsed.data;
 
   const updated = await auditedPrisma(user!.userId).campaign.update({
@@ -94,6 +101,10 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
   const existing = await prisma.campaign.findUnique({ where: { id } });
   if (!existing) {
     return NextResponse.json({ error: { code: "not_found", message: "Campaign not found." } }, { status: 404 });
+  }
+
+  if (!CROSS_CAMPAIGN_ROLES.includes(user!.role as (typeof CROSS_CAMPAIGN_ROLES)[number]) && existing.created_by !== user!.userId) {
+    return NextResponse.json({ error: { code: "forbidden", message: "You can only delete campaigns you created." } }, { status: 403 });
   }
 
   await auditedPrisma(user!.userId).campaign.delete({ where: { id } });

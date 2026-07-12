@@ -69,9 +69,12 @@ export default function PortalShell({ roleLabel, navItems, children }: PortalShe
 
   return (
     <div className="min-h-screen flex bg-ivory-50">
-      {/* Desktop sidebar */}
-      <aside className="hidden lg:flex flex-col w-64 shrink-0 bg-midnight-950 py-6">
-        <div className="px-6 mb-8 flex items-center gap-3">
+      {/* Desktop sidebar — pinned to the viewport height (not the page's,
+          which can grow taller than the screen), so the logout button at
+          the bottom never needs a page scroll to reach. Only the nav list
+          itself scrolls internally if it's ever too long to fit. */}
+      <aside className="hidden lg:flex flex-col w-64 shrink-0 bg-midnight-950 py-6 h-screen sticky top-0">
+        <div className="px-6 mb-8 flex items-center gap-3 shrink-0">
           <img src="/logo.svg" alt="Vertex" className="h-8 w-auto brightness-0 invert opacity-95" />
           <div className="flex flex-col justify-center">
             <span className="text-ivory-50 font-semibold text-sm leading-none tracking-[0.15em]">VERTEX</span>
@@ -81,9 +84,11 @@ export default function PortalShell({ roleLabel, navItems, children }: PortalShe
           </div>
         </div>
 
-        <NavList />
+        <div className="flex-1 overflow-y-auto">
+          <NavList />
+        </div>
 
-        <div className="mt-auto px-3 pt-6">
+        <div className="shrink-0 px-3 pt-6">
           <button
             onClick={handleLogout}
             className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-ivory-50/50 hover:text-ivory-50 hover:bg-white/5 transition-colors"

@@ -167,6 +167,7 @@ export default function RecruiterReportsPage() {
       } else if (form.type === "weekly") {
         content = {
           candidates: periodCandidates.map((c) => ({
+            id: c.id,
             name: c.user?.full_name ?? c.full_name ?? "— unnamed lead —",
             region: c.country?.region?.name ?? null,
             role: c.desired_role,

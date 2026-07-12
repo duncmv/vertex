@@ -20,6 +20,7 @@ export async function GET(req: NextRequest) {
   const countryId = searchParams.get("country_id") ?? undefined;
   const type = searchParams.get("type") ?? undefined;
   const status = searchParams.get("status") ?? undefined;
+  const recruiterId = searchParams.get("recruiter_id") ?? undefined;
 
   let where: Prisma.ReportWhereInput;
   switch (user!.role) {
@@ -61,6 +62,7 @@ export async function GET(req: NextRequest) {
         countryId ? { country_id: countryId } : {},
         type ? { type: type as never } : {},
         status ? { status: status as never } : {},
+        recruiterId ? { submitted_by: recruiterId } : {},
       ],
     },
     select: {

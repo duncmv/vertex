@@ -30,6 +30,21 @@ interface ReportRow {
   return_reason: string | null;
 }
 
+interface NoteRow {
+  id: string;
+  message: string;
+  created_at: string;
+  author: { full_name: string };
+}
+
+interface FeedItem {
+  id: string;
+  date: string;
+  text: string;
+  label: string;
+  kind: "return" | "note";
+}
+
 const METRIC_LABELS: Record<string, string> = {
   agent_signups: "Agent Sign-ups",
   applicant_flow: "Applicant Flow",
@@ -56,6 +71,7 @@ export default function RecruiterOverviewPage() {
   const [candidates, setCandidates] = useState<CandidateSummary[]>([]);
   const [targetProgress, setTargetProgress] = useState<TargetProgress[]>([]);
   const [reports, setReports] = useState<ReportRow[]>([]);
+  const [notes, setNotes] = useState<NoteRow[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -71,11 +87,13 @@ export default function RecruiterOverviewPage() {
       fetch("/api/candidates").then((r) => r.json()),
       fetch(`/api/recruiter-targets/progress?${params}`).then((r) => r.json()),
       fetch("/api/reports").then((r) => r.json()),
+      fetch("/api/recruiter-notes").then((r) => r.json()),
     ])
-      .then(([candidatesRes, progressRes, reportsRes]) => {
+      .then(([candidatesRes, progressRes, reportsRes, notesRes]) => {
         setCandidates(candidatesRes.data ?? []);
         setTargetProgress(progressRes.data ?? []);
         setReports(reportsRes.data ?? []);
+        setNotes(notesRes.data ?? []);
       })
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -95,10 +113,13 @@ export default function RecruiterOverviewPage() {
     };
   }, [candidates]);
 
-  const supervisorFeedback = useMemo(
-    () => reports.filter((r) => r.status === "returned" && r.return_reason).slice(0, 5),
-    [reports]
-  );
+  const supervisorFeedback = useMemo(() => {
+    const fromReturns: FeedItem[] = reports
+      .filter((r) => r.status === "returned" && r.return_reason)
+      .map((r) => ({ id: r.id, date: r.period_end, text: r.return_reason!, label: `${r.type} report returned`, kind: "return" as const }));
+    const fromNotes: FeedItem[] = notes.map((n) => ({ id: n.id, date: n.created_at, text: n.message, label: n.author.full_name, kind: "note" as const }));
+    return [...fromReturns, ...fromNotes].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 5);
+  }, [reports, notes]);
 
   const reportsDue = useMemo(() => {
     const now = new Date();
@@ -191,15 +212,15 @@ export default function RecruiterOverviewPage() {
               <ChatCircleText size={16} weight="bold" className="text-gold-600" /> From your country supervisor
             </h2>
             {supervisorFeedback.length === 0 ? (
-              <p className="text-sm text-midnight-900/40">No feedback on your reports right now.</p>
+              <p className="text-sm text-midnight-900/40">No feedback from your supervisor right now.</p>
             ) : (
               <div className="space-y-3">
-                {supervisorFeedback.map((r) => (
-                  <div key={r.id} className="text-sm border-b border-midnight-900/5 last:border-0 pb-3 last:pb-0">
+                {supervisorFeedback.map((item) => (
+                  <div key={item.id} className="text-sm border-b border-midnight-900/5 last:border-0 pb-3 last:pb-0">
                     <div className="text-xs text-midnight-900/45 uppercase tracking-wide mb-1">
-                      {r.type} report · {new Date(r.period_start).toLocaleDateString()} – {new Date(r.period_end).toLocaleDateString()}
+                      {item.label} · {new Date(item.date).toLocaleDateString()}
                     </div>
-                    <div className="text-red-600">{r.return_reason}</div>
+                    <div className={item.kind === "return" ? "text-red-600" : "text-midnight-900/80"}>{item.text}</div>
                   </div>
                 ))}
               </div>

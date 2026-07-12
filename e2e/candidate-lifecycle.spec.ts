@@ -148,10 +148,13 @@ test.describe("Candidate pre-application lifecycle (Phase 2)", () => {
       await login(page, "e2e-supervisor@test.local", PASSWORD);
       await expect(page).toHaveURL(/\/supervisor$/);
 
-      const candidateRow = page.locator("tr", { hasText: candidateName });
-      await expect(candidateRow).toBeVisible({ timeout: 25_000 });
-      await candidateRow.getByRole("button", { name: "Return" }).click();
-      await pickOption(page, candidateRow.getByRole("combobox"), "Return to Submitted");
+      await page.getByRole("link", { name: "Candidates", exact: true }).click();
+      await page.waitForURL(/\/supervisor\/candidates$/);
+      await page.getByRole("link", { name: candidateName }).click();
+      await page.waitForURL(/\/supervisor\/candidates\/.+/);
+
+      await page.getByRole("button", { name: "Return" }).click();
+      await pickOption(page, page.getByRole("combobox"), "Return to Submitted");
       await page.getByPlaceholder("Reason for return (required)…").fill("Please double-check the passport number.");
       await page.getByRole("button", { name: "Confirm Return" }).click();
 
@@ -170,6 +173,11 @@ test.describe("Candidate pre-application lifecycle (Phase 2)", () => {
 
       await logout(page);
       await login(page, "e2e-supervisor@test.local", PASSWORD);
+
+      await page.getByRole("link", { name: "Candidates", exact: true }).click();
+      await page.waitForURL(/\/supervisor\/candidates$/);
+      await page.getByRole("link", { name: candidateName }).click();
+      await page.waitForURL(/\/supervisor\/candidates\/.+/);
 
       await page.getByRole("button", { name: /Verify → Verified/ }).click();
       await expect(page.getByText("verified", { exact: true })).toBeVisible({ timeout: 25_000 });

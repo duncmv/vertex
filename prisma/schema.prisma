@@ -76,6 +76,8 @@ model User {
   partner_candidates_reviewed PartnerCandidate[] @relation("PartnerCandidateReviewer")
   recruiter_targets_received  RecruiterTarget[]  @relation("RecruiterTargetRecruiter")
   recruiter_targets_set       RecruiterTarget[]  @relation("RecruiterTargetSetter")
+  recruiter_notes_received    RecruiterNote[]    @relation("RecruiterNoteRecipient")
+  recruiter_notes_authored    RecruiterNote[]    @relation("RecruiterNoteAuthor")
 
   @@index([email])
   @@index([supervisor_id])
@@ -421,6 +423,23 @@ model RecruiterTarget {
   updated_at         DateTime       @updatedAt
 
   @@unique([campaign_target_id, recruiter_id])
+  @@index([recruiter_id])
+}
+
+// A Country Supervisor's one-way note to a specific recruiter under them
+// (the "communicate with that particular recruiter" capability) — kept
+// deliberately lightweight rather than a full messaging thread, since
+// report return_reason already carries per-report feedback; this is for
+// anything else a supervisor wants to flag outside a specific report.
+model RecruiterNote {
+  id           String   @id @default(cuid())
+  recruiter_id String
+  recruiter    User     @relation("RecruiterNoteRecipient", fields: [recruiter_id], references: [id], onDelete: Cascade)
+  author_id    String
+  author       User     @relation("RecruiterNoteAuthor", fields: [author_id], references: [id], onDelete: Cascade)
+  message      String   @db.Text
+  created_at   DateTime @default(now())
+
   @@index([recruiter_id])
 }
 

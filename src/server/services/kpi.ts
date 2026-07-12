@@ -218,6 +218,60 @@ export async function computeTargetsVsActuals(campaignId: string, filters: Pick<
   );
 }
 
+export interface CountryTargetVsActual {
+  campaignTargetId: string;
+  metric: CampaignMetric;
+  campaignName: string;
+  targetValue: number;
+  actualValue: number;
+}
+
+/**
+ * A country's own target-vs-actual (Country Supervisor Overview) — same
+ * shape as computeTargetsVsActuals but scoped directly to one country's
+ * active CampaignTargets rather than one campaign's full target set, since
+ * a country can sit under several concurrent campaigns.
+ */
+export async function computeCountryTargetsVsActuals(
+  countryId: string,
+  filters: Pick<KpiFilters, "periodStart" | "periodEnd">
+): Promise<CountryTargetVsActual[]> {
+  const targets = await prisma.campaignTarget.findMany({
+    where: { country_id: countryId, campaign: { status: "active" } },
+    include: { campaign: { select: { name: true } } },
+  });
+
+  return Promise.all(
+    targets.map(async (target: CampaignTarget & { campaign: { name: string } }) => {
+      const scoped: KpiFilters = { ...filters, countryId };
+
+      let actualValue: number;
+      switch (target.metric) {
+        case "agent_signups":
+          actualValue = await computeAgentSignups(scoped);
+          break;
+        case "conversion_rate":
+          actualValue = (await computeConversionRates(scoped)).overall;
+          break;
+        case "applicant_flow":
+        default: {
+          const flow = await computeApplicantFlow(scoped);
+          actualValue = Object.values(flow).reduce((a, b) => a + b, 0);
+          break;
+        }
+      }
+
+      return {
+        campaignTargetId: target.id,
+        metric: target.metric,
+        campaignName: target.campaign.name,
+        targetValue: target.target_value,
+        actualValue,
+      };
+    })
+  );
+}
+
 export interface RecruiterTargetVsActual {
   recruiterTargetId: string;
   metric: CampaignMetric;

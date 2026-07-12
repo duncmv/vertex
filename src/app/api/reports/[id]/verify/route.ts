@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { auditedPrisma } from "@/lib/audit";
 import { getAuthUser, requireRole } from "@/lib/api-auth";
 import { canReviewReport } from "@/server/services/reportWorkflow";
+import { maybeAutoConsolidate } from "@/server/services/reportConsolidation";
 
 const REVIEWER_ROLES = ["country_supervisor", "inhouse_supervisor", "director", "admin"] as const;
 
@@ -51,6 +52,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     data: { status: "verified", return_reason: null },
     select: { id: true, status: true },
   });
+
+  if (report.scope_level === "recruiter" && report.country_id) {
+    await maybeAutoConsolidate(report.country_id, report.type, report.period_start, report.period_end);
+  }
 
   return NextResponse.json({ data: updated });
 }

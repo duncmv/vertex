@@ -301,13 +301,22 @@ export const upsertRecruiterTargetSchema = z.object({
 // into a country report. `content` is free-form JSON since it snapshots
 // whatever the submitter reports at the time (candidate list, notes,
 // KPI summary) rather than a fixed schema.
-export const submitReportSchema = z.object({
-  type: z.enum(["daily", "weekly", "monthly"]),
-  period_start: z.string(),
-  period_end: z.string(),
-  content: z.record(z.string(), z.unknown()).default({}),
-  child_report_ids: z.array(z.string().cuid()).optional(),
-});
+export const submitReportSchema = z
+  .object({
+    type: z.enum(["daily", "weekly", "monthly"]),
+    period_start: z.string(),
+    period_end: z.string(),
+    content: z.record(z.string(), z.unknown()).default({}),
+    child_report_ids: z.array(z.string().cuid()).optional(),
+  })
+  .refine((data) => new Date(data.period_end) > new Date(data.period_start), {
+    message: "Period end must be after the period start.",
+    path: ["period_end"],
+  })
+  .refine((data) => new Date(data.period_end) <= new Date(), {
+    message: "A report can't cover a period that hasn't happened yet.",
+    path: ["period_end"],
+  });
 
 export const returnReportSchema = z.object({
   return_reason: z.string().min(5).max(1000),

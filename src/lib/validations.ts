@@ -303,6 +303,14 @@ export const upsertRecruiterTargetSchema = z.object({
   target_value: z.number().positive(),
 });
 
+// A Country Supervisor's one-way note to a specific recruiter (see
+// RecruiterNote in schema.prisma) — deliberately just a message string,
+// no subject/thread structure.
+export const createRecruiterNoteSchema = z.object({
+  recruiter_id: z.string().cuid(),
+  message: z.string().min(1).max(2000),
+});
+
 // Reporting cycle (SRS FR-3.4) — a recruiter submits daily/weekly reports;
 // a supervisor consolidates verified recruiter reports (child_report_ids)
 // into a country report. `content` is free-form JSON since it snapshots

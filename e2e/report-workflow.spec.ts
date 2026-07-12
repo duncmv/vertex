@@ -52,7 +52,7 @@ test.describe("Reporting cycle escalation (Phase 3)", () => {
       await page.getByRole("button", { name: "Verify" }).click();
       await expect(page.getByText("Nothing awaiting review.")).toBeVisible({ timeout: 25_000 });
 
-      await page.getByRole("button", { name: "Consolidate Report" }).click();
+      await page.getByRole("button", { name: "Consolidate manually" }).click();
       await page.locator('input[type="date"]').first().fill("2026-07-01");
       await page.locator('input[type="date"]').nth(1).fill("2026-07-08");
       await page.getByText(/E2E Recruiter/).click(); // checks the checkbox via its label

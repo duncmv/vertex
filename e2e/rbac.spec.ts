@@ -49,20 +49,14 @@ test.describe("Authenticated access (regression coverage for the middleware cryp
   });
 });
 
-test.describe("Candidate registration (Phase 1: real DB write, audited)", () => {
-  test("registers a new candidate end to end", async ({ page }) => {
-    const uniqueEmail = `e2e-${Date.now()}@test.local`;
-
+test.describe("Candidate registration is invite-only (no general sign-up)", () => {
+  test("visiting /auth/register without an invite token redirects to /apply", async ({ page }) => {
+    // Regression coverage: a candidate account only ever comes from a
+    // screening invite now (Candidate Information Form -> screened ->
+    // invite -> set password) — there's no blank sign-up form to land on
+    // anymore, so the only sensible thing for a bare /auth/register visit
+    // to do is send the visitor to the actual starting point.
     await page.goto("/auth/register");
-    await page.fill("#reg-fullname", "E2E Test Candidate");
-    await page.fill("#reg-email", uniqueEmail);
-    await page.fill("#reg-password", "TestPassword123!");
-    await page.fill("#reg-confirm-password", "TestPassword123!");
-
-    await page.click("#register-submit-btn");
-
-    await expect(page.getByRole("heading", { name: /check your email/i })).toBeVisible({
-      timeout: 10_000,
-    });
+    await expect(page).toHaveURL(/\/apply$/);
   });
 });

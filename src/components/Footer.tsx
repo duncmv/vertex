@@ -14,7 +14,7 @@ const FOOTER_LINKS = {
   "For Candidates": [
     { href: "/jobs", label: "Browse Jobs" },
     { href: "/apply", label: "Apply Now" },
-    { href: "/auth/register", label: "Create Account" },
+    { href: "/auth/login", label: "Log In" },
   ],
   Partners: [
     { href: "/contact", label: "Agencies & Manpower Suppliers" },

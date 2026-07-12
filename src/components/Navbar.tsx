@@ -158,7 +158,7 @@ export default function Navbar() {
               Log In
             </Link>
             <Link
-              href="/auth/register"
+              href="/apply"
               className="bg-gold-400 hover:bg-gold-300 text-midnight-950 font-semibold text-[12px] py-3 px-6 rounded-full transition-all uppercase tracking-[0.15em]"
             >
               Get Started
@@ -220,7 +220,7 @@ export default function Navbar() {
               <Link href="/auth/login" className="px-4 py-2.5 text-sm font-medium uppercase tracking-[0.15em] text-ivory-50/60">
                 Log In
               </Link>
-              <Link href="/auth/register" className="btn-gold text-sm mx-2 mt-1">
+              <Link href="/apply" className="btn-gold text-sm mx-2 mt-1">
                 Get Started
               </Link>
             </div>

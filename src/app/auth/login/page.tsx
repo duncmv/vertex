@@ -74,6 +74,8 @@ function LoginForm() {
   const googleErrorMsg =
     googleError === "google_cancelled"
       ? "Google sign-in was cancelled."
+      : googleError === "google_no_account"
+      ? "No Vertex account found for that Google email. New candidates get an account after their application is reviewed — submit an application to get started."
       : googleError
       ? "Google sign-in failed. Please try again."
       : null;
@@ -115,8 +117,8 @@ function LoginForm() {
         </button>
 
         <p className="text-center text-sm text-midnight-900/50 mt-4">
-          Don&apos;t have an account?{" "}
-          <Link href="/auth/register" className="text-gold-600 font-semibold hover:underline">Create Account</Link>
+          Don&apos;t have an account yet?{" "}
+          <Link href="/apply" className="text-gold-600 font-semibold hover:underline">Submit an Application</Link>
         </p>
       </form>
     </div>

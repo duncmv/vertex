@@ -241,7 +241,7 @@ export default function AboutPage() {
             pursue opportunities abroad — start with Vertex.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link href="/auth/register" className="btn-gold px-9 py-4">
+            <Link href="/apply" className="btn-gold px-9 py-4">
               Apply Now
             </Link>
             <Link href="/contact" className="btn-ghost-dark px-9 py-4">

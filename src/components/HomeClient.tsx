@@ -654,7 +654,7 @@ export default function HomeClient({ jobs }: { jobs: any[] }) {
               to pursue opportunities abroad — Vertex provides the institutional platform to move forward.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Link href="/auth/register" className="btn-gold px-8 py-3.5">
+              <Link href="/apply" className="btn-gold px-8 py-3.5">
                 Apply Now
               </Link>
               <Link href="/contact" className="btn-ghost-dark px-8 py-3.5">

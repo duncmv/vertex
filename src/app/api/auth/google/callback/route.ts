@@ -67,7 +67,11 @@ export async function GET(req: NextRequest) {
     return NextResponse.redirect(`${appUrl}/auth/login?error=google_no_email`);
   }
 
-  // 3. Find or create user in DB
+  // 3. Find the existing user — never create one here. A candidate
+  // account only ever comes into being via the screening invite (Candidate
+  // Information Form -> screened -> invite -> set password), so Google
+  // sign-in is login-only: it must match an account that already exists,
+  // the same way email/password login can't conjure one up either.
   let user = await prisma.user.findFirst({
     where: {
       OR: [
@@ -78,18 +82,12 @@ export async function GET(req: NextRequest) {
   });
 
   if (!user) {
-    // New user — create account (no password needed)
-    user = await prisma.user.create({
-      data: {
-        full_name: googleUser.name,
-        email: googleUser.email,
-        google_id: googleUser.sub,
-        email_verified: true, // Google already verified their email
-        role: "candidate",
-      },
-    });
-  } else if (!user.google_id) {
-    // Existing email-registered user — link their Google account
+    return NextResponse.redirect(`${appUrl}/auth/login?error=google_no_account`);
+  }
+
+  if (!user.google_id) {
+    // Existing email-registered user signing in with Google for the
+    // first time — link their Google account.
     user = await prisma.user.update({
       where: { id: user.id },
       data: { google_id: googleUser.sub, email_verified: true },

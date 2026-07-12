@@ -13,20 +13,19 @@ const optionalEmail = z.preprocess((val) => (val === "" ? undefined : val), z.st
 const optionalDateString = z.preprocess((val) => (val === "" ? undefined : val), z.string().optional());
 
 // Auth
+// A candidate account only ever comes into being via the screening
+// invite (Candidate Information Form -> screened -> invite -> set
+// password) — there's no general-purpose sign-up form anymore, so
+// full_name/email/phone/country aren't client-supplied here at all;
+// they're read server-side off the Candidate record the invite token
+// points at, same data the register page's read-only summary shows.
 export const registerSchema = z.object({
-  full_name: z.string().min(2, "Full name must be at least 2 characters").max(100),
-  email: z.string().email("Invalid email address"),
   password: z
     .string()
     .min(8, "Password must be at least 8 characters")
     .regex(/[A-Z]/, "Password must contain at least one uppercase letter")
     .regex(/[0-9]/, "Password must contain at least one number"),
-  phone: z.string().optional(),
-  country: z.string().optional(),
-  // Present when arriving via a recruiter's candidate-invite email (SRS
-  // FR-2.1) — links this new account to the existing recruiter-sourced
-  // Candidate record instead of creating a fresh, empty one.
-  invite: z.string().optional(),
+  invite: z.string().min(1, "An invite link is required to create an account."),
 });
 
 export const loginSchema = z.object({

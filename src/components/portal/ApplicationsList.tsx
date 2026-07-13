@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import DocumentLink from "@/components/DocumentLink";
 import Pagination from "@/components/Pagination";
-import { usePagination } from "@/lib/usePagination";
+import { DEFAULT_PAGE_SIZE } from "@/lib/usePagination";
 
 interface ApplicationRow {
   id: string;
@@ -34,20 +34,27 @@ export default function ApplicationsList({ emptyLabel }: { emptyLabel: string })
   const [applications, setApplications] = useState<ApplicationRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const pageSize = DEFAULT_PAGE_SIZE;
 
   useEffect(() => {
-    fetch("/api/applications")
+    setLoading(true);
+    fetch(`/api/applications?page=${page}&pageSize=${pageSize}`)
       .then((r) => r.json())
-      .then((res) => setApplications(Array.isArray(res) ? res : []))
+      .then((res) => {
+        setApplications(res.data ?? []);
+        setTotal(res.total ?? 0);
+      })
       .catch(() => setError("Failed to load applications."))
       .finally(() => setLoading(false));
-  }, []);
+  }, [page, pageSize]);
 
-  const { page, setPage, totalPages, paged, total, pageSize } = usePagination(applications);
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
   if (loading) return <p className="text-midnight-900/50">Loading…</p>;
   if (error) return <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg p-4 text-sm">{error}</div>;
-  if (applications.length === 0) return <div className="card p-10 text-center text-midnight-900/50">{emptyLabel}</div>;
+  if (total === 0) return <div className="card p-10 text-center text-midnight-900/50">{emptyLabel}</div>;
 
   return (
     <div className="card overflow-x-auto">
@@ -63,7 +70,7 @@ export default function ApplicationsList({ emptyLabel }: { emptyLabel: string })
           </tr>
         </thead>
         <tbody>
-          {paged.map((a) => {
+          {applications.map((a) => {
             const name = a.candidate.user?.full_name ?? a.candidate.full_name ?? "— unnamed lead —";
             const contact = a.candidate.user?.email ?? "";
             return (

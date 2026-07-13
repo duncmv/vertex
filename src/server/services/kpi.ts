@@ -83,6 +83,38 @@ function reachedOrLaterFromFlow(flow: Record<CandidateLifecycleStatus, number>, 
   return LIFECYCLE_ORDER.slice(idx).reduce((sum, status) => sum + flow[status], 0);
 }
 
+function verifiedCandidatesFromFlow(flow: Record<CandidateLifecycleStatus, number>): number {
+  return reachedOrLaterFromFlow(flow, LIFECYCLE_ORDER.indexOf("verified"));
+}
+
+function conversionOverallFromFlow(flow: Record<CandidateLifecycleStatus, number>): number {
+  const totalVerified = verifiedCandidatesFromFlow(flow);
+  return totalVerified === 0 ? 0 : Math.round((flow.approved / totalVerified) * 1000) / 10;
+}
+
+// A campaign target's scope (country/region/recruiter + period) is what
+// determines its applicant-flow query — several targets on the same
+// campaign, or several metrics on the same target's scope, very
+// plausibly share one. Caching computeApplicantFlow per unique scope
+// within one targets-vs-actuals call means N targets sharing a scope
+// cost one groupBy query, not N.
+function kpiScopeKey(filters: KpiFilters): string {
+  return `${filters.countryId ?? ""}|${filters.regionId ?? ""}|${filters.recruiterId ?? ""}|${filters.periodStart.getTime()}|${filters.periodEnd.getTime()}`;
+}
+
+function createFlowCache() {
+  const cache = new Map<string, Promise<Record<CandidateLifecycleStatus, number>>>();
+  return (filters: KpiFilters) => {
+    const key = kpiScopeKey(filters);
+    let pending = cache.get(key);
+    if (!pending) {
+      pending = computeApplicantFlow(filters);
+      cache.set(key, pending);
+    }
+    return pending;
+  };
+}
+
 /**
  * "Verified candidates" (campaign-target metric, redefined 2026-07-13):
  * candidates who reached "verified" or later (i.e. verified + approved) —
@@ -91,7 +123,7 @@ function reachedOrLaterFromFlow(flow: Record<CandidateLifecycleStatus, number>, 
  */
 export async function computeVerifiedCandidates(filters: KpiFilters): Promise<number> {
   const flow = await computeApplicantFlow(filters);
-  return reachedOrLaterFromFlow(flow, LIFECYCLE_ORDER.indexOf("verified"));
+  return verifiedCandidatesFromFlow(flow);
 }
 
 /**
@@ -111,10 +143,7 @@ export async function computeVerifiedCandidates(filters: KpiFilters): Promise<nu
 export async function computeConversionRates(filters: KpiFilters): Promise<{ overall: number; byStage: StageConversion[] }> {
   const flow = await computeApplicantFlow(filters);
   const reachedOrLater = (idx: number) => reachedOrLaterFromFlow(flow, idx);
-
-  const totalVerified = reachedOrLater(LIFECYCLE_ORDER.indexOf("verified"));
-  const totalApproved = flow.approved;
-  const overall = totalVerified === 0 ? 0 : Math.round((totalApproved / totalVerified) * 1000) / 10;
+  const overall = conversionOverallFromFlow(flow);
 
   const byStage: StageConversion[] = [];
   for (let i = 0; i < LIFECYCLE_ORDER.length - 1; i++) {
@@ -201,6 +230,7 @@ export interface TargetVsActual {
  */
 export async function computeTargetsVsActuals(campaignId: string, filters: Pick<KpiFilters, "periodStart" | "periodEnd">): Promise<TargetVsActual[]> {
   const targets = await prisma.campaignTarget.findMany({ where: { campaign_id: campaignId } });
+  const getFlow = createFlowCache();
 
   return Promise.all(
     targets.map(async (target: CampaignTarget) => {
@@ -210,10 +240,8 @@ export async function computeTargetsVsActuals(campaignId: string, filters: Pick<
         regionId: target.region_id ?? undefined,
       };
 
-      const actualValue =
-        target.metric === "conversion_rate"
-          ? (await computeConversionRates(scoped)).overall
-          : await computeVerifiedCandidates(scoped);
+      const flow = await getFlow(scoped);
+      const actualValue = target.metric === "conversion_rate" ? conversionOverallFromFlow(flow) : verifiedCandidatesFromFlow(flow);
 
       return {
         campaignTargetId: target.id,
@@ -249,15 +277,14 @@ export async function computeCountryTargetsVsActuals(
     where: { country_id: countryId, campaign: { status: "active" } },
     include: { campaign: { select: { name: true } } },
   });
+  const getFlow = createFlowCache();
 
   return Promise.all(
     targets.map(async (target: CampaignTarget & { campaign: { name: string } }) => {
       const scoped: KpiFilters = { ...filters, countryId };
 
-      const actualValue =
-        target.metric === "conversion_rate"
-          ? (await computeConversionRates(scoped)).overall
-          : await computeVerifiedCandidates(scoped);
+      const flow = await getFlow(scoped);
+      const actualValue = target.metric === "conversion_rate" ? conversionOverallFromFlow(flow) : verifiedCandidatesFromFlow(flow);
 
       return {
         campaignTargetId: target.id,
@@ -292,15 +319,14 @@ export async function computeRecruiterTargetsVsActuals(
     where: { recruiter_id: recruiterId },
     include: { campaign_target: { include: { campaign: { select: { name: true } } } } },
   });
+  const getFlow = createFlowCache();
 
   return Promise.all(
     targets.map(async (rt: RecruiterTarget & { campaign_target: CampaignTarget & { campaign: { name: string } } }) => {
       const scoped: KpiFilters = { ...filters, recruiterId };
 
-      const actualValue =
-        rt.campaign_target.metric === "conversion_rate"
-          ? (await computeConversionRates(scoped)).overall
-          : await computeVerifiedCandidates(scoped);
+      const flow = await getFlow(scoped);
+      const actualValue = rt.campaign_target.metric === "conversion_rate" ? conversionOverallFromFlow(flow) : verifiedCandidatesFromFlow(flow);
 
       return {
         recruiterTargetId: rt.id,

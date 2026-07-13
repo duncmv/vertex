@@ -6,27 +6,56 @@ export interface DocumentCompletenessResult {
 }
 
 /**
- * Required document type keys for one destination country: the universal
- * set (admin-managed DocumentRequirementType.is_universal — Candidate
- * Information Form §3's items with no "Required for: X" tag) plus
- * whatever extra documents that country requires (admin-managed
- * CountryDocumentRequirement). Shared by the screening-gate completeness
- * check below and anywhere that needs a single application's own
- * requirement list (candidate dashboard, staff candidate detail).
+ * Required document type keys for a batch of destination countries in one
+ * pass: the universal set (admin-managed DocumentRequirementType.
+ * is_universal — Candidate Information Form §3's items with no "Required
+ * for: X" tag) plus whatever extras each country requires (admin-managed
+ * CountryDocumentRequirement) — one query for the universal set, one for
+ * every country's extras `WHERE country_id IN (...)`, regardless of how
+ * many applications/countries are being resolved. Callers that used to
+ * call the single-country version once per application (candidate
+ * dashboard, staff candidate detail, the screening-gate completeness
+ * check below) turned that into an N+1 — 2 queries per application
+ * instead of 2 total. Returns a lookup keyed by country id, plus `null`
+ * for the universal-only set.
  */
-export async function getRequiredDocumentTypesForCountryId(countryId: string | null): Promise<string[]> {
+export async function getRequiredDocumentTypesForCountryIds(
+  countryIds: (string | null | undefined)[]
+): Promise<Map<string | null, string[]>> {
+  const uniqueIds = [...new Set(countryIds.filter((id): id is string => !!id))];
+
   const [universalTypes, countryExtras] = await Promise.all([
     prisma.documentRequirementType.findMany({ where: { is_universal: true }, select: { key: true } }),
-    countryId
-      ? prisma.countryDocumentRequirement.findMany({ where: { country_id: countryId }, select: { document_type: true } })
-      : Promise.resolve([] as { document_type: string }[]),
+    uniqueIds.length > 0
+      ? prisma.countryDocumentRequirement.findMany({
+          where: { country_id: { in: uniqueIds } },
+          select: { country_id: true, document_type: true },
+        })
+      : Promise.resolve([] as { country_id: string; document_type: string }[]),
   ]);
-  return [
-    ...new Set([
-      ...universalTypes.map((t: { key: string }) => t.key),
-      ...countryExtras.map((c: { document_type: string }) => c.document_type),
-    ]),
-  ];
+
+  const universalKeys = universalTypes.map((t: { key: string }) => t.key);
+  const extrasByCountry = new Map<string, string[]>();
+  for (const extra of countryExtras as { country_id: string; document_type: string }[]) {
+    const list = extrasByCountry.get(extra.country_id) ?? [];
+    list.push(extra.document_type);
+    extrasByCountry.set(extra.country_id, list);
+  }
+
+  const result = new Map<string | null, string[]>();
+  result.set(null, universalKeys);
+  for (const id of uniqueIds) {
+    result.set(id, [...new Set([...universalKeys, ...(extrasByCountry.get(id) ?? [])])]);
+  }
+  return result;
+}
+
+/** Single-country convenience wrapper for the (common) case of resolving
+ * just one destination — a thin pass-through to the batched version above
+ * so there's one source of truth for the universal+extras merge logic. */
+export async function getRequiredDocumentTypesForCountryId(countryId: string | null): Promise<string[]> {
+  const map = await getRequiredDocumentTypesForCountryIds([countryId]);
+  return map.get(countryId) ?? map.get(null) ?? [];
 }
 
 /**
@@ -47,17 +76,13 @@ export async function evaluateDocumentCompletenessForCandidateId(candidateId: st
     }),
   ]);
 
-  const rawCountryIds: string[] = applications
-    .map((a: { preferred_country_1_id: string | null }) => a.preferred_country_1_id)
-    .filter((id: string | null): id is string => !!id);
-  const countryIds = [...new Set<string>(rawCountryIds)];
-  const requiredPerCountry = await Promise.all(countryIds.map((id) => getRequiredDocumentTypesForCountryId(id)));
-  // Always include the universal set even if no application has a
-  // destination country yet — matches the original behavior where the
-  // universal set applied regardless of country selection.
-  const universalOnly = await getRequiredDocumentTypesForCountryId(null);
-
-  const requiredTypes = [...new Set([universalOnly, ...requiredPerCountry].flat())];
+  const requiredByCountry = await getRequiredDocumentTypesForCountryIds(
+    applications.map((a: { preferred_country_1_id: string | null }) => a.preferred_country_1_id)
+  );
+  // requiredByCountry always has a `null` (universal-only) entry plus one
+  // per distinct country among the applications — union every value since
+  // any of those requirement sets being incomplete blocks "submitted".
+  const requiredTypes = [...new Set([...requiredByCountry.values()].flat())];
   const uploadedTypes = new Set(documents.map((d: { type: string }) => d.type));
   const missingTypes = requiredTypes.filter((t) => !uploadedTypes.has(t));
 

@@ -6,6 +6,7 @@ import { submitReportSchema } from "@/lib/validations";
 import type { Prisma, ScopeLevel } from "@prisma/client";
 
 const STAFF_ROLES = ["regional_recruiter", "country_supervisor", "inhouse_supervisor", "director", "admin"] as const;
+const MAX_PAGE_SIZE = 200;
 
 // GET /api/reports — role-scoped (SRS FR-3.4, FR-3.7 escalation path):
 // a recruiter sees their own; a supervisor sees their own country
@@ -55,35 +56,49 @@ export async function GET(req: NextRequest) {
       where = {}; // director, admin — unrestricted
   }
 
-  const reports = await prisma.report.findMany({
-    where: {
-      AND: [
-        where,
-        countryId ? { country_id: countryId } : {},
-        type ? { type: type as never } : {},
-        status ? { status: status as never } : {},
-        recruiterId ? { submitted_by: recruiterId } : {},
-      ],
-    },
-    select: {
-      id: true,
-      type: true,
-      scope_level: true,
-      status: true,
-      period_start: true,
-      period_end: true,
-      return_reason: true,
-      content: true,
-      submitter: { select: { id: true, full_name: true } },
-      country: { select: { id: true, name: true } },
-      parent_report_id: true,
-      child_reports: { select: { id: true, status: true, submitter: { select: { full_name: true } } } },
-      created_at: true,
-    },
-    orderBy: { created_at: "desc" },
-  });
+  const combinedWhere: Prisma.ReportWhereInput = {
+    AND: [
+      where,
+      countryId ? { country_id: countryId } : {},
+      type ? { type: type as never } : {},
+      status ? { status: status as never } : {},
+      recruiterId ? { submitted_by: recruiterId } : {},
+    ],
+  };
 
-  return NextResponse.json({ data: reports });
+  // Paginated, defaulting to page 1 / 50 rows even without params — a
+  // director/admin's unrestricted view (or a country's accumulated
+  // history over months) is otherwise a fully unbounded findMany at
+  // 40-country/800-recruiter scale.
+  const page = Math.max(1, Number(searchParams.get("page")) || 1);
+  const pageSize = Math.min(MAX_PAGE_SIZE, Math.max(1, Number(searchParams.get("pageSize")) || 50));
+
+  const [reports, total] = await Promise.all([
+    prisma.report.findMany({
+      where: combinedWhere,
+      select: {
+        id: true,
+        type: true,
+        scope_level: true,
+        status: true,
+        period_start: true,
+        period_end: true,
+        return_reason: true,
+        content: true,
+        submitter: { select: { id: true, full_name: true } },
+        country: { select: { id: true, name: true } },
+        parent_report_id: true,
+        child_reports: { select: { id: true, status: true, submitter: { select: { full_name: true } } } },
+        created_at: true,
+      },
+      orderBy: { created_at: "desc" },
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+    }),
+    prisma.report.count({ where: combinedWhere }),
+  ]);
+
+  return NextResponse.json({ data: reports, total, page, pageSize });
 }
 
 // POST /api/reports — submit a new report (SRS FR-3.4). A recruiter

@@ -4,7 +4,7 @@ import { auditedPrisma } from "@/lib/audit";
 import { getAuthUser, requireRole } from "@/lib/api-auth";
 import { canAccessCandidate } from "@/server/scope";
 import { updateCandidateDetailsSchema } from "@/lib/validations";
-import { getRequiredDocumentTypesForCountryId } from "@/server/services/documentCompleteness";
+import { getRequiredDocumentTypesForCountryIds } from "@/server/services/documentCompleteness";
 
 const STAFF_ROLES = ["regional_recruiter", "country_supervisor", "inhouse_supervisor", "director", "admin"] as const;
 
@@ -86,19 +86,16 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   // application's own destination country's extras), plus the union
   // across all of them for a single "still missing overall" list — see
   // documentCompleteness.ts for why this can't just be the first
-  // application's country.
-  const [applicationsWithRequirements, universalTypes] = await Promise.all([
-    Promise.all(
-      candidate.applications.map(async (app: (typeof candidate.applications)[number]) => ({
-        ...app,
-        required_document_types: await getRequiredDocumentTypesForCountryId(app.preferred_country_1?.id ?? null),
-      }))
-    ),
-    getRequiredDocumentTypesForCountryId(null),
-  ]);
-  const requiredDocumentTypes = [
-    ...new Set([...universalTypes, ...applicationsWithRequirements.flatMap((a) => a.required_document_types)]),
-  ];
+  // application's country. Batched into one lookup regardless of
+  // application count, rather than a query pair per application.
+  const requiredByCountry = await getRequiredDocumentTypesForCountryIds(
+    candidate.applications.map((app: (typeof candidate.applications)[number]) => app.preferred_country_1?.id ?? null)
+  );
+  const applicationsWithRequirements = candidate.applications.map((app: (typeof candidate.applications)[number]) => ({
+    ...app,
+    required_document_types: requiredByCountry.get(app.preferred_country_1?.id ?? null) ?? requiredByCountry.get(null) ?? [],
+  }));
+  const requiredDocumentTypes = [...new Set([...requiredByCountry.values()].flat())];
 
   return NextResponse.json({
     data: { ...candidate, applications: applicationsWithRequirements, required_document_types: requiredDocumentTypes },

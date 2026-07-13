@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import DocumentLink from "@/components/DocumentLink";
 import CandidateStatusControls from "./CandidateStatusControls";
@@ -8,7 +8,8 @@ import CandidateDocumentUpload from "./CandidateDocumentUpload";
 import CandidateEditDetails from "./CandidateEditDetails";
 import SearchableSelect from "@/components/SearchableSelect";
 import Pagination from "@/components/Pagination";
-import { usePagination } from "@/lib/usePagination";
+import { DEFAULT_PAGE_SIZE } from "@/lib/usePagination";
+import { useDebouncedValue } from "@/lib/useDebouncedValue";
 import { MagnifyingGlass } from "@phosphor-icons/react";
 
 const STATUS_STYLES: Record<string, string> = {
@@ -80,15 +81,29 @@ export default function CandidateList({
   const [error, setError] = useState("");
   const [q, setQ] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const pageSize = DEFAULT_PAGE_SIZE;
+  const debouncedQ = useDebouncedValue(q);
+
+  // Search/filter changes reset back to page 1 — staying on, say, page 4
+  // of an unfiltered list makes no sense once a filter narrows the set.
+  useEffect(() => setPage(1), [debouncedQ, statusFilter]);
 
   useEffect(() => {
     setLoading(true);
-    fetch("/api/candidates")
+    const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
+    if (debouncedQ) params.set("q", debouncedQ);
+    if (statusFilter) params.set("status", statusFilter);
+    fetch(`/api/candidates?${params}`)
       .then((r) => r.json())
-      .then((res) => setCandidates(res.data ?? []))
+      .then((res) => {
+        setCandidates(res.data ?? []);
+        setTotal(res.total ?? 0);
+      })
       .catch(() => setError("Failed to load candidates."))
       .finally(() => setLoading(false));
-  }, [refreshKey]);
+  }, [refreshKey, page, pageSize, debouncedQ, statusFilter]);
 
   const recordConsent = async (id: string) => {
     const res = await fetch(`/api/candidates/${id}`, {
@@ -108,22 +123,12 @@ export default function CandidateList({
     setCandidates((prev) => prev.map((row) => (row.id === id ? { ...row, documents: body.data.documents } : row)));
   };
 
-  const filtered = useMemo(() => {
-    const query = q.trim().toLowerCase();
-    return candidates.filter((c) => {
-      if (statusFilter && c.lifecycle_status !== statusFilter) return false;
-      if (!query) return true;
-      const name = (c.user?.full_name ?? c.full_name ?? "").toLowerCase();
-      const contact = (c.user?.email ?? c.email ?? c.phone ?? "").toLowerCase();
-      return name.includes(query) || contact.includes(query);
-    });
-  }, [candidates, q, statusFilter]);
-
-  const { page, setPage, totalPages, paged, total, pageSize } = usePagination(filtered);
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const hasFilter = Boolean(q.trim() || statusFilter);
 
   if (loading) return <p className="text-midnight-900/50">Loading…</p>;
   if (error) return <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg p-4 text-sm">{error}</div>;
-  if (candidates.length === 0) return <div className="card p-10 text-center text-midnight-900/50">{emptyLabel}</div>;
+  if (total === 0 && !hasFilter) return <div className="card p-10 text-center text-midnight-900/50">{emptyLabel}</div>;
 
   return (
     <div>
@@ -146,7 +151,7 @@ export default function CandidateList({
         />
       </div>
 
-      {filtered.length === 0 ? (
+      {candidates.length === 0 ? (
         <div className="card p-10 text-center text-midnight-900/50">No candidates match your search.</div>
       ) : (
         <div className="card overflow-x-auto">
@@ -162,7 +167,7 @@ export default function CandidateList({
               </tr>
             </thead>
             <tbody>
-              {paged.map((c) => {
+              {candidates.map((c) => {
                 const name = c.user?.full_name ?? c.full_name ?? "— unnamed lead —";
                 const contact = c.user?.email ?? c.email ?? c.phone ?? "";
                 return (

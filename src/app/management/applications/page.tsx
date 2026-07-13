@@ -8,7 +8,7 @@ import DocumentLink from "@/components/DocumentLink";
 import DocumentVerifyControls from "@/components/DocumentVerifyControls";
 import SearchableSelect from "@/components/SearchableSelect";
 import Pagination from "@/components/Pagination";
-import { usePagination } from "@/lib/usePagination";
+import { DEFAULT_PAGE_SIZE } from "@/lib/usePagination";
 
 interface CandidateDocument { id: string; type: string; verification_status: string; }
 
@@ -25,15 +25,22 @@ interface Application {
 export default function AdminApplicationsPage() {
   const [applications, setApplications] = useState<Application[]>([]);
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const pageSize = DEFAULT_PAGE_SIZE;
 
   useEffect(() => {
-    fetch("/api/applications")
+    setLoading(true);
+    fetch(`/api/applications?page=${page}&pageSize=${pageSize}`)
       .then((r) => r.json())
-      .then((res) => setApplications(Array.isArray(res) ? res : []))
+      .then((res) => {
+        setApplications(res.data ?? []);
+        setTotal(res.total ?? 0);
+      })
       .finally(() => setLoading(false));
-  }, []);
+  }, [page, pageSize]);
 
-  const { page, setPage, totalPages, paged, total, pageSize } = usePagination(applications);
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
   const handleStatusChange = async (appId: string, newStatus: string) => {
     const res = await fetch(`/api/applications/${appId}`, {
@@ -56,7 +63,7 @@ export default function AdminApplicationsPage() {
 
       {loading ? (
         <p className="text-midnight-900/50">Loading…</p>
-      ) : applications.length === 0 ? (
+      ) : total === 0 ? (
         <div className="card p-10 text-center text-midnight-900/50">No applications yet.</div>
       ) : (
         <div className="card overflow-x-auto">
@@ -70,7 +77,7 @@ export default function AdminApplicationsPage() {
               </tr>
             </thead>
             <tbody>
-              {paged.map((app) => (
+              {applications.map((app) => (
                 <tr key={app.id} className="border-b border-midnight-900/5 last:border-0">
                   <td className="px-5 py-4">
                     <div className="font-medium text-midnight-900">{app.candidate.user?.full_name ?? app.candidate.full_name ?? "— unnamed lead —"}</div>

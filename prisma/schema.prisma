@@ -254,6 +254,15 @@ model Candidate {
   @@index([recruiter_id])
   @@index([country_id])
   @@index([partner_id])
+  @@index([lifecycle_status])
+  @@index([created_at])
+  // Matches the most common staff list query shape (scope by
+  // recruiter/country, then filter by status) at 40-country/800-recruiter
+  // scale — a single-column index on each still works, but a composite
+  // lets Postgres satisfy both predicates from one index scan instead of
+  // combining two bitmap scans.
+  @@index([recruiter_id, lifecycle_status])
+  @@index([country_id, lifecycle_status])
 }
 
 // police_clearance already covers the Candidate Information Form's
@@ -312,6 +321,7 @@ model AuditLog {
 
   @@index([entity_type, entity_id])
   @@index([actor_id])
+  @@index([created_at])
 }
 
 // ── Phase 3: Control, Reporting & Governance ────────────────────────────
@@ -367,6 +377,12 @@ model Report {
   @@index([country_id])
   @@index([status])
   @@index([type, period_start])
+  // Serves the daily-compliance check on every Country Supervisor/
+  // In-House overview page load ("has each recruiter submitted a daily
+  // report covering today") — country-scoped, filtered by type, then a
+  // period_end range; at 40-country/800-recruiter scale this runs on
+  // every dashboard load, not just occasionally.
+  @@index([country_id, type, period_end])
 }
 
 enum CampaignStatus {
@@ -570,6 +586,8 @@ model Application {
   @@index([candidate_id])
   @@index([job_id])
   @@index([current_location_country_id])
+  @@index([application_status])
+  @@index([submitted_at])
 }
 
 model Payment {

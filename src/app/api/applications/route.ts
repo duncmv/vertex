@@ -7,14 +7,23 @@ import { getAuthUser, requireAuth } from "@/lib/api-auth";
 import { isStaffRole } from "@/lib/rbac";
 import { canAccessCandidate, scopeCandidatesToRequester } from "@/server/scope";
 import { assignNextRecruiterForCountry } from "@/server/services/recruiterAssignment";
-import { getRequiredDocumentTypesForCountryId } from "@/server/services/documentCompleteness";
+import { getRequiredDocumentTypesForCountryIds } from "@/server/services/documentCompleteness";
 import { rateLimit } from "@/lib/rate-limit";
+
+const MAX_PAGE_SIZE = 200;
 
 // GET /api/applications — a candidate sees their own; every staff role
 // sees applications scoped exactly like the candidate list itself (SRS
 // FR-2.1 "guide and track applications" — a recruiter needs this for
 // their own sourced candidates, not just admin). Reuses
 // scopeCandidatesToRequester so the two views can never drift apart.
+//
+// The staff branch is paginated (page/pageSize, defaulting to page 1 /
+// 50 rows even if the caller doesn't ask) — at 40-country/800-recruiter
+// scale this was a fully unbounded findMany, returning every application
+// a country/recruiter has ever had in one response. The candidate branch
+// stays unbounded — a single candidate's own application count is small
+// by construction, not something that grows with platform-wide volume.
 export async function GET(req: NextRequest) {
   const user = await getAuthUser(req);
   const guardRes = requireAuth(user);
@@ -22,25 +31,34 @@ export async function GET(req: NextRequest) {
 
   if (isStaffRole(user!.role)) {
     const candidateScope = await scopeCandidatesToRequester(user!);
-    const applications = await prisma.application.findMany({
-      where: { candidate: candidateScope },
-      include: {
-        candidate: {
-          select: {
-            full_name: true,
-            documents: { select: { id: true, type: true, verification_status: true } },
-            user: { select: { full_name: true, email: true } },
-            recruiter: { select: { id: true, full_name: true } },
-            country: { select: { id: true, name: true } },
+    const page = Math.max(1, Number(req.nextUrl.searchParams.get("page")) || 1);
+    const pageSize = Math.min(MAX_PAGE_SIZE, Math.max(1, Number(req.nextUrl.searchParams.get("pageSize")) || 50));
+    const where = { candidate: candidateScope };
+
+    const [applications, total] = await Promise.all([
+      prisma.application.findMany({
+        where,
+        include: {
+          candidate: {
+            select: {
+              full_name: true,
+              documents: { select: { id: true, type: true, verification_status: true } },
+              user: { select: { full_name: true, email: true } },
+              recruiter: { select: { id: true, full_name: true } },
+              country: { select: { id: true, name: true } },
+            },
           },
+          job: { select: { title: true, country: true, city: true } },
+          preferred_country_1: { select: { name: true } },
+          preferred_sector: { select: { name: true } },
         },
-        job: { select: { title: true, country: true, city: true } },
-        preferred_country_1: { select: { name: true } },
-        preferred_sector: { select: { name: true } },
-      },
-      orderBy: { submitted_at: "desc" },
-    });
-    return NextResponse.json(applications);
+        orderBy: { submitted_at: "desc" },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      }),
+      prisma.application.count({ where }),
+    ]);
+    return NextResponse.json({ data: applications, total, page, pageSize });
   }
 
   // Candidate: find their own
@@ -60,13 +78,15 @@ export async function GET(req: NextRequest) {
   // Which document types this specific application needs (universal set
   // + its own destination country's extras) — lets the candidate's
   // dashboard show a per-application checklist instead of one flattened,
-  // first-application-only list.
-  const withRequirements = await Promise.all(
-    applications.map(async (app: (typeof applications)[number]) => ({
-      ...app,
-      required_document_types: await getRequiredDocumentTypesForCountryId(app.preferred_country_1_id),
-    }))
+  // first-application-only list. Batched into one lookup regardless of
+  // application count, rather than a query pair per application.
+  const requiredByCountry = await getRequiredDocumentTypesForCountryIds(
+    applications.map((a: (typeof applications)[number]) => a.preferred_country_1_id)
   );
+  const withRequirements = applications.map((app: (typeof applications)[number]) => ({
+    ...app,
+    required_document_types: requiredByCountry.get(app.preferred_country_1_id) ?? requiredByCountry.get(null) ?? [],
+  }));
 
   return NextResponse.json(withRequirements);
 }

@@ -1,6 +1,7 @@
 import path from "path";
 import fs from "fs/promises";
 import { v4 as uuidv4 } from "uuid";
+import { put, del, get } from "@vercel/blob";
 import { signDocumentToken, verifyDocumentToken } from "./jwt";
 import { backupToR2, deleteFromR2, restoreFromR2 } from "./backup";
 
@@ -18,6 +19,18 @@ const DEFAULT_SIGNED_URL_TTL_SECONDS = 300; // 5 minutes
 // by Next.js with no access control at all (SRS FR-1.6).
 const STORAGE_ROOT = path.resolve(process.cwd(), process.env.UPLOAD_DIR || "./storage/documents");
 
+// Vercel's serverless functions don't have a persistent local filesystem —
+// each invocation can run in a fresh container, and even within one, local
+// writes don't survive or share across instances — so local disk storage
+// silently doesn't work there. The real production/staging target
+// (cPanel Node hosting, which does have a persistent disk) keeps local
+// disk + R2 backup exactly as before; a demo deployment on Vercel uses
+// Vercel Blob instead. Gated on both process.env.VERCEL (set
+// automatically by Vercel in every deployment) and the token's presence,
+// so cPanel never accidentally uses Blob even if a token is mistakenly
+// left in its environment.
+const useVercelBlob = Boolean(process.env.VERCEL) && Boolean(process.env.BLOB_READ_WRITE_TOKEN);
+
 export class DocumentNotFoundError extends Error {}
 
 function resolveWithinStorageRoot(storagePath: string): string {
@@ -28,10 +41,23 @@ function resolveWithinStorageRoot(storagePath: string): string {
   return resolved;
 }
 
+// A Blob-backed document's storage_path is its full Blob URL (fully
+// qualified); a local-disk one is always a bare relative path — a cheap,
+// sufficient discriminator without needing a separate "storage driver"
+// column on Document, and one that keeps working through any future
+// transition where old rows are on disk and new ones are on Blob.
+function isBlobUrl(storagePath: string): boolean {
+  return storagePath.startsWith("https://") || storagePath.startsWith("http://");
+}
+
 /**
- * Saves a candidate document to the private, non-public storage directory
- * and returns its storage path. Never returns a public URL — callers must
- * request a short-lived signed URL via getSignedDocumentUrl to view it.
+ * Saves a candidate document to private storage and returns its storage
+ * path. Never returns a public URL — callers must request a short-lived
+ * signed URL via getSignedDocumentUrl to view it. On Vercel Blob this
+ * uses real `access: 'private'` (genuine auth-gated access, not just an
+ * unguessable public URL) — the token-holding server is the only thing
+ * that can ever read it back, via resolveDocumentContent below, same as
+ * local disk being outside /public.
  */
 export async function saveUploadedFile(
   file: File,
@@ -48,8 +74,13 @@ export async function saveUploadedFile(
   const ext = file.name.split(".").pop() || "bin";
   const uniqueName = `${uuidv4()}.${ext}`;
   const storagePath = `${type}/${uniqueName}`;
-  const absolutePath = resolveWithinStorageRoot(storagePath);
 
+  if (useVercelBlob) {
+    const blob = await put(storagePath, file, { access: "private", token: process.env.BLOB_READ_WRITE_TOKEN });
+    return blob.url;
+  }
+
+  const absolutePath = resolveWithinStorageRoot(storagePath);
   await fs.mkdir(path.dirname(absolutePath), { recursive: true });
   const buffer = Buffer.from(await file.arrayBuffer());
   await fs.writeFile(absolutePath, buffer);
@@ -72,27 +103,50 @@ export async function getSignedDocumentUrl(
   return `/api/documents/file?token=${encodeURIComponent(token)}`;
 }
 
-/**
- * Resolves a signed document token to an absolute filesystem path, self-
- * healing from the R2 backup if the local copy is ever missing (SRS NFR-7
- * "tested restores"). Throws if the token is invalid/expired, resolves
- * outside the storage root, or the file isn't recoverable from either copy.
- */
-export async function resolveAndEnsureDocumentPath(token: string): Promise<string> {
-  const { storagePath } = verifyDocumentToken(token);
-  const absolutePath = resolveWithinStorageRoot(storagePath);
+export interface ResolvedDocument {
+  buffer: Buffer;
+  extension: string;
+}
 
+/**
+ * Resolves a signed document token to its actual bytes, self-healing from
+ * the R2 backup if a local copy is ever missing (SRS NFR-7 "tested
+ * restores") — Blob-backed documents skip that path entirely since Blob
+ * is itself the durable, managed store. Throws if the token is invalid/
+ * expired, resolves outside the storage root, or isn't recoverable from
+ * either copy.
+ */
+export async function resolveDocumentContent(token: string): Promise<ResolvedDocument> {
+  const { storagePath } = verifyDocumentToken(token);
+  const extension = (storagePath.split(".").pop() || "bin").toLowerCase();
+
+  if (isBlobUrl(storagePath)) {
+    const result = await get(storagePath, { access: "private", token: process.env.BLOB_READ_WRITE_TOKEN });
+    if (!result || result.statusCode !== 200) throw new DocumentNotFoundError("Document not found in blob storage.");
+    const buffer = Buffer.from(await new Response(result.stream).arrayBuffer());
+    return { buffer, extension };
+  }
+
+  const absolutePath = resolveWithinStorageRoot(storagePath);
   try {
-    await fs.access(absolutePath);
-    return absolutePath;
+    return { buffer: await fs.readFile(absolutePath), extension };
   } catch {
     const restored = await restoreFromR2(storagePath, absolutePath);
     if (!restored) throw new DocumentNotFoundError("Document not found in primary or backup storage.");
-    return absolutePath;
+    return { buffer: await fs.readFile(absolutePath), extension };
   }
 }
 
 export async function deleteUploadedFile(storagePath: string): Promise<void> {
+  if (isBlobUrl(storagePath)) {
+    try {
+      await del(storagePath, { token: process.env.BLOB_READ_WRITE_TOKEN });
+    } catch (err) {
+      console.error("Blob delete failed for", storagePath, err);
+    }
+    return;
+  }
+
   try {
     await fs.unlink(resolveWithinStorageRoot(storagePath));
   } catch {

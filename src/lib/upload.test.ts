@@ -4,7 +4,7 @@ import path from "path";
 import {
   saveUploadedFile,
   getSignedDocumentUrl,
-  resolveAndEnsureDocumentPath,
+  resolveDocumentContent,
   deleteUploadedFile,
   DocumentNotFoundError,
 } from "./upload";
@@ -22,7 +22,7 @@ function makeFile(name: string, content = "test file bytes"): File {
   return new File([content], name, { type: "application/pdf" });
 }
 
-describe("saveUploadedFile / getSignedDocumentUrl / resolveAndEnsureDocumentPath", () => {
+describe("saveUploadedFile / getSignedDocumentUrl / resolveDocumentContent", () => {
   it("saves a file and returns a storage path scoped by document type", async () => {
     const storagePath = await saveUploadedFile(makeFile("cv.pdf"), "cv");
     expect(storagePath).toMatch(/^cv\/.+\.pdf$/);
@@ -36,24 +36,25 @@ describe("saveUploadedFile / getSignedDocumentUrl / resolveAndEnsureDocumentPath
     await expect(saveUploadedFile(badFile, "cv")).rejects.toThrow(/Invalid file type/);
   });
 
-  it("round-trips a signed URL back to the correct file", async () => {
+  it("round-trips a signed URL back to the correct file content", async () => {
     const storagePath = await saveUploadedFile(makeFile("passport.pdf"), "passport");
     const url = await getSignedDocumentUrl(storagePath, 60);
     const token = new URL(url, "http://localhost").searchParams.get("token")!;
 
-    const resolvedPath = await resolveAndEnsureDocumentPath(token);
-    expect(resolvedPath).toBe(path.join(TEST_STORAGE_ROOT, storagePath));
+    const { buffer, extension } = await resolveDocumentContent(token);
+    expect(buffer.toString("utf-8")).toBe("test file bytes");
+    expect(extension).toBe("pdf");
   });
 
   it("rejects a token whose storage path escapes the storage root", async () => {
     const forgedToken = signDocumentToken({ storagePath: "../../../../etc/passwd" }, 60);
-    await expect(resolveAndEnsureDocumentPath(forgedToken)).rejects.toThrow();
+    await expect(resolveDocumentContent(forgedToken)).rejects.toThrow();
   });
 
   it("rejects an expired token", async () => {
     const storagePath = await saveUploadedFile(makeFile("cv.pdf"), "cv");
     const expiredToken = signDocumentToken({ storagePath }, -1);
-    await expect(resolveAndEnsureDocumentPath(expiredToken)).rejects.toThrow();
+    await expect(resolveDocumentContent(expiredToken)).rejects.toThrow();
     // sanity: verifyDocumentToken itself is what throws for expiry
     expect(() => verifyDocumentToken(expiredToken)).toThrow();
   });
@@ -65,7 +66,7 @@ describe("saveUploadedFile / getSignedDocumentUrl / resolveAndEnsureDocumentPath
     const url = await getSignedDocumentUrl(storagePath, 60);
     const token = new URL(url, "http://localhost").searchParams.get("token")!;
 
-    await expect(resolveAndEnsureDocumentPath(token)).rejects.toThrow(DocumentNotFoundError);
+    await expect(resolveDocumentContent(token)).rejects.toThrow(DocumentNotFoundError);
   });
 });
 

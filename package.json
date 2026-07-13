@@ -25,6 +25,7 @@
     "@phosphor-icons/react": "^2.1.10",
     "@prisma/client": "^6.19.2",
     "@stripe/stripe-js": "^8.11.0",
+    "@vercel/blob": "^2.6.1",
     "ai": "^6.0.116",
     "bcryptjs": "^3.0.3",
     "framer-motion": "^12.36.0",

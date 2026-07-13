@@ -35,9 +35,14 @@ export default function ManagementReportsPage() {
   const [expanded, setExpanded] = useState<string | null>(null);
   const [returnDrafts, setReturnDrafts] = useState<Record<string, string>>({});
 
+  // Director/admin's unrestricted, cross-country view derives its
+  // grouped/expandable display from one fetch — pageSize=200 (the API's
+  // own cap) is a protective bound against what used to be a fully
+  // unbounded query, not true pagination; that needs this view
+  // restructured into filtered, independently-paginated queries.
   const load = () => {
     setLoading(true);
-    fetch("/api/reports")
+    fetch("/api/reports?pageSize=200")
       .then((r) => r.json())
       .then((res) => setReports(res.data ?? []))
       .finally(() => setLoading(false));

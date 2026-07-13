@@ -5,7 +5,7 @@ import PortalShell from "@/components/portal/PortalShell";
 import { RECRUITER_NAV_ITEMS } from "@/components/portal/recruiterNav";
 import SearchableSelect from "@/components/SearchableSelect";
 import Pagination from "@/components/Pagination";
-import { usePagination } from "@/lib/usePagination";
+import { DEFAULT_PAGE_SIZE } from "@/lib/usePagination";
 import { Plus, PaperPlaneTilt, Target } from "@phosphor-icons/react";
 
 interface ReportRow {
@@ -98,19 +98,25 @@ export default function RecruiterReportsPage() {
   const [periodCandidates, setPeriodCandidates] = useState<CandidateForReport[]>([]);
   const [targetProgress, setTargetProgress] = useState<TargetProgress[]>([]);
   const [loadingPeriodData, setLoadingPeriodData] = useState(false);
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const pageSize = DEFAULT_PAGE_SIZE;
 
-  const load = () => {
+  const load = (pageOverride?: number) => {
     setLoading(true);
-    fetch("/api/reports")
+    fetch(`/api/reports?page=${pageOverride ?? page}&pageSize=${pageSize}`)
       .then((r) => r.json())
-      .then((res) => setReports(res.data ?? []))
+      .then((res) => {
+        setReports(res.data ?? []);
+        setTotal(res.total ?? 0);
+      })
       .catch(() => setError("Failed to load reports."))
       .finally(() => setLoading(false));
   };
 
-  useEffect(load, []);
+  useEffect(() => load(), [page]);
 
-  const { page, setPage, totalPages, paged, total, pageSize } = usePagination(reports);
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
   const isDateDrivenType = form.type === "weekly" || form.type === "monthly";
 
@@ -203,7 +209,8 @@ export default function RecruiterReportsPage() {
       if (!res.ok) throw new Error(body.error?.message ?? "Failed to submit report.");
       setForm({ type: "daily", period_start: "", period_end: "", notes: "", challenges: "", performance_updates: "" });
       setShowForm(false);
-      load();
+      setPage(1);
+      load(1);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to submit report.");
     } finally {
@@ -362,7 +369,7 @@ export default function RecruiterReportsPage() {
 
       {loading ? (
         <p className="text-midnight-900/50">Loading…</p>
-      ) : reports.length === 0 ? (
+      ) : total === 0 ? (
         <div className="card p-10 text-center text-midnight-900/50">No reports submitted yet.</div>
       ) : (
         <div className="card overflow-x-auto">
@@ -376,7 +383,7 @@ export default function RecruiterReportsPage() {
               </tr>
             </thead>
             <tbody>
-              {paged.map((r) => (
+              {reports.map((r) => (
                 <tr key={r.id} className="border-b border-midnight-900/5 last:border-0 align-top">
                   <td className="px-5 py-4 text-midnight-900/70">
                     {new Date(r.period_start).toLocaleDateString()} – {new Date(r.period_end).toLocaleDateString()}

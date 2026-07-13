@@ -128,9 +128,18 @@ export default function SupervisorReportsPage() {
   const [saving, setSaving] = useState(false);
   const [viewMode, setViewMode] = useState<"outstanding" | "byPeriod">("outstanding");
 
+  // This page derives several client-side views (outstanding-to-review,
+  // by-period grouping, the consolidation checklist) from one fetch, so
+  // it can't just take a server-paginated page the way a flat table can
+  // — slicing the base fetch would silently drop older reports from the
+  // grouped views instead of offering a real "next page". pageSize=200
+  // (the API's own cap) is a protective bound against the previous fully
+  // unbounded query, not true pagination for this page — that needs each
+  // tab restructured into its own filtered, independently-paginated
+  // query, which is a separate piece of work.
   const load = () => {
     setLoading(true);
-    fetch("/api/reports")
+    fetch("/api/reports?pageSize=200")
       .then((r) => r.json())
       .then((res) => setReports(res.data ?? []))
       .catch(() => setError("Failed to load reports."))

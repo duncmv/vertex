@@ -117,10 +117,15 @@ export default function InhouseReportsPage() {
   const [overview, setOverview] = useState<Overview | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Country-scoped but still derives grouped/expandable views from one
+  // fetch — pageSize=200 (the API's own cap) is a protective bound
+  // against what used to be a fully unbounded query, not true
+  // pagination; that needs this view restructured into filtered,
+  // independently-paginated queries per tab.
   const load = () => {
     setLoading(true);
     Promise.all([
-      fetch("/api/reports").then((r) => r.json()),
+      fetch("/api/reports?pageSize=200").then((r) => r.json()),
       fetch("/api/inhouse/overview").then((r) => r.json()),
     ])
       .then(([reportsRes, overviewRes]) => {

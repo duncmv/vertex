@@ -120,6 +120,10 @@ test.describe("Candidate pre-application lifecycle (Phase 2)", () => {
       await login(page, candidateEmail, PASSWORD);
       await expect(page).toHaveURL(/\/dashboard$/);
 
+      // Document upload lives on its own tab now (candidate dashboard
+      // rebuilt on PortalShell, 2026-07-13), not the Overview landing page.
+      await page.goto("/dashboard/documents");
+
       await page.getByTestId("upload-cv-input").setInputFiles({ name: "cv.pdf", mimeType: "application/pdf", buffer: PDF_BUFFER });
       await expect(page.getByText("Uploaded CV / Resume")).toBeVisible({ timeout: 25_000 });
 
@@ -179,25 +183,31 @@ test.describe("Candidate pre-application lifecycle (Phase 2)", () => {
       await page.getByRole("link", { name: candidateName }).click();
       await page.waitForURL(/\/supervisor\/candidates\/.+/);
 
-      await page.getByRole("button", { name: /Verify → Verified/ }).click();
+      await page.getByRole("button", { name: "Verify", exact: true }).click();
       await expect(page.getByText("verified", { exact: true })).toBeVisible({ timeout: 25_000 });
 
       // Country Supervisor's ceiling is "Verified" — "Approved" is a
       // distinct, higher tier (Regional Supervisory Operational Workflow
       // p.5: "Approved by In-House"), so no approve action is offered here.
-      await expect(page.getByRole("button", { name: /Verify → Approved/ })).toHaveCount(0);
+      await expect(page.getByRole("button", { name: "Approve", exact: true })).toHaveCount(0);
       await expect(page.getByText("Awaiting In-House approval")).toBeVisible();
     });
 
     await test.step("only In-House can approve", async () => {
       await logout(page);
       await login(page, "e2e-inhouse@test.local", PASSWORD);
-      await expect(page).toHaveURL(/\/management$/);
+      await expect(page).toHaveURL(/\/inhouse$/);
 
-      const candidateRow = page.locator("tr", { hasText: candidateName });
-      await expect(candidateRow).toBeVisible({ timeout: 25_000 });
-      await candidateRow.getByRole("button", { name: /Verify → Approved/ }).click();
-      await expect(candidateRow.getByText("approved", { exact: true })).toBeVisible({ timeout: 25_000 });
+      // In-House's candidate list links out to the dedicated detail page
+      // (basePath set on CandidateList) rather than rendering inline
+      // status controls in the table row.
+      await page.getByRole("link", { name: "Candidates", exact: true }).click();
+      await page.waitForURL(/\/inhouse\/candidates$/);
+      await page.getByRole("link", { name: candidateName }).click();
+      await page.waitForURL(/\/inhouse\/candidates\/.+/);
+
+      await page.getByRole("button", { name: "Approve", exact: true }).click();
+      await expect(page.getByText("approved", { exact: true })).toBeVisible({ timeout: 25_000 });
     });
   });
 });

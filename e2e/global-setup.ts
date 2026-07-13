@@ -41,16 +41,20 @@ export default async function globalSetup() {
     // "Approved by In-House" is a distinct, higher tier than Country
     // Supervisor's "Verified" ceiling (Regional Supervisory Operational
     // Workflow p.5) — tests that need to reach "approved" need a real
-    // In-House account, not the country supervisor.
+    // In-House account, not the country supervisor. In-House's own portal
+    // is country-scoped exactly like Country Supervisor's (In-House
+    // Supervisor portal work, this session) — needs assigned_country_id
+    // too, or their candidate list scopes to nothing.
     await prisma.user.upsert({
       where: { email: "e2e-inhouse@test.local" },
-      update: { role: "inhouse_supervisor", password_hash, email_verified: true },
+      update: { role: "inhouse_supervisor", password_hash, email_verified: true, assigned_country_id: country.id },
       create: {
         full_name: "E2E In-House Supervisor",
         email: "e2e-inhouse@test.local",
         password_hash,
         role: "inhouse_supervisor",
         email_verified: true,
+        assigned_country_id: country.id,
       },
     });
 
@@ -126,8 +130,12 @@ export default async function globalSetup() {
 
     const caseCandidate = await prisma.candidate.upsert({
       where: { user_id: caseCandidateUser.id },
-      update: { lifecycle_status: "verified" },
-      create: { user_id: caseCandidateUser.id, source: "self_registered", lifecycle_status: "verified" },
+      update: { lifecycle_status: "verified", country_id: country.id },
+      // country_id is required for this candidate to appear in In-House's
+      // own country-scoped candidate list (In-House Supervisor portal
+      // work, this session) — without it, "approved" is unreachable via
+      // the real UI flow this test exercises.
+      create: { user_id: caseCandidateUser.id, source: "self_registered", lifecycle_status: "verified", country_id: country.id },
     });
 
     // job_id has no unique constraint against candidate_id anymore

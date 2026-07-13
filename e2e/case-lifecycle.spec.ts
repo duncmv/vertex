@@ -32,15 +32,26 @@ test.describe("Mobility case lifecycle (Phase 4)", () => {
   test("approval opens a case, staff advance it and issue a contract, candidate signs it", async ({ page }) => {
     await test.step("In-House approves the already-verified candidate, which auto-creates a case", async () => {
       await login(page, "e2e-inhouse@test.local", PASSWORD);
-      await expect(page).toHaveURL(/\/management$/);
+      await expect(page).toHaveURL(/\/inhouse$/);
 
-      const row = page.locator("tr", { hasText: "E2E Case Candidate" });
-      await expect(row).toBeVisible({ timeout: 25_000 });
-      await row.getByRole("button", { name: /Verify → Approved/ }).click();
-      await expect(row.getByText("approved", { exact: true })).toBeVisible({ timeout: 25_000 });
+      // In-House's own portal (split from /management since this session's
+      // In-House Supervisor portal work) links a candidate row out to its
+      // dedicated detail page rather than showing inline actions.
+      await page.getByRole("link", { name: "Candidates", exact: true }).click();
+      await page.waitForURL(/\/inhouse\/candidates$/);
+      await page.getByRole("link", { name: "E2E Case Candidate" }).click();
+      await page.waitForURL(/\/inhouse\/candidates\/.+/);
+
+      await page.getByRole("button", { name: "Approve", exact: true }).click();
+      await expect(page.getByText("approved", { exact: true })).toBeVisible({ timeout: 25_000 });
     });
 
     await test.step("the case appears in the management case list at its opening stage", async () => {
+      // Case-stage management (advance stage, issue contract) stayed on
+      // /management, which In-House no longer has access to post-split —
+      // switch to an account that does for the rest of this staff flow.
+      await logout(page);
+      await login(page, "e2e-admin@test.local", PASSWORD);
       await page.goto("/management/cases");
       const caseCard = page.locator("a", { hasText: "E2E Case Candidate" });
       await expect(caseCard).toBeVisible({ timeout: 25_000 });
@@ -49,7 +60,7 @@ test.describe("Mobility case lifecycle (Phase 4)", () => {
       await page.waitForURL(/\/management\/cases\/.+/);
     });
 
-    await test.step("In-House advances the case to Verification with a deadline", async () => {
+    await test.step("staff advances the case to Verification with a deadline", async () => {
       await page.getByRole("combobox").first().click();
       await page.getByRole("option", { name: "Verification" }).click();
       await page.getByPlaceholder("Notes (optional)").fill("Docs look complete, moving to verification.");
@@ -59,7 +70,7 @@ test.describe("Mobility case lifecycle (Phase 4)", () => {
       await expect(page.getByText("Docs look complete, moving to verification.")).toBeVisible();
     });
 
-    await test.step("In-House issues a contract", async () => {
+    await test.step("staff issues a contract", async () => {
       await page.getByPlaceholder(/Offer of employment/).fill("Offer of employment for E2E Test Job. Salary and terms as discussed. Start date to be confirmed.");
       await page.getByRole("button", { name: "Issue Contract" }).click();
 
@@ -69,7 +80,7 @@ test.describe("Mobility case lifecycle (Phase 4)", () => {
     await test.step("the candidate signs their own contract from their dashboard", async () => {
       await logout(page);
       await login(page, "e2e-case-candidate@test.local", PASSWORD);
-      await page.goto("/dashboard");
+      await page.goto("/dashboard/cases");
 
       await expect(page.getByText("My Placement Case")).toBeVisible({ timeout: 25_000 });
       await expect(page.getByText(/Offer of employment for E2E Test Job/)).toBeVisible();

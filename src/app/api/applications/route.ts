@@ -7,6 +7,7 @@ import { getAuthUser, requireAuth } from "@/lib/api-auth";
 import { isStaffRole } from "@/lib/rbac";
 import { canAccessCandidate, scopeCandidatesToRequester } from "@/server/scope";
 import { assignNextRecruiterForCountry } from "@/server/services/recruiterAssignment";
+import { getRequiredDocumentTypesForCountryId } from "@/server/services/documentCompleteness";
 import { rateLimit } from "@/lib/rate-limit";
 
 // GET /api/applications — a candidate sees their own; every staff role
@@ -56,7 +57,18 @@ export async function GET(req: NextRequest) {
     orderBy: { submitted_at: "desc" },
   });
 
-  return NextResponse.json(applications);
+  // Which document types this specific application needs (universal set
+  // + its own destination country's extras) — lets the candidate's
+  // dashboard show a per-application checklist instead of one flattened,
+  // first-application-only list.
+  const withRequirements = await Promise.all(
+    applications.map(async (app: (typeof applications)[number]) => ({
+      ...app,
+      required_document_types: await getRequiredDocumentTypesForCountryId(app.preferred_country_1_id),
+    }))
+  );
+
+  return NextResponse.json(withRequirements);
 }
 
 // POST /api/applications — the Candidate Information Form. The first

@@ -4,6 +4,7 @@ import { auditedPrisma } from "@/lib/audit";
 import { getAuthUser, requireRole } from "@/lib/api-auth";
 import { canAccessCandidate } from "@/server/scope";
 import { updateCandidateDetailsSchema } from "@/lib/validations";
+import { getRequiredDocumentTypesForCountryId } from "@/server/services/documentCompleteness";
 
 const STAFF_ROLES = ["regional_recruiter", "country_supervisor", "inhouse_supervisor", "director", "admin"] as const;
 
@@ -81,7 +82,27 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     return NextResponse.json({ error: { code: "forbidden", message: "Forbidden." } }, { status: 403 });
   }
 
-  return NextResponse.json({ data: candidate });
+  // Which document types each application needs (universal set + that
+  // application's own destination country's extras), plus the union
+  // across all of them for a single "still missing overall" list — see
+  // documentCompleteness.ts for why this can't just be the first
+  // application's country.
+  const [applicationsWithRequirements, universalTypes] = await Promise.all([
+    Promise.all(
+      candidate.applications.map(async (app: (typeof candidate.applications)[number]) => ({
+        ...app,
+        required_document_types: await getRequiredDocumentTypesForCountryId(app.preferred_country_1?.id ?? null),
+      }))
+    ),
+    getRequiredDocumentTypesForCountryId(null),
+  ]);
+  const requiredDocumentTypes = [
+    ...new Set([...universalTypes, ...applicationsWithRequirements.flatMap((a) => a.required_document_types)]),
+  ];
+
+  return NextResponse.json({
+    data: { ...candidate, applications: applicationsWithRequirements, required_document_types: requiredDocumentTypes },
+  });
 }
 
 // PATCH /api/candidates/:id — progressive detail edits + consent capture

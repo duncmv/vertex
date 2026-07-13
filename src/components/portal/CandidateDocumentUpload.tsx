@@ -5,12 +5,13 @@ import { UploadSimple } from "@phosphor-icons/react";
 
 interface Props {
   candidateId: string;
-  type: "cv" | "passport";
+  type: string;
+  label?: string;
   onUploaded: () => void;
 }
 
 /** Lets a recruiter/supervisor upload a document for a lead who has no account of their own yet (SRS FR-2.1, FR-2.5). */
-export default function CandidateDocumentUpload({ candidateId, type, onUploaded }: Props) {
+export default function CandidateDocumentUpload({ candidateId, type, label, onUploaded }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
@@ -56,9 +57,9 @@ export default function CandidateDocumentUpload({ candidateId, type, onUploaded 
         type="button"
         disabled={uploading}
         onClick={() => inputRef.current?.click()}
-        className="inline-flex items-center gap-1 text-xs text-gold-600 hover:underline disabled:opacity-50 capitalize"
+        className="inline-flex items-center gap-1 text-xs text-gold-600 hover:underline disabled:opacity-50"
       >
-        <UploadSimple size={12} weight="bold" /> {uploading ? "Uploading…" : `Upload ${type}`}
+        <UploadSimple size={12} weight="bold" /> {uploading ? "Uploading…" : label ?? `Upload ${type.replace(/_/g, " ")}`}
       </button>
       {error && <div className="text-[10px] text-red-500 mt-0.5">{error}</div>}
     </div>

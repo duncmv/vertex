@@ -7,8 +7,7 @@ import SearchableSelect from "@/components/SearchableSelect";
 import { Target, Plus, X, Trash } from "@phosphor-icons/react";
 
 const METRICS = [
-  { value: "agent_signups", label: "Agent Sign-ups" },
-  { value: "applicant_flow", label: "Applicant Flow" },
+  { value: "verified_candidates", label: "Verified Candidates" },
   { value: "conversion_rate", label: "Conversion Rate (%)" },
 ];
 
@@ -114,7 +113,7 @@ export default function InhouseCampaignsPage() {
       });
       const body = await res.json();
       if (!res.ok) throw new Error(body.error?.message ?? "Failed to save target.");
-      setDrafts((prev) => ({ ...prev, [campaignId]: { metric: "agent_signups", value: "" } }));
+      setDrafts((prev) => ({ ...prev, [campaignId]: { metric: "verified_candidates", value: "" } }));
       load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save target.");
@@ -236,7 +235,7 @@ export default function InhouseCampaignsPage() {
 
                   <div className="flex flex-wrap items-center gap-2">
                     <SearchableSelect
-                      value={drafts[c.id]?.metric ?? "agent_signups"}
+                      value={drafts[c.id]?.metric ?? "verified_candidates"}
                       onChange={(value) => setDrafts((prev) => ({ ...prev, [c.id]: { metric: value, value: prev[c.id]?.value ?? "" } }))}
                       className="input-field py-1.5 text-xs w-auto"
                       options={METRICS}
@@ -245,7 +244,7 @@ export default function InhouseCampaignsPage() {
                       type="number"
                       placeholder="Target value"
                       value={drafts[c.id]?.value ?? ""}
-                      onChange={(e) => setDrafts((prev) => ({ ...prev, [c.id]: { metric: prev[c.id]?.metric ?? "agent_signups", value: e.target.value } }))}
+                      onChange={(e) => setDrafts((prev) => ({ ...prev, [c.id]: { metric: prev[c.id]?.metric ?? "verified_candidates", value: e.target.value } }))}
                       className="input-field py-1.5 text-xs w-32"
                     />
                     <button

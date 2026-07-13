@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import DocumentLink from "@/components/DocumentLink";
+import CandidateMessages from "@/components/CandidateMessages";
 import CandidateStatusControls from "./CandidateStatusControls";
 import CandidateDocumentUpload from "./CandidateDocumentUpload";
 import { PencilSimple, CheckCircle } from "@phosphor-icons/react";
@@ -66,6 +67,7 @@ interface CandidateData {
   country: { id: string; name: string } | null;
   documents: { id: string; type: string; verification_status: string; uploaded_at: string }[];
   applications: ApplicationRow[];
+  required_document_types: string[];
 }
 
 const EDITABLE_FIELDS = [
@@ -103,11 +105,19 @@ export default function CandidateDetail({ candidateId, backHref, canVerify = fal
   const [error, setError] = useState("");
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [docTypeLabels, setDocTypeLabels] = useState<Record<string, string>>({});
   const [form, setForm] = useState<Record<(typeof EDITABLE_FIELDS)[number], string>>({
     date_of_birth: "", passport_number: "", email: "", desired_role: "", second_nationality: "",
     passport_expiry: "", current_occupation: "", highest_education: "", home_address: "",
     whatsapp_number: "", marital_status: "",
   });
+
+  useEffect(() => {
+    fetch("/api/admin/document-types")
+      .then((r) => r.json())
+      .then((res) => setDocTypeLabels(Object.fromEntries((res.data ?? []).map((t: { key: string; label: string }) => [t.key, t.label]))))
+      .catch(() => {});
+  }, []);
 
   const load = () => {
     setLoading(true);
@@ -346,22 +356,61 @@ export default function CandidateDetail({ candidateId, backHref, canVerify = fal
         </div>
       )}
 
-      <div className="card p-6">
-        <h2 className="text-sm font-semibold text-midnight-900/70 uppercase tracking-wider mb-4">Documents</h2>
-        <div className="space-y-2 mb-4">
-          {data.documents.length === 0 && <p className="text-sm text-midnight-900/40">No documents uploaded yet.</p>}
-          {data.documents.map((d) => (
-            <div key={d.id} className="flex items-center justify-between text-sm border-b border-midnight-900/5 pb-2">
-              <DocumentLink documentId={d.id} label={d.type} className="text-gold-600 hover:underline capitalize" />
-              <span className="text-xs text-midnight-900/45 capitalize">{d.verification_status}</span>
+      {(() => {
+        const uploadedByType = new Map(data.documents.map((d) => [d.type, d]));
+        const extraDocs = data.documents.filter((d) => !data.required_document_types.includes(d.type));
+        return (
+          <div className="card p-6">
+            <h2 className="text-sm font-semibold text-midnight-900/70 uppercase tracking-wider mb-1">Documents</h2>
+            <p className="text-xs text-midnight-900/40 mb-4">
+              Required across this candidate&rsquo;s application{data.applications.length === 1 ? "" : "s"} — upload whatever&rsquo;s still missing.
+            </p>
+            <div className="space-y-2 mb-4">
+              {data.required_document_types.length === 0 && (
+                <p className="text-sm text-midnight-900/40">No document requirements yet — select a destination country on an application first.</p>
+              )}
+              {data.required_document_types.map((type) => {
+                const doc = uploadedByType.get(type);
+                return (
+                  <div key={type} className="flex items-center justify-between text-sm border-b border-midnight-900/5 pb-2">
+                    <span className="text-midnight-900">{docTypeLabels[type] ?? type.replace(/_/g, " ")}</span>
+                    {doc ? (
+                      <div className="flex items-center gap-3">
+                        <DocumentLink documentId={doc.id} label="View" className="text-gold-600 hover:underline text-xs" />
+                        <span className="text-xs text-midnight-900/45 capitalize">{doc.verification_status}</span>
+                        <CandidateDocumentUpload candidateId={data.id} type={type} label="Replace" onUploaded={load} />
+                      </div>
+                    ) : (
+                      <CandidateDocumentUpload candidateId={data.id} type={type} label="Upload" onUploaded={load} />
+                    )}
+                  </div>
+                );
+              })}
             </div>
-          ))}
-        </div>
-        <div className="flex items-center gap-4 pt-2 border-t border-midnight-900/10">
-          <CandidateDocumentUpload candidateId={data.id} type="cv" onUploaded={load} />
-          <CandidateDocumentUpload candidateId={data.id} type="passport" onUploaded={load} />
-        </div>
-      </div>
+
+            {extraDocs.length > 0 && (
+              <div className="pt-2 border-t border-midnight-900/10">
+                <div className="text-[11px] text-midnight-900/40 uppercase tracking-wider mb-2">Additional documents on file</div>
+                <div className="space-y-2">
+                  {extraDocs.map((d) => (
+                    <div key={d.id} className="flex items-center justify-between text-sm">
+                      <DocumentLink documentId={d.id} label={docTypeLabels[d.type] ?? d.type.replace(/_/g, " ")} className="text-gold-600 hover:underline" />
+                      <span className="text-xs text-midnight-900/45 capitalize">{d.verification_status}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
+      {/* Messaging is scoped to the candidate and their assigned recruiter
+          only (confirmed with the business) — canVerify is false exactly
+          when this page is rendered from the recruiter's own portal, the
+          one context where the viewer might actually be that recruiter;
+          supervisor/in-house viewers would just get a 403 from the API. */}
+      {!canVerify && <CandidateMessages candidateId={data.id} />}
     </div>
   );
 }

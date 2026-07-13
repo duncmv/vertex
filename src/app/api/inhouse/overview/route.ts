@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getAuthUser, requireRole } from "@/lib/api-auth";
-import { computeApplicantFlow, computeAgentSignups, computeConversionRates } from "@/server/services/kpi";
-import type { CampaignMetric } from "@prisma/client";
+import { computeApplicantFlow, computeVerifiedCandidates, computeConversionRates } from "@/server/services/kpi";
 
 // GET /api/inhouse/overview — everything the In-House Supervisor's
 // Country Overview dashboard needs, pre-scoped to their one assigned
@@ -63,19 +62,10 @@ export async function GET(req: NextRequest) {
   const filters = { countryId, periodStart: new Date(0), periodEnd: new Date() };
   const campaignTargets = await Promise.all(
     activeCampaignTargets.map(async (t: (typeof activeCampaignTargets)[number]) => {
-      let actualValue: number;
-      switch (t.metric as CampaignMetric) {
-        case "agent_signups":
-          actualValue = await computeAgentSignups(filters);
-          break;
-        case "conversion_rate":
-          actualValue = (await computeConversionRates(filters)).overall;
-          break;
-        case "applicant_flow":
-        default:
-          actualValue = Object.values(candidateFunnel).reduce((a, b) => a + b, 0);
-          break;
-      }
+      const actualValue =
+        t.metric === "conversion_rate"
+          ? (await computeConversionRates(filters)).overall
+          : await computeVerifiedCandidates(filters);
       return {
         id: t.id,
         metric: t.metric,

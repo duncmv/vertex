@@ -124,7 +124,7 @@ export default function CandidateStatusControls({ candidateId, status, canVerify
             onClick={() => submit(nextStatus)}
             className="text-xs font-semibold text-emerald-600 hover:underline disabled:opacity-50"
           >
-            Verify → {STATUS_LABELS[nextStatus]}
+            {nextStatus === "approved" ? "Approve" : "Verify"}
           </button>
         )}
 

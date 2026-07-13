@@ -9,8 +9,7 @@ import { usePagination } from "@/lib/usePagination";
 import { Plus, Target, Trash, X } from "@phosphor-icons/react";
 
 const METRICS = [
-  { value: "agent_signups", label: "Agent Sign-ups" },
-  { value: "applicant_flow", label: "Applicant Flow" },
+  { value: "verified_candidates", label: "Verified Candidates" },
   { value: "conversion_rate", label: "Conversion Rate (%)" },
 ];
 
@@ -123,7 +122,7 @@ export default function CampaignsPage() {
         ...(scopeType === "region" ? { region_id: scopeId } : {}),
       }),
     });
-    setTargetForms((prev) => ({ ...prev, [campaignId]: { metric: "agent_signups", scope: "", target_value: "" } }));
+    setTargetForms((prev) => ({ ...prev, [campaignId]: { metric: "verified_candidates", scope: "", target_value: "" } }));
     load();
   };
 
@@ -235,14 +234,14 @@ export default function CampaignsPage() {
 
                 <div className="flex flex-wrap items-center gap-2">
                   <SearchableSelect
-                    value={targetForms[c.id]?.metric ?? "agent_signups"}
+                    value={targetForms[c.id]?.metric ?? "verified_candidates"}
                     onChange={(value) => setTargetForms((prev) => ({ ...prev, [c.id]: { ...prev[c.id], metric: value, scope: prev[c.id]?.scope ?? "", target_value: prev[c.id]?.target_value ?? "" } }))}
                     className="input-field py-1.5 text-xs w-auto"
                     options={METRICS.map((m) => ({ value: m.value, label: m.label }))}
                   />
                   <SearchableSelect
                     value={targetForms[c.id]?.scope ?? ""}
-                    onChange={(value) => setTargetForms((prev) => ({ ...prev, [c.id]: { metric: prev[c.id]?.metric ?? "agent_signups", scope: value, target_value: prev[c.id]?.target_value ?? "" } }))}
+                    onChange={(value) => setTargetForms((prev) => ({ ...prev, [c.id]: { metric: prev[c.id]?.metric ?? "verified_candidates", scope: value, target_value: prev[c.id]?.target_value ?? "" } }))}
                     className="input-field py-1.5 text-xs w-auto"
                     placeholder="Campaign-wide"
                     options={[
@@ -255,7 +254,7 @@ export default function CampaignsPage() {
                     type="number"
                     placeholder="Target value"
                     value={targetForms[c.id]?.target_value ?? ""}
-                    onChange={(e) => setTargetForms((prev) => ({ ...prev, [c.id]: { metric: prev[c.id]?.metric ?? "agent_signups", scope: prev[c.id]?.scope ?? "", target_value: e.target.value } }))}
+                    onChange={(e) => setTargetForms((prev) => ({ ...prev, [c.id]: { metric: prev[c.id]?.metric ?? "verified_candidates", scope: prev[c.id]?.scope ?? "", target_value: e.target.value } }))}
                     className="input-field py-1.5 text-xs w-28"
                   />
                   <button onClick={() => addTarget(c.id)} className="btn-secondary py-1.5 px-3 text-xs">

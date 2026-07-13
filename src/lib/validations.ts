@@ -285,7 +285,7 @@ export const updateCampaignSchema = z.object({
 
 export const createCampaignTargetSchema = z
   .object({
-    metric: z.enum(["agent_signups", "applicant_flow", "conversion_rate"]),
+    metric: z.enum(["verified_candidates", "conversion_rate"]),
     country_id: z.string().cuid().optional(),
     region_id: z.string().cuid().optional(),
     target_value: z.number().positive(),

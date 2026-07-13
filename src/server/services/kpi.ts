@@ -79,22 +79,42 @@ export interface StageConversion {
   rate: number;
 }
 
+function reachedOrLaterFromFlow(flow: Record<CandidateLifecycleStatus, number>, idx: number): number {
+  return LIFECYCLE_ORDER.slice(idx).reduce((sum, status) => sum + flow[status], 0);
+}
+
 /**
- * "Conversion rate" (SRS FR-3.2): overall identified→approved rate, plus a
- * stage-by-stage breakdown for the funnel view. A candidate currently
- * sitting at stage N is counted as having cleared every stage before N
- * (lifecycle stages are strictly sequential — see candidateLifecycle.ts),
- * so "reached this stage or later" is just an index comparison, not a
- * separate historical query.
+ * "Verified candidates" (campaign-target metric, redefined 2026-07-13):
+ * candidates who reached "verified" or later (i.e. verified + approved) —
+ * Country Supervisor's own ceiling in the lifecycle, and the pool
+ * conversion_rate below measures against.
+ */
+export async function computeVerifiedCandidates(filters: KpiFilters): Promise<number> {
+  const flow = await computeApplicantFlow(filters);
+  return reachedOrLaterFromFlow(flow, LIFECYCLE_ORDER.indexOf("verified"));
+}
+
+/**
+ * "Conversion rate" (redefined 2026-07-13, confirmed with the business):
+ * of the candidates who made it to "verified", what fraction went all the
+ * way through to "approved" — not identified→approved anymore, since a
+ * huge chunk of the funnel (screening, document upload, recruiter
+ * reporting) is agent-network throughput rather than something a
+ * verified candidate's own approval odds should be judged against. Also
+ * returns the full stage-by-stage breakdown for the funnel view, which is
+ * unaffected by this redefinition. A candidate currently sitting at stage
+ * N is counted as having cleared every stage before N (lifecycle stages
+ * are strictly sequential — see candidateLifecycle.ts), so "reached this
+ * stage or later" is just an index comparison, not a separate historical
+ * query.
  */
 export async function computeConversionRates(filters: KpiFilters): Promise<{ overall: number; byStage: StageConversion[] }> {
   const flow = await computeApplicantFlow(filters);
-  const reachedOrLater = (idx: number) =>
-    LIFECYCLE_ORDER.slice(idx).reduce((sum, status) => sum + flow[status], 0);
+  const reachedOrLater = (idx: number) => reachedOrLaterFromFlow(flow, idx);
 
-  const totalIdentified = reachedOrLater(0);
+  const totalVerified = reachedOrLater(LIFECYCLE_ORDER.indexOf("verified"));
   const totalApproved = flow.approved;
-  const overall = totalIdentified === 0 ? 0 : Math.round((totalApproved / totalIdentified) * 1000) / 10;
+  const overall = totalVerified === 0 ? 0 : Math.round((totalApproved / totalVerified) * 1000) / 10;
 
   const byStage: StageConversion[] = [];
   for (let i = 0; i < LIFECYCLE_ORDER.length - 1; i++) {
@@ -176,8 +196,8 @@ export interface TargetVsActual {
 /**
  * "Targets vs actuals" (SRS FR-3.2): for every CampaignTarget on a
  * campaign, compute the real current value for that same metric/scope
- * and compare. `actualValue` for "conversion_rate" is the overall rate;
- * for "agent_signups"/"applicant_flow" it's a count.
+ * and compare. `actualValue` for "conversion_rate" is the overall
+ * verified→approved rate; for "verified_candidates" it's a count.
  */
 export async function computeTargetsVsActuals(campaignId: string, filters: Pick<KpiFilters, "periodStart" | "periodEnd">): Promise<TargetVsActual[]> {
   const targets = await prisma.campaignTarget.findMany({ where: { campaign_id: campaignId } });
@@ -190,21 +210,10 @@ export async function computeTargetsVsActuals(campaignId: string, filters: Pick<
         regionId: target.region_id ?? undefined,
       };
 
-      let actualValue: number;
-      switch (target.metric) {
-        case "agent_signups":
-          actualValue = await computeAgentSignups(scoped);
-          break;
-        case "conversion_rate":
-          actualValue = (await computeConversionRates(scoped)).overall;
-          break;
-        case "applicant_flow":
-        default: {
-          const flow = await computeApplicantFlow(scoped);
-          actualValue = Object.values(flow).reduce((a, b) => a + b, 0);
-          break;
-        }
-      }
+      const actualValue =
+        target.metric === "conversion_rate"
+          ? (await computeConversionRates(scoped)).overall
+          : await computeVerifiedCandidates(scoped);
 
       return {
         campaignTargetId: target.id,
@@ -245,21 +254,10 @@ export async function computeCountryTargetsVsActuals(
     targets.map(async (target: CampaignTarget & { campaign: { name: string } }) => {
       const scoped: KpiFilters = { ...filters, countryId };
 
-      let actualValue: number;
-      switch (target.metric) {
-        case "agent_signups":
-          actualValue = await computeAgentSignups(scoped);
-          break;
-        case "conversion_rate":
-          actualValue = (await computeConversionRates(scoped)).overall;
-          break;
-        case "applicant_flow":
-        default: {
-          const flow = await computeApplicantFlow(scoped);
-          actualValue = Object.values(flow).reduce((a, b) => a + b, 0);
-          break;
-        }
-      }
+      const actualValue =
+        target.metric === "conversion_rate"
+          ? (await computeConversionRates(scoped)).overall
+          : await computeVerifiedCandidates(scoped);
 
       return {
         campaignTargetId: target.id,
@@ -299,21 +297,10 @@ export async function computeRecruiterTargetsVsActuals(
     targets.map(async (rt: RecruiterTarget & { campaign_target: CampaignTarget & { campaign: { name: string } } }) => {
       const scoped: KpiFilters = { ...filters, recruiterId };
 
-      let actualValue: number;
-      switch (rt.campaign_target.metric) {
-        case "agent_signups":
-          actualValue = await computeAgentSignups(scoped);
-          break;
-        case "conversion_rate":
-          actualValue = (await computeConversionRates(scoped)).overall;
-          break;
-        case "applicant_flow":
-        default: {
-          const flow = await computeApplicantFlow(scoped);
-          actualValue = Object.values(flow).reduce((a, b) => a + b, 0);
-          break;
-        }
-      }
+      const actualValue =
+        rt.campaign_target.metric === "conversion_rate"
+          ? (await computeConversionRates(scoped)).overall
+          : await computeVerifiedCandidates(scoped);
 
       return {
         recruiterTargetId: rt.id,

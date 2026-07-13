@@ -7,7 +7,7 @@ import { canSetLifecycleStatus, type LifecycleStatus } from "@/server/services/c
 import { createCaseForApprovedApplication } from "@/server/services/caseLifecycle";
 import { evaluateScreeningGateForCandidateId } from "@/server/services/screening";
 import { updateCandidateStatusSchema } from "@/lib/validations";
-import { sendCandidateInviteEmail } from "@/lib/email";
+import { sendCandidateInviteEmail, sendCandidateApprovedEmail } from "@/lib/email";
 
 // PATCH /api/candidates/:id/status — role-gated lifecycle transition
 // (SRS FR-2.4), screening-gate enforced on screened (FR-2.5 — evaluated
@@ -51,6 +51,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       country_id: true,
       full_name: true,
       email: true,
+      user: { select: { full_name: true, email: true } },
     },
   });
   if (!candidate) {
@@ -133,6 +134,12 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     });
     if (application) {
       await createCaseForApprovedApplication(application.id, user!.userId);
+    }
+
+    const recipientEmail = candidate.user?.email ?? candidate.email;
+    const recipientName = candidate.user?.full_name ?? candidate.full_name;
+    if (recipientEmail && recipientName) {
+      sendCandidateApprovedEmail(recipientEmail, recipientName).catch(console.error);
     }
   }
 

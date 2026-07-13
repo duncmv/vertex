@@ -279,6 +279,56 @@ export async function sendCaseStageUpdateEmail(to: string, name: string, jobTitl
   }
 }
 
+// Fires once on the candidate lifecycle's "approved" transition
+// (candidates/[id]/status/route.ts) — the point a Case actually opens
+// (Regional Supervisory Operational Workflow p.5). Distinct from
+// sendStatusUpdateEmail/sendCaseStageUpdateEmail above, which track the
+// legacy Application.application_status field and case-stage changes
+// respectively, not this candidate-lifecycle milestone.
+export async function sendCandidateApprovedEmail(to: string, name: string) {
+  const defaultHtml = emailLayout({
+    eyebrow: "Application Approved",
+    title: "You've been approved, {{name}}.",
+    bodyHtml: `
+      ${p("Congratulations — your application has been approved by our In-House team. Your mobility case is now open, and your recruiter will be in touch with next steps.")}
+      ${goldButton(`${APP_URL}/dashboard`, "View My Case")}
+    `,
+  });
+
+  const config = await getEmailConfig("candidate_approved", "You've been approved — Vertex International", defaultHtml);
+  const finalHtml = config.html.replace(/\{\{name\}\}/g, name);
+
+  try {
+    await transporter.sendMail({ from: FROM, to, subject: config.subject, html: finalHtml });
+  } catch (error) {
+    console.error("Error sending candidate approved email:", error);
+  }
+}
+
+// Fires whenever either side of the candidate<->recruiter message thread
+// posts a new message, notifying whoever didn't send it — a light nudge
+// to check the thread rather than reproducing the message content itself
+// (no need to put message contents in an email a third party could see).
+export async function sendCandidateMessageNotificationEmail(to: string, name: string, viewUrl: string) {
+  const defaultHtml = emailLayout({
+    eyebrow: "New Message",
+    title: "You have a new message, {{name}}.",
+    bodyHtml: `
+      ${p("You've received a new message on Vertex International. Log in to read and reply.")}
+      ${goldButton(viewUrl, "View Message")}
+    `,
+  });
+
+  const config = await getEmailConfig("candidate_message", "New message — Vertex International", defaultHtml);
+  const finalHtml = config.html.replace(/\{\{name\}\}/g, name);
+
+  try {
+    await transporter.sendMail({ from: FROM, to, subject: config.subject, html: finalHtml });
+  } catch (error) {
+    console.error("Error sending message notification:", error);
+  }
+}
+
 // Staff-facing notification (SRS FR-5.1) — a partner submitted a candidate
 // through its own portal. This candidate never enters Vertex's internal
 // recruiter/screening funnel, so this email (plus the record itself) is

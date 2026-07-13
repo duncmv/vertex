@@ -78,6 +78,7 @@ model User {
   recruiter_targets_set       RecruiterTarget[]  @relation("RecruiterTargetSetter")
   recruiter_notes_received    RecruiterNote[]    @relation("RecruiterNoteRecipient")
   recruiter_notes_authored    RecruiterNote[]    @relation("RecruiterNoteAuthor")
+  candidate_messages_sent     CandidateMessage[]
 
   @@index([email])
   @@index([supervisor_id])
@@ -243,6 +244,7 @@ model Candidate {
   user                     User?             @relation(fields: [user_id], references: [id], onDelete: Cascade)
   applications             Application[]
   documents                Document[]
+  messages                 CandidateMessage[]
   // Set once this Candidate was bridged from a partner's own submission
   // (future job-assignment step, not exercised yet) rather than created
   // directly.
@@ -277,6 +279,25 @@ model Document {
 
   @@index([candidate_id])
   @@index([type])
+}
+
+// One continuous thread per candidate (2026-07-13, confirmed with the
+// business) — not split per-Application or per-Case, so the same
+// conversation carries through whether the candidate is still applying
+// or already has a case open. Sender is always either the candidate's
+// own linked User or their assigned recruiter (Candidate.recruiter_id at
+// the time of sending); scoped to just those two participants, not a
+// general staff-visible channel like RecruiterNote.
+model CandidateMessage {
+  id           String   @id @default(cuid())
+  candidate_id String
+  candidate    Candidate @relation(fields: [candidate_id], references: [id], onDelete: Cascade)
+  sender_id    String
+  sender       User     @relation(fields: [sender_id], references: [id], onDelete: Cascade)
+  body         String   @db.Text
+  created_at   DateTime @default(now())
+
+  @@index([candidate_id])
 }
 
 model AuditLog {
@@ -376,9 +397,13 @@ model Campaign {
   @@index([created_by])
 }
 
+// Redefined (2026-07-13, confirmed with the business): a campaign target
+// is either how many candidates a country/campaign should get to
+// "verified" (Country Supervisor's own ceiling — see candidateLifecycle.ts),
+// or what fraction of those verified candidates should go all the way
+// through to "approved" — not a raw sign-up/funnel count anymore.
 enum CampaignMetric {
-  agent_signups
-  applicant_flow
+  verified_candidates
   conversion_rate
 }
 

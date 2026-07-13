@@ -29,6 +29,27 @@ const AUDITED_MODELS = new Set([
 ]);
 const AUDITED_OPERATIONS = new Set(["create", "update", "delete"]);
 
+// Fields that must never be duplicated into AuditLog.before/after, even
+// though the model itself is audited — bcrypt is one-way, but there's no
+// reason to needlessly widen where a credential hash can be read from
+// (a compromised AuditLog table shouldn't also mean compromised
+// password hashes). The audit trail doesn't need the old/new hash to be
+// useful — "password was changed" is captured by the row existing at
+// all, not by the hash value itself.
+const REDACTED_FIELDS: Record<string, string[]> = {
+  User: ["password_hash"],
+};
+
+function redactSnapshot(model: string, snapshot: Record<string, unknown> | null): Record<string, unknown> | null {
+  const fields = REDACTED_FIELDS[model];
+  if (!snapshot || !fields) return snapshot;
+  const copy = { ...snapshot };
+  for (const field of fields) {
+    if (field in copy) copy[field] = "[redacted]";
+  }
+  return copy;
+}
+
 function modelDelegateName(model: string): string {
   return model.charAt(0).toLowerCase() + model.slice(1);
 }
@@ -74,8 +95,8 @@ export function auditedPrisma(actorId: string | null) {
               entity_id: entityId,
               action: operation,
               actor_id: actorId,
-              before: before ? JSON.parse(JSON.stringify(before)) : undefined,
-              after: operation !== "delete" ? JSON.parse(JSON.stringify(result)) : undefined,
+              before: before ? redactSnapshot(model, JSON.parse(JSON.stringify(before))) : undefined,
+              after: operation !== "delete" ? redactSnapshot(model, JSON.parse(JSON.stringify(result))) : undefined,
             },
           });
 

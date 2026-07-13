@@ -4,7 +4,8 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { CaretDown, Check } from "@phosphor-icons/react";
-import { isInternalPortalPath } from "@/lib/rbac";
+import { isInternalPortalPath, homeFor } from "@/lib/rbac";
+import type { Role } from "@prisma/client";
 
 const BASE_NAV_LINKS = [
   { href: "/", label: "Home" },
@@ -34,6 +35,7 @@ export default function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const [currentLang, setCurrentLang] = useState("en");
   const [hasJobs, setHasJobs] = useState(false);
+  const [authedRole, setAuthedRole] = useState<Role | null>(null);
   const pathname = usePathname();
 
   // The Jobs nav link only appears once there's something to browse —
@@ -44,6 +46,25 @@ export default function Navbar() {
       .then((res) => setHasJobs((res.total ?? 0) > 0))
       .catch(() => {});
   }, []);
+
+  // Swaps Login/Get Started for Dashboard/Log Out when a session cookie
+  // is present — this public marketing nav previously never checked auth
+  // state at all, so a logged-in candidate browsing /jobs or /about kept
+  // seeing "Log In" as if they weren't. Re-checked on every route change
+  // since login/logout happen via full navigations, not client state this
+  // component would otherwise observe.
+  useEffect(() => {
+    fetch("/api/auth/me")
+      .then((r) => (r.ok ? r.json() : { data: null }))
+      .then((res) => setAuthedRole(res.data?.role ?? null))
+      .catch(() => setAuthedRole(null));
+  }, [pathname]);
+
+  const handleLogout = async () => {
+    await fetch("/api/auth/logout", { method: "POST" });
+    setAuthedRole(null);
+    window.location.href = "/";
+  };
 
   const navLinks = hasJobs
     ? [...BASE_NAV_LINKS.slice(0, 2), JOBS_LINK, ...BASE_NAV_LINKS.slice(2)]
@@ -151,18 +172,37 @@ export default function Navbar() {
 
             <div className="h-5 w-px bg-white/15 hidden lg:block" />
 
-            <Link
-              href="/auth/login"
-              className="text-[12px] font-semibold tracking-[0.2em] uppercase text-ivory-50/50 hover:text-ivory-50 transition-colors"
-            >
-              Log In
-            </Link>
-            <Link
-              href="/apply"
-              className="bg-gold-400 hover:bg-gold-300 text-midnight-950 font-semibold text-[12px] py-3 px-6 rounded-full transition-all uppercase tracking-[0.15em]"
-            >
-              Get Started
-            </Link>
+            {authedRole ? (
+              <>
+                <Link
+                  href={homeFor(authedRole)}
+                  className="text-[12px] font-semibold tracking-[0.2em] uppercase text-ivory-50/50 hover:text-ivory-50 transition-colors"
+                >
+                  Dashboard
+                </Link>
+                <button
+                  onClick={handleLogout}
+                  className="bg-gold-400 hover:bg-gold-300 text-midnight-950 font-semibold text-[12px] py-3 px-6 rounded-full transition-all uppercase tracking-[0.15em]"
+                >
+                  Log Out
+                </button>
+              </>
+            ) : (
+              <>
+                <Link
+                  href="/auth/login"
+                  className="text-[12px] font-semibold tracking-[0.2em] uppercase text-ivory-50/50 hover:text-ivory-50 transition-colors"
+                >
+                  Log In
+                </Link>
+                <Link
+                  href="/apply"
+                  className="bg-gold-400 hover:bg-gold-300 text-midnight-950 font-semibold text-[12px] py-3 px-6 rounded-full transition-all uppercase tracking-[0.15em]"
+                >
+                  Get Started
+                </Link>
+              </>
+            )}
           </div>
 
           {/* Mobile hamburger */}
@@ -217,12 +257,25 @@ export default function Navbar() {
               </div>
 
               <hr className="my-1 border-white/10" />
-              <Link href="/auth/login" className="px-4 py-2.5 text-sm font-medium uppercase tracking-[0.15em] text-ivory-50/60">
-                Log In
-              </Link>
-              <Link href="/apply" className="btn-gold text-sm mx-2 mt-1">
-                Get Started
-              </Link>
+              {authedRole ? (
+                <>
+                  <Link href={homeFor(authedRole)} className="px-4 py-2.5 text-sm font-medium uppercase tracking-[0.15em] text-ivory-50/60">
+                    Dashboard
+                  </Link>
+                  <button onClick={handleLogout} className="btn-gold text-sm mx-2 mt-1 text-center">
+                    Log Out
+                  </button>
+                </>
+              ) : (
+                <>
+                  <Link href="/auth/login" className="px-4 py-2.5 text-sm font-medium uppercase tracking-[0.15em] text-ivory-50/60">
+                    Log In
+                  </Link>
+                  <Link href="/apply" className="btn-gold text-sm mx-2 mt-1">
+                    Get Started
+                  </Link>
+                </>
+              )}
             </div>
           </div>
         )}

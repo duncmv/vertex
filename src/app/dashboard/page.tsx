@@ -1,61 +1,39 @@
 "use client";
-export const dynamic = "force-dynamic";
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import CandidateCaseCard from "@/components/CandidateCaseCard";
-import CandidateProfileForm from "@/components/CandidateProfileForm";
-import Pagination from "@/components/Pagination";
-import { usePagination } from "@/lib/usePagination";
-import { documentTypeLabel } from "@/lib/documentTypes";
+import PortalShell from "@/components/portal/PortalShell";
+import { CANDIDATE_NAV_ITEMS } from "@/components/portal/candidateNav";
 import {
   ClipboardText,
   FileText,
-  IdentificationCard,
-  CheckCircle,
-  XCircle,
-  UploadSimple,
-  Tray,
-  Receipt,
-  MapPin,
+  Airplane,
+  Warning,
   ArrowRight,
+  MapPin,
+  Tray,
 } from "@phosphor-icons/react";
 
 interface Application {
   id: string;
   application_status: string;
   submitted_at: string;
-  job: { id: string; title: string; country: string; city: string; salary_range?: string } | null;
-  preferred_country_1_id: string | null;
+  job: { id: string; title: string; country: string; city: string } | null;
   preferred_country_1: { name: string } | null;
   preferred_sector: { name: string } | null;
+  required_document_types: string[];
 }
 
 interface Profile {
-  id: string;
-  documents: { id: string; type: string; verification_status: string }[];
-  passport_number?: string | null;
-  nationality?: string | null;
-  second_nationality?: string | null;
-  date_of_birth?: string | null;
-  passport_expiry?: string | null;
-  current_occupation?: string | null;
-  highest_education?: string | null;
-  home_address?: string | null;
-  whatsapp_number?: string | null;
-  marital_status?: string | null;
+  documents: { type: string }[];
   _count: { applications: number };
-  user: { full_name: string; email: string; phone?: string; country?: string };
+  user: { full_name: string };
 }
 
-interface Payment {
+interface CaseSummary {
   id: string;
-  amount: number;
-  transaction_id: string;
-  payment_method: string;
-  payment_status: string;
-  created_at: string;
-  job: { title: string };
+  current_stage: string;
+  contract: { status: string } | null;
 }
 
 function StatusBadge({ status }: { status: string }) {
@@ -66,287 +44,170 @@ function StatusBadge({ status }: { status: string }) {
   return <span className={cls[status] ?? "badge bg-slate-100 text-slate-600"}>{status.replace("_", " ")}</span>;
 }
 
-export default function DashboardPage() {
+export default function CandidateOverviewPage() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [applications, setApplications] = useState<Application[]>([]);
-  const [payments, setPayments] = useState<Payment[]>([]);
-  const [extraDocumentTypes, setExtraDocumentTypes] = useState<string[]>([]);
-  const [documentTypeLabels, setDocumentTypeLabels] = useState<Record<string, string>>({});
-  const [universalDocumentTypes, setUniversalDocumentTypes] = useState<string[]>([]);
+  const [cases, setCases] = useState<CaseSummary[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
 
   useEffect(() => {
     Promise.all([
       fetch("/api/candidates/profile").then((r) => r.json()),
       fetch("/api/applications").then((r) => r.json()),
-      fetch("/api/payments/me").then((r) => r.json()).catch(() => []),
-      fetch("/api/apply/options").then((r) => r.json()).catch(() => null),
-    ]).then(([p, a, payRes, optionsRes]) => {
+      fetch("/api/cases").then((r) => r.json()).catch(() => ({ data: [] })),
+    ]).then(([p, a, c]) => {
       setProfile(p.error ? null : p);
       setApplications(Array.isArray(a) ? a : []);
-      setPayments(Array.isArray(payRes) ? payRes : []);
+      setCases(c.data ?? []);
       setLoading(false);
-
-      // Document requirement types are admin-managed (DocumentRequirementType)
-      // — is_universal marks the fixed set required for every programme;
-      // the rest are only required for specific destination countries
-      // (admin-managed CountryDocumentRequirement).
-      const types: { key: string; label: string; is_universal: boolean }[] = optionsRes?.documentTypes ?? [];
-      setDocumentTypeLabels(Object.fromEntries(types.map((t) => [t.key, t.label])));
-      setUniversalDocumentTypes(types.filter((t) => t.is_universal).map((t) => t.key));
-
-      const countryId = Array.isArray(a) ? a[0]?.preferred_country_1_id : null;
-      if (countryId) {
-        fetch(`/api/admin/countries/${countryId}/document-requirements`)
-          .then((r) => r.json())
-          .then((res) => setExtraDocumentTypes((res.data ?? []).map((r: { document_type: string }) => r.document_type)))
-          .catch(() => {});
-      }
-    }).catch(() => { setError("Failed to load dashboard."); setLoading(false); });
+    }).catch(() => setLoading(false));
   }, []);
 
-  const applicationsPage = usePagination(applications);
-  const paymentsPage = usePagination(payments);
+  if (loading) {
+    return (
+      <PortalShell roleLabel="Candidate" navItems={CANDIDATE_NAV_ITEMS}>
+        <p className="text-midnight-900/50">Loading…</p>
+      </PortalShell>
+    );
+  }
 
-  if (loading) return (
-    <div className="min-h-screen flex items-center justify-center bg-ivory-50">
-      <div className="w-10 h-10 border-4 border-midnight-900/15 border-t-midnight-700 rounded-full animate-spin" />
-    </div>
-  );
+  const uploadedTypes = new Set(profile?.documents.map((d) => d.type) ?? []);
+  const requiredTypes = [...new Set(applications.flatMap((a) => a.required_document_types))];
+  const missingTypes = requiredTypes.filter((t) => !uploadedTypes.has(t));
 
-  const hasCv = profile?.documents.some((d) => d.type === "cv") ?? false;
-  const hasPassport = profile?.documents.some((d) => d.type === "passport") ?? false;
+  const unsignedCase = cases.find((c) => c.contract && c.contract.status !== "signed");
+
+  const pendingActions: { label: string; href: string }[] = [];
+  if (missingTypes.length > 0) {
+    pendingActions.push({
+      label: `${missingTypes.length} document${missingTypes.length === 1 ? "" : "s"} still needed`,
+      href: "/dashboard/documents",
+    });
+  }
+  if (unsignedCase) {
+    pendingActions.push({ label: "Contract awaiting your signature", href: "/dashboard/cases" });
+  }
 
   return (
-    <div className="bg-ivory-50 min-h-screen">
-      {/* Header */}
-      <div className="bg-white border-b border-midnight-900/10">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 flex items-center justify-between flex-wrap gap-4">
-          <div>
-            <p className="eyebrow mb-2">
-              <span className="eyebrow-rule" />
-              My Account
-            </p>
-            <h1 className="section-title text-3xl md:text-4xl">My Dashboard</h1>
-            <p className="text-midnight-900/55 text-sm mt-2 font-light">Welcome back, {profile?.user.full_name ?? "Candidate"}</p>
+    <PortalShell roleLabel="Candidate" navItems={CANDIDATE_NAV_ITEMS}>
+      <p className="eyebrow mb-3">
+        <span className="eyebrow-rule" />
+        My Account
+      </p>
+      <h1 className="section-title text-3xl md:text-4xl mb-2">Overview.</h1>
+      <p className="text-midnight-900/55 font-light mb-8 max-w-2xl">
+        Welcome back, {profile?.user.full_name ?? "there"}.
+      </p>
+
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-8">
+        <div className="card p-6 flex items-center gap-4">
+          <div className="w-12 h-12 rounded-full bg-midnight-950/5 flex items-center justify-center shrink-0">
+            <ClipboardText size={22} weight="regular" className="text-midnight-800" />
           </div>
-          <div className="flex gap-3">
-            <Link href="/jobs" className="btn-secondary text-xs py-2.5 px-5">Browse Jobs</Link>
-            <button
-              onClick={async () => { await fetch("/api/auth/logout", { method: "POST" }); window.location.href = "/"; }}
-              className="text-sm text-red-500 hover:text-red-700 font-medium"
-            >
-              Log Out
-            </button>
+          <div>
+            <div className="text-2xl font-semibold text-midnight-900">{profile?._count.applications ?? 0}</div>
+            <div className="text-midnight-900/50 text-sm">Applications</div>
+          </div>
+        </div>
+        <div className="card p-6 flex items-center gap-4">
+          <div className="w-12 h-12 rounded-full bg-midnight-950/5 flex items-center justify-center shrink-0">
+            <FileText size={22} weight="regular" className="text-midnight-800" />
+          </div>
+          <div>
+            <div className="text-2xl font-semibold text-midnight-900">
+              {requiredTypes.length - missingTypes.length}/{requiredTypes.length}
+            </div>
+            <div className="text-midnight-900/50 text-sm">Documents complete</div>
+          </div>
+        </div>
+        <div className="card p-6 flex items-center gap-4">
+          <div className="w-12 h-12 rounded-full bg-midnight-950/5 flex items-center justify-center shrink-0">
+            <Airplane size={22} weight="regular" className="text-midnight-800" />
+          </div>
+          <div>
+            <div className="text-2xl font-semibold text-midnight-900 capitalize">
+              {cases[0]?.current_stage.replace(/_/g, " ") ?? "—"}
+            </div>
+            <div className="text-midnight-900/50 text-sm">{cases.length > 0 ? "Case stage" : "No case yet"}</div>
           </div>
         </div>
       </div>
 
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 space-y-8">
-        {error && <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg p-4 text-sm">{error}</div>}
+      {pendingActions.length > 0 && (
+        <div className="card p-6 mb-8 border-amber-200 bg-amber-50/40">
+          <h2 className="text-sm font-semibold text-midnight-900/70 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+            <Warning size={14} weight="bold" className="text-amber-600" /> Pending actions
+          </h2>
+          <div className="space-y-2">
+            {pendingActions.map((a) => (
+              <Link key={a.href + a.label} href={a.href} className="flex items-center justify-between text-sm text-midnight-900 hover:underline">
+                {a.label} <ArrowRight size={14} weight="bold" />
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
 
-        {/* Profile summary */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {[
-            { label: "Applications", value: profile?._count.applications ?? 0, icon: ClipboardText },
-            { label: "CV Uploaded", value: hasCv ? "Yes" : "No", icon: FileText, ok: hasCv },
-            { label: "Passport Scan", value: hasPassport ? "Yes" : "No", icon: IdentificationCard, ok: hasPassport },
-          ].map((stat) => {
-            const Icon = stat.icon;
-            return (
-              <div key={stat.label} className="card p-6 flex items-center gap-4">
-                <div className="w-12 h-12 rounded-full bg-midnight-950/5 flex items-center justify-center shrink-0">
-                  <Icon size={22} weight="regular" className="text-midnight-800" />
-                </div>
-                <div className="flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="text-2xl font-semibold text-midnight-900">{stat.value}</span>
-                    {"ok" in stat && (
-                      stat.ok
-                        ? <CheckCircle size={18} weight="fill" className="text-emerald-600" />
-                        : <XCircle size={18} weight="fill" className="text-red-400" />
-                    )}
-                  </div>
-                  <div className="text-midnight-900/50 text-sm">{stat.label}</div>
-                </div>
-              </div>
-            );
-          })}
+      <div className="card p-6">
+        <div className="flex items-center justify-between mb-5">
+          <h2 className="text-lg font-semibold text-midnight-900">My Applications</h2>
+          <Link href="/jobs" className="text-sm text-gold-600 hover:underline">Browse More Jobs →</Link>
         </div>
 
-        {/* Personal Information (Candidate Information Form Section 2) */}
-        {profile && (
-          <div className="card p-6">
-            <h2 className="text-lg font-semibold text-midnight-900 mb-4 flex items-center gap-2">
-              <IdentificationCard size={18} weight="regular" /> Personal Information
-            </h2>
-            <CandidateProfileForm
-              initial={profile}
-              onSaved={() => fetch("/api/candidates/profile").then((r) => r.json()).then((p) => !p.error && setProfile(p))}
-            />
+        {applications.length === 0 ? (
+          <div className="text-center py-10 text-midnight-900/40">
+            <Tray size={36} weight="regular" className="mx-auto mb-3" />
+            <p>No applications yet. <Link href="/jobs" className="text-gold-600 hover:underline">Browse Jobs</Link></p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm text-left">
+              <thead className="text-midnight-900/40 text-xs uppercase tracking-wider">
+                <tr className="border-b border-midnight-900/10">
+                  <th className="px-5 py-3 font-semibold">Programme</th>
+                  <th className="px-5 py-3 font-semibold">Status</th>
+                  <th className="px-5 py-3 font-semibold">Applied On</th>
+                  <th className="px-5 py-3 font-semibold text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {applications.map((app) => (
+                  <tr key={app.id} className="border-b border-midnight-900/5 last:border-0">
+                    <td className="px-5 py-4">
+                      {app.job ? (
+                        <>
+                          <div className="font-medium text-midnight-900 mb-1">{app.job.title}</div>
+                          <div className="text-midnight-900/45 text-xs flex items-center gap-1">
+                            <MapPin size={12} weight="regular" /> {app.job.city}, {app.job.country}
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <div className="font-medium text-midnight-900 mb-1">{app.preferred_sector?.name ?? "General Programme Application"}</div>
+                          {app.preferred_country_1 && (
+                            <div className="text-midnight-900/45 text-xs flex items-center gap-1">
+                              <MapPin size={12} weight="regular" /> {app.preferred_country_1.name}
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </td>
+                    <td className="px-5 py-4"><StatusBadge status={app.application_status} /></td>
+                    <td className="px-5 py-4 text-midnight-900/60">{new Date(app.submitted_at).toLocaleDateString()}</td>
+                    <td className="px-5 py-4 text-right">
+                      {app.job && (
+                        <Link href={`/jobs/${app.job.id}`} className="inline-flex items-center gap-1 text-sm font-semibold text-gold-600 hover:underline">
+                          View Job <ArrowRight size={14} weight="bold" />
+                        </Link>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
-
-        {/* Document Upload */}
-        <div className="card p-6">
-          <h2 className="text-lg font-semibold text-midnight-900 mb-4 flex items-center gap-2">
-            <UploadSimple size={18} weight="regular" /> Upload Documents
-          </h2>
-          <div className="grid sm:grid-cols-2 gap-4">
-            {[...universalDocumentTypes, ...extraDocumentTypes].map((type) => {
-              const uploaded = profile?.documents.some((d) => d.type === type) ?? false;
-              return (
-                <label
-                  key={type}
-                  className={`border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-colors group ${
-                    uploaded
-                      ? "border-emerald-300 bg-emerald-50/40"
-                      : "border-midnight-900/15 hover:border-gold-400 hover:bg-gold-50/40"
-                  }`}
-                >
-                  {uploaded ? (
-                    <CheckCircle size={30} weight="fill" className="mx-auto mb-2 text-emerald-600" />
-                  ) : (
-                    <FileText size={30} weight="regular" className="mx-auto mb-2 text-midnight-900/40 group-hover:text-gold-600" />
-                  )}
-                  <div className="font-semibold text-midnight-800 group-hover:text-midnight-950">
-                    {uploaded ? "Uploaded" : "Upload"} {documentTypeLabels[type] ?? documentTypeLabel(type)}
-                  </div>
-                  <div className="text-xs text-midnight-900/40 mt-1">PDF, JPG, PNG · Max 5MB{uploaded && " · Click to replace"}</div>
-                  <input
-                    type="file"
-                    data-testid={`upload-${type}-input`}
-                    accept=".pdf,.jpg,.jpeg,.png"
-                    className="hidden"
-                    onChange={async (e) => {
-                      const file = e.target.files?.[0];
-                      if (!file) return;
-                      const fd = new FormData();
-                      fd.append("file", file);
-                      await fetch(`/api/upload?type=${type}`, { method: "POST", body: fd });
-                      window.location.reload();
-                    }}
-                  />
-                </label>
-              );
-            })}
-          </div>
-        </div>
-
-        <CandidateCaseCard />
-
-        {/* Applications */}
-        <div className="card p-6">
-          <div className="flex items-center justify-between mb-5">
-            <h2 className="text-lg font-semibold text-midnight-900">My Applications</h2>
-            <Link href="/jobs" className="text-sm text-gold-600 hover:underline">Browse More Jobs →</Link>
-          </div>
-
-          {applications.length === 0 ? (
-            <div className="text-center py-10 text-midnight-900/40">
-              <Tray size={36} weight="regular" className="mx-auto mb-3" />
-              <p>No applications yet. <Link href="/jobs" className="text-gold-600 hover:underline">Browse Jobs</Link></p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm text-left">
-                <thead className="text-midnight-900/40 text-xs uppercase tracking-wider">
-                  <tr className="border-b border-midnight-900/10">
-                    <th className="px-5 py-3 font-semibold">Programme</th>
-                    <th className="px-5 py-3 font-semibold">Status</th>
-                    <th className="px-5 py-3 font-semibold">Applied On</th>
-                    <th className="px-5 py-3 font-semibold text-right">Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {applications.map((app) => (
-                    <tr key={app.id} className="border-b border-midnight-900/5 last:border-0">
-                      <td className="px-5 py-4">
-                        {app.job ? (
-                          <>
-                            <div className="font-medium text-midnight-900 mb-1">{app.job.title}</div>
-                            <div className="text-midnight-900/45 text-xs flex items-center gap-1">
-                              <MapPin size={12} weight="regular" /> {app.job.city}, {app.job.country}
-                            </div>
-                          </>
-                        ) : (
-                          <>
-                            <div className="font-medium text-midnight-900 mb-1">{app.preferred_sector?.name ?? "General Programme Application"}</div>
-                            {app.preferred_country_1 && (
-                              <div className="text-midnight-900/45 text-xs flex items-center gap-1">
-                                <MapPin size={12} weight="regular" /> {app.preferred_country_1.name}
-                              </div>
-                            )}
-                          </>
-                        )}
-                      </td>
-                      <td className="px-5 py-4"><StatusBadge status={app.application_status} /></td>
-                      <td className="px-5 py-4 text-midnight-900/60">{new Date(app.submitted_at).toLocaleDateString()}</td>
-                      <td className="px-5 py-4 text-right">
-                        {app.job && (
-                          <Link href={`/jobs/${app.job.id}`} className="inline-flex items-center gap-1 text-sm font-semibold text-gold-600 hover:underline">
-                            View Job <ArrowRight size={14} weight="bold" />
-                          </Link>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-
-        {/* Payment History & Receipts */}
-        <div className="card p-6">
-          <div className="flex items-center justify-between mb-5">
-            <h2 className="text-lg font-semibold text-midnight-900">Payment Receipts</h2>
-          </div>
-
-          {payments.length === 0 ? (
-            <div className="text-center py-10 text-midnight-900/40">
-              <Receipt size={36} weight="regular" className="mx-auto mb-3" />
-              <p>No payment history found.</p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm text-left">
-                <thead className="text-midnight-900/40 text-xs uppercase tracking-wider">
-                  <tr className="border-b border-midnight-900/10">
-                    <th className="px-5 py-3 font-semibold">Job Title</th>
-                    <th className="px-5 py-3 font-semibold">Amount Paid</th>
-                    <th className="px-5 py-3 font-semibold">Method</th>
-                    <th className="px-5 py-3 font-semibold">Date</th>
-                    <th className="px-5 py-3 font-semibold text-right">Transaction ID</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {payments.map((payment) => (
-                    <tr key={payment.id} className="border-b border-midnight-900/5 last:border-0">
-                      <td className="px-5 py-4 font-medium text-midnight-900">
-                        {payment.job?.title || "Unknown Job"}
-                      </td>
-                      <td className="px-5 py-4 font-medium text-emerald-700">
-                        ${payment.amount.toFixed(2)} USD
-                      </td>
-                      <td className="px-5 py-4 text-midnight-900/60 capitalize">
-                        {payment.payment_method}
-                      </td>
-                      <td className="px-5 py-4 text-midnight-900/60">
-                        {new Date(payment.created_at).toLocaleDateString()}
-                      </td>
-                      <td className="px-5 py-4 text-right text-xs text-midnight-900/40 font-mono">
-                        {payment.transaction_id || payment.id.substring(0, 8)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
       </div>
-    </div>
+    </PortalShell>
   );
 }

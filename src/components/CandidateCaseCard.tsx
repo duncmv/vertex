@@ -15,12 +15,20 @@ interface CandidateCase {
   };
 }
 
+interface Props {
+  /** Show an explicit "no cases" message instead of rendering nothing —
+   * for a dedicated Cases tab where this is the whole page's content, as
+   * opposed to an addendum on a longer dashboard where silently
+   * disappearing is the right call. */
+  showEmptyState?: boolean;
+}
+
 /**
  * The candidate's own view of their mobility case (SRS FR-4.1/4.3) — read
  * progress, sign the contract. No stage-advance or document-verification
  * controls here; those stay with staff.
  */
-export default function CandidateCaseCard() {
+export default function CandidateCaseCard({ showEmptyState = false }: Props = {}) {
   const [cases, setCases] = useState<CandidateCase[]>([]);
   const [loading, setLoading] = useState(true);
   const [signName, setSignName] = useState("");
@@ -55,7 +63,16 @@ export default function CandidateCaseCard() {
     load();
   };
 
-  if (loading || cases.length === 0) return null;
+  if (loading) return showEmptyState ? <p className="text-midnight-900/50">Loading…</p> : null;
+
+  if (cases.length === 0) {
+    if (!showEmptyState) return null;
+    return (
+      <div className="card p-10 text-center text-midnight-900/40">
+        No case yet — one opens automatically once your application is approved.
+      </div>
+    );
+  }
 
   return (
     <div className="card p-6">

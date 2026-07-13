@@ -59,11 +59,11 @@ export function homeFor(role: Role): string {
   return ROLE_HOME[role] ?? "/";
 }
 
-// Staff-facing portal shells (admin/recruiter/supervisor/management) render
-// their own PortalShell chrome and should NOT also get the public marketing
-// Navbar/Footer/chat widgets. /dashboard is deliberately excluded — it's the
-// candidate's own page and was already designed around the public chrome.
-const INTERNAL_PORTAL_PREFIXES = ["/admin", "/recruiter", "/supervisor", "/inhouse", "/management", "/marketing", "/partner"];
+// Every role-based portal shell (including the candidate's own /dashboard,
+// rebuilt on PortalShell 2026-07-13 to match the others) renders its own
+// chrome and should NOT also get the public marketing Navbar/Footer/chat
+// widgets.
+const INTERNAL_PORTAL_PREFIXES = ["/admin", "/recruiter", "/supervisor", "/inhouse", "/management", "/marketing", "/partner", "/dashboard"];
 
 export function isInternalPortalPath(pathname: string): boolean {
   return INTERNAL_PORTAL_PREFIXES.some((p) => pathname.startsWith(p));

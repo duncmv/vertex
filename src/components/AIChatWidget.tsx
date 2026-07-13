@@ -5,15 +5,6 @@ import { usePathname } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { isInternalPortalPath } from "@/lib/rbac";
 
-function VertexMark({ className }: { className?: string }) {
-  return (
-    <svg viewBox="80 15 170 170" className={className} fill="currentColor" xmlns="http://www.w3.org/2000/svg">
-      <path d="M 120 85 C 130 83 145 75 160 55 C 135 65 110 75 80 85 Z" />
-      <path d="M 125 100 L 165 150 L 250 50 C 220 55 195 70 170 115 L 140 85 Z" />
-    </svg>
-  );
-}
-
 export default function AIChatWidget() {
   const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
@@ -132,7 +123,7 @@ export default function AIChatWidget() {
               <div className="bg-slate-900 text-white p-4 flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="w-8 h-8 rounded-full bg-emerald-600 flex items-center justify-center text-white shadow-inner">
-                    <VertexMark className="w-4.5 h-4.5" />
+                    <img src="/logo.svg" alt="Vertex" className="h-4.5 w-auto brightness-0 invert" />
                   </div>
                   <div>
                     <h3 className="font-bold text-sm">Vertex AI Assistant</h3>
@@ -242,7 +233,7 @@ export default function AIChatWidget() {
           ) : (
             <div className="relative group">
               <span className="absolute -inset-1 rounded-full bg-emerald-500 opacity-40 blur transition duration-500 group-hover:opacity-75"></span>
-              <VertexMark className="w-7 h-7 relative z-10" />
+              <img src="/logo.svg" alt="Vertex" className="h-7 w-auto brightness-0 invert relative z-10" />
             </div>
           )}
         </button>

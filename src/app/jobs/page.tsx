@@ -162,7 +162,6 @@ export default async function JobsPage({
 
                   <div className="flex items-center justify-between pt-6 border-t border-midnight-900/10 mt-auto">
                     <div className="flex items-center gap-5 text-xs text-midnight-900/40 uppercase tracking-[0.1em]">
-                      <span>{new Date(job.created_at).toLocaleDateString()}</span>
                       <span className="flex items-center gap-1.5">
                         <Users size={14} weight="regular" /> {job._count?.applications || 0} applied
                       </span>

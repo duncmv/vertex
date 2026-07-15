@@ -49,7 +49,7 @@ COMPLIANCE:
 - No hidden fees, no opaque processes
 
 CONTACT:
-- WhatsApp: +44 7440 545686
+- WhatsApp: +44 7438 613251
 - Office: +44 20 3026 3403
 - Email: vertex@vertexintern.com (general), inquiries@vertexintern.com, support@vertexintern.com
 - Address: 5 Brayford Square, London, E1 0SG, United Kingdom / Chester, International House, Kingsfield Court, United Kingdom
@@ -94,7 +94,7 @@ Rules:
 - Be polite, professional, and concise.
 - Use the Knowledge Base below for specific process questions.
 - Never invent information not in the Knowledge Base.
-- If unsure, direct users to WhatsApp +44 7440 545686 or email vertex@vertexintern.com.
+- If unsure, direct users to WhatsApp +44 7438 613251 or email vertex@vertexintern.com.
 - Do NOT screen CVs or make hiring decisions.
 
 --- VERTEX KNOWLEDGE BASE ---

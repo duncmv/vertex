@@ -3,6 +3,9 @@
 import { useEffect, useMemo, useState } from "react";
 import SearchableSelect from "@/components/SearchableSelect";
 import { NON_PROGRAMME_TYPE_KEYS } from "@/lib/documentTypes";
+import { WORLD_COUNTRIES } from "@/lib/worldCountries";
+
+const WORLD_COUNTRY_OPTIONS = WORLD_COUNTRIES.map((name) => ({ value: name, label: name }));
 
 interface Option {
   id: string;
@@ -102,7 +105,7 @@ const emptyForm = {
 
   payment_plan_acknowledged: false,
 
-  current_location_country_id: "",
+  current_location_country_name: "",
   holds_schengen_visa: "",
   prior_visa_refusals: "",
   available_for_embassy_appointment: false,
@@ -134,6 +137,7 @@ const emptyForm = {
 export default function ApplicationForm({ candidateId, onSubmitted, compact, includePersonalInfo, jobId, initialCountryName, initialSectorName, initialProfile, useEmailIntakeIfConfigured }: Props) {
   const [countries, setCountries] = useState<Option[]>([]);
   const [locationCountries, setLocationCountries] = useState<Option[]>([]);
+  const [recruiterCountryNames, setRecruiterCountryNames] = useState<string[]>([]);
   const [sectors, setSectors] = useState<Option[]>([]);
   const [documentTypes, setDocumentTypes] = useState<DocumentTypeOption[]>([]);
   const [documentRequirements, setDocumentRequirements] = useState<{ country_id: string; document_type: string }[]>([]);
@@ -168,6 +172,7 @@ export default function ApplicationForm({ candidateId, onSubmitted, compact, inc
       .then((res) => {
         setCountries(res.countries ?? []);
         setLocationCountries(res.locationCountries ?? []);
+        setRecruiterCountryNames(res.recruiterCountryNames ?? []);
         setSectors(res.sectors ?? []);
         setDocumentTypes(res.documentTypes ?? []);
         setDocumentRequirements(res.documentRequirements ?? []);
@@ -215,6 +220,16 @@ export default function ApplicationForm({ candidateId, onSubmitted, compact, inc
     return map;
   }, [documentRequirements, countries]);
 
+  // The full world list, plus any of Vertex's own admin-managed
+  // source-market countries that aren't already on it (a spelling variant,
+  // or an admin-added country) — so an operational Country row is always
+  // selectable here even if it doesn't match the static list exactly.
+  const currentLocationOptions = useMemo(() => {
+    const worldNames = new Set(WORLD_COUNTRIES.map((n) => n.toLowerCase()));
+    const extra = locationCountries.filter((c) => !worldNames.has(c.name.toLowerCase()));
+    return [...WORLD_COUNTRY_OPTIONS, ...extra.map((c) => ({ value: c.name, label: c.name }))];
+  }, [locationCountries]);
+
   const set = <K extends keyof typeof emptyForm>(key: K, value: (typeof emptyForm)[K]) =>
     setForm((f) => ({ ...f, [key]: value }));
 
@@ -232,7 +247,15 @@ export default function ApplicationForm({ candidateId, onSubmitted, compact, inc
     setMessage("");
     setFieldErrors({});
 
-    const useEmailIntake = useEmailIntakeIfConfigured && intakeMode === "email";
+    // Even with the CRM active, a self-service submission whose current
+    // location isn't one of Vertex's source-market countries with an
+    // available Regional Recruiter has nobody to pick it up in the CRM —
+    // fall back to the same email-intake bridge used while the CRM isn't
+    // live at all, rather than silently creating an orphaned candidate.
+    const hasRecruiterForCountry = recruiterCountryNames.some(
+      (name) => name.toLowerCase() === form.current_location_country_name.toLowerCase()
+    );
+    const useEmailIntake = useEmailIntakeIfConfigured && (intakeMode === "email" || !hasRecruiterForCountry);
     const res = await fetch(useEmailIntake ? "/api/public-intake/application" : "/api/applications", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -355,12 +378,24 @@ export default function ApplicationForm({ candidateId, onSubmitted, compact, inc
             </div>
             <div>
               <label htmlFor="nationality" className={labelCls}>Nationality <span className="text-red-500">*</span></label>
-              <input id="nationality" value={form.nationality} onChange={(e) => set("nationality", e.target.value)} required className="input-field" />
+              <SearchableSelect
+                id="nationality"
+                value={form.nationality}
+                onChange={(value) => set("nationality", value)}
+                required
+                placeholder="Select a country…"
+                options={WORLD_COUNTRY_OPTIONS}
+              />
               {err("nationality") && <p className={errCls}>{err("nationality")}</p>}
             </div>
             <div>
               <label className={labelCls}>Second Nationality (if any)</label>
-              <input value={form.second_nationality} onChange={(e) => set("second_nationality", e.target.value)} className="input-field" />
+              <SearchableSelect
+                value={form.second_nationality}
+                onChange={(value) => set("second_nationality", value)}
+                placeholder="None"
+                options={WORLD_COUNTRY_OPTIONS}
+              />
             </div>
             <div>
               <label htmlFor="passport_number" className={labelCls}>Passport Number <span className="text-red-500">*</span></label>
@@ -461,7 +496,7 @@ export default function ApplicationForm({ candidateId, onSubmitted, compact, inc
             required
             className="w-4 h-4 mt-0.5"
           />
-          I understand the payment plan above.
+          I understand the payment plan above. <span className="text-red-500">*</span>
         </label>
         {err("payment_plan_acknowledged") && <p className={errCls}>{err("payment_plan_acknowledged")}</p>}
       </section>
@@ -470,15 +505,16 @@ export default function ApplicationForm({ candidateId, onSubmitted, compact, inc
         <h2 className="font-bold text-slate-800 mb-4">Section 5 — Visa & Travel Readiness</h2>
         <div className="grid sm:grid-cols-2 gap-4">
           <div>
-            <label htmlFor="current_location_country_id" className={labelCls}>Current Location (country) <span className="text-red-500">*</span></label>
+            <label htmlFor="current_location_country_name" className={labelCls}>Current Location (country) <span className="text-red-500">*</span></label>
             <SearchableSelect
-              id="current_location_country_id"
-              value={form.current_location_country_id}
-              onChange={(value) => set("current_location_country_id", value)}
+              id="current_location_country_name"
+              value={form.current_location_country_name}
+              onChange={(value) => set("current_location_country_name", value)}
               required
-              options={locationCountries.map((c) => ({ value: c.id, label: c.name }))}
+              placeholder="Select a country…"
+              options={currentLocationOptions}
             />
-            {err("current_location_country_id") && <p className={errCls}>{err("current_location_country_id")}</p>}
+            {err("current_location_country_name") && <p className={errCls}>{err("current_location_country_name")}</p>}
           </div>
           <div>
             <label className={labelCls}>Do you currently hold any Schengen / EU visa?</label>
@@ -497,16 +533,19 @@ export default function ApplicationForm({ candidateId, onSubmitted, compact, inc
             />
           </div>
           <div>
-            <label className={labelCls}>Preferred contact channel</label>
+            <label htmlFor="preferred_contact_channel" className={labelCls}>Preferred contact channel <span className="text-red-500">*</span></label>
             <SearchableSelect
+              id="preferred_contact_channel"
               value={form.preferred_contact_channel}
               onChange={(value) => set("preferred_contact_channel", value as typeof form.preferred_contact_channel)}
+              required
               options={[
                 { value: "email", label: "Email" },
                 { value: "whatsapp", label: "WhatsApp" },
                 { value: "phone", label: "Phone" },
               ]}
             />
+            {err("preferred_contact_channel") && <p className={errCls}>{err("preferred_contact_channel")}</p>}
           </div>
         </div>
         <div className="flex flex-col sm:flex-row gap-4 mt-4">
@@ -559,7 +598,7 @@ export default function ApplicationForm({ candidateId, onSubmitted, compact, inc
               required
               className="w-4 h-4 mt-0.5"
             />
-            I confirm the above.
+            I confirm the above. <span className="text-red-500">*</span>
           </label>
           {err("consent_given") && <p className={errCls}>{err("consent_given")}</p>}
         </section>

@@ -1,6 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import SearchableSelect from "@/components/SearchableSelect";
+import { WORLD_COUNTRIES } from "@/lib/worldCountries";
+
+const WORLD_COUNTRY_OPTIONS = WORLD_COUNTRIES.map((name) => ({ value: name, label: name }));
 
 interface ProfileFields {
   nationality?: string | null;
@@ -82,11 +86,21 @@ export default function CandidateProfileForm({ initial, onSaved }: Props) {
     <form onSubmit={submit} className="grid sm:grid-cols-2 gap-4">
       <div>
         <label className={labelCls}>Nationality</label>
-        <input value={form.nationality} onChange={(e) => set("nationality", e.target.value)} className={inputCls} />
+        <SearchableSelect
+          value={form.nationality}
+          onChange={(value) => set("nationality", value)}
+          placeholder="Select a country…"
+          options={WORLD_COUNTRY_OPTIONS}
+        />
       </div>
       <div>
         <label className={labelCls}>Second Nationality (if any)</label>
-        <input value={form.second_nationality} onChange={(e) => set("second_nationality", e.target.value)} className={inputCls} />
+        <SearchableSelect
+          value={form.second_nationality}
+          onChange={(value) => set("second_nationality", value)}
+          placeholder="None"
+          options={WORLD_COUNTRY_OPTIONS}
+        />
       </div>
       <div>
         <label className={labelCls}>Date of Birth</label>

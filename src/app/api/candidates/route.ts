@@ -32,6 +32,7 @@ const CANDIDATE_SELECT = {
   user: { select: { full_name: true, email: true } },
   recruiter: { select: { id: true, full_name: true } },
   country: { select: { id: true, name: true, region: { select: { id: true, name: true } } } },
+  country_name: true,
   partner: { select: { id: true, name: true } },
   documents: { select: { id: true, type: true, verification_status: true } },
 } satisfies Prisma.CandidateSelect;

@@ -62,8 +62,10 @@ test.describe("Candidate pre-application lifecycle (Phase 2)", () => {
       await page.getByLabel("Full Name (as per passport)").fill(candidateName);
       await page.getByLabel("Date of Birth").fill("1995-06-15");
       // Plain "Nationality" would also substring-match "Second Nationality
-      // (if any)" — target the input by id instead.
-      await page.locator("#nationality").fill("Kenyan");
+      // (if any)" — target the input by id instead. Nationality is a
+      // SearchableSelect (full world-country list) now, not a free-text
+      // input, so pick the option rather than filling text.
+      await pickOption(page, page.locator("#nationality"), "Kenya");
       await page.getByLabel("Passport Number").fill("P" + Date.now());
       await page.getByLabel(/Passport Expiry Date/).fill("2030-01-01");
       await page.getByLabel(/Phone Number/).fill("+254700111222");
@@ -79,11 +81,16 @@ test.describe("Candidate pre-application lifecycle (Phase 2)", () => {
       await pickOption(page, page.getByLabel("Preferred Country — Option 1"), "United Kingdom");
       await pickOptionByIndex(page, page.getByLabel("Preferred Type of Work"), 0);
       await page.getByLabel("Earliest Possible Travel Date").fill("2026-12-01");
-      // Alphabetically first non-Europe country — "E2E Country" (global-setup
-      // fixture), which is also e2e-recruiter/e2e-supervisor's assigned
-      // territory, so the candidate lands in the supervisor's scope.
-      await pickOptionByIndex(page, page.getByLabel("Current Location (country)"), 0);
+      // "E2E Country" (global-setup fixture) is also e2e-recruiter/
+      // e2e-supervisor's assigned territory, so the candidate lands in the
+      // supervisor's scope. Current Location now offers the full
+      // world-country list (lib/worldCountries.ts) plus any of Vertex's own
+      // admin-managed countries not already on it — "E2E Country" falls
+      // into that second group, so pick it by name, not position.
+      await pickOption(page, page.getByLabel("Current Location (country)"), "E2E Country");
       await page.getByLabel("I understand the payment plan above.").check();
+      // Preferred contact channel is mandatory now.
+      await pickOption(page, page.getByLabel(/Preferred contact channel/), "Email");
       await page.getByLabel("I confirm the above.").check();
       await page.getByRole("button", { name: "Submit Application" }).click();
 

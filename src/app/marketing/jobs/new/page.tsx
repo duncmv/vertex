@@ -27,6 +27,11 @@ export default function CreateJobPage() {
     requirements: "",
     status: "active",
     employer_client_id: "",
+    visa_type: "",
+    duration_permit: "",
+    processing_time: "",
+    service_fee_gbp: "",
+    visa_success_rates: "",
   });
 
   useEffect(() => {
@@ -50,7 +55,15 @@ export default function CreateJobPage() {
       const res = await fetch("/api/jobs", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...formData, employer_client_id: formData.employer_client_id || undefined }),
+        body: JSON.stringify({
+          ...formData,
+          employer_client_id: formData.employer_client_id || undefined,
+          visa_type: formData.visa_type || undefined,
+          duration_permit: formData.duration_permit || undefined,
+          processing_time: formData.processing_time || undefined,
+          visa_success_rates: formData.visa_success_rates || undefined,
+          service_fee_gbp: formData.service_fee_gbp ? Number(formData.service_fee_gbp) : undefined,
+        }),
       });
 
       if (res.ok) {
@@ -128,6 +141,37 @@ export default function CreateJobPage() {
                 placeholder="No linked client"
                 options={employerClients.map((c) => ({ value: c.id, label: c.name }))}
               />
+            </div>
+
+            <div className="col-span-1 md:col-span-2 border-t border-midnight-900/10 pt-6 mt-2">
+              <p className="text-xs font-semibold uppercase tracking-[0.1em] text-midnight-900/40 mb-4">
+                Work-Permit Programme Details <span className="font-normal normal-case">(Optional — shown on the public Opportunities page when filled in)</span>
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-midnight-900/70 mb-1.5">Visa Type</label>
+              <input type="text" name="visa_type" value={formData.visa_type} onChange={handleChange} className="input-field w-full" placeholder="e.g. Visa D" />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-midnight-900/70 mb-1.5">Duration / Permit</label>
+              <input type="text" name="duration_permit" value={formData.duration_permit} onChange={handleChange} className="input-field w-full" placeholder="e.g. 2-year resident card" />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-midnight-900/70 mb-1.5">Processing Time</label>
+              <input type="text" name="processing_time" value={formData.processing_time} onChange={handleChange} className="input-field w-full" placeholder="e.g. 3 months" />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-midnight-900/70 mb-1.5">Service Fee (GBP)</label>
+              <input type="number" min="0" step="1" name="service_fee_gbp" value={formData.service_fee_gbp} onChange={handleChange} className="input-field w-full" placeholder="e.g. 1400" />
+            </div>
+
+            <div className="col-span-1 md:col-span-2">
+              <label className="block text-sm font-medium text-midnight-900/70 mb-1.5">Visa Success Rates</label>
+              <input type="text" name="visa_success_rates" value={formData.visa_success_rates} onChange={handleChange} className="input-field w-full" placeholder="e.g. Asia: 70–80% · Africa: 85–95% · South America: above 95%" />
             </div>
 
             <div className="col-span-1 md:col-span-2">

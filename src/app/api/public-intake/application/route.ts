@@ -46,17 +46,15 @@ export async function POST(req: NextRequest) {
   const nationality = infoParsed.data.nationality;
   const passportNumber = infoParsed.data.passport_number;
 
-  const [job, country1, country2, country3, sector, currentLocationCountry] = await Promise.all([
+  const [job, country1, country2, country3, sector] = await Promise.all([
     parsed.data.job_id ? prisma.job.findUnique({ where: { id: parsed.data.job_id } }) : Promise.resolve(null),
     prisma.country.findUnique({ where: { id: parsed.data.preferred_country_1_id } }),
     parsed.data.preferred_country_2_id ? prisma.country.findUnique({ where: { id: parsed.data.preferred_country_2_id } }) : Promise.resolve(null),
     parsed.data.preferred_country_3_id ? prisma.country.findUnique({ where: { id: parsed.data.preferred_country_3_id } }) : Promise.resolve(null),
     prisma.sector.findUnique({ where: { id: parsed.data.preferred_sector_id } }),
-    prisma.country.findUnique({ where: { id: parsed.data.current_location_country_id } }),
   ]);
   if (!country1) return NextResponse.json({ error: "Preferred country (option 1) not found." }, { status: 404 });
   if (!sector) return NextResponse.json({ error: "Preferred type of work not found." }, { status: 404 });
-  if (!currentLocationCountry) return NextResponse.json({ error: "Current location country not found." }, { status: 404 });
 
   // The email itself is the entire point of this endpoint — unlike other
   // notification emails in lib/email.ts, this one is not swallowed on
@@ -76,7 +74,7 @@ export async function POST(req: NextRequest) {
       earliestTravelDate: parsed.data.earliest_travel_date,
       priorEuVisaApplied: parsed.data.prior_eu_visa_applied,
       documentsAvailable: parsed.data.documents_available,
-      currentLocationCountry: currentLocationCountry.name,
+      currentLocationCountry: parsed.data.current_location_country_name,
       holdsSchengenVisa: parsed.data.holds_schengen_visa,
       priorVisaRefusals: parsed.data.prior_visa_refusals,
       availableForEmbassyAppointment: parsed.data.available_for_embassy_appointment,

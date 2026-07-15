@@ -124,14 +124,20 @@ export const submitApplicationSchema = z.object({
   // exists.
   documents_available: z.array(z.string().min(1).max(60)).default([]),
 
-  // Section 5 — Visa & Travel Readiness. current_location_country_id also
-  // drives round-robin recruiter assignment for a self-service submission.
-  current_location_country_id: z.string().cuid("Select your current location"),
+  // Section 5 — Visa & Travel Readiness. current_location_country_name is
+  // a free choice from the full world-country list (lib/worldCountries.ts),
+  // not restricted to Vertex's admin-managed Country rows — it's resolved
+  // by name server-side (POST /api/applications), and also feeds
+  // round-robin recruiter assignment when it matches a Country row that
+  // has one available.
+  current_location_country_name: z.string().min(1, "Select your current location"),
   holds_schengen_visa: z.string().max(200).optional(),
   prior_visa_refusals: z.string().max(500).optional(),
   available_for_embassy_appointment: z.boolean().default(false),
   willing_to_start_within_30_days: z.boolean().default(false),
-  preferred_contact_channel: z.enum(["email", "whatsapp", "phone"]).optional(),
+  preferred_contact_channel: z.enum(["email", "whatsapp", "phone"], {
+    message: "Select your preferred contact channel.",
+  }),
 
   // Section 4 — Payment Plan Acknowledgement: must be explicitly ticked to submit.
   payment_plan_acknowledged: z.literal(true, {
@@ -474,7 +480,9 @@ export const submitPartnerCandidateSchema = z.object({
   prior_visa_refusals: z.string().max(500).optional(),
   available_for_embassy_appointment: z.boolean().default(false),
   willing_to_start_within_30_days: z.boolean().default(false),
-  preferred_contact_channel: z.enum(["email", "whatsapp", "phone"]).optional(),
+  preferred_contact_channel: z.enum(["email", "whatsapp", "phone"], {
+    message: "Select the candidate's preferred contact channel.",
+  }),
 });
 
 // Phase 5: Employer/Client CRM (SRS FR-5.2) — the employer a vacancy is

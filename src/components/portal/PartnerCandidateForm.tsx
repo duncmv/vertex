@@ -3,6 +3,9 @@
 import { useEffect, useMemo, useState } from "react";
 import SearchableSelect from "@/components/SearchableSelect";
 import { NON_PROGRAMME_TYPE_KEYS } from "@/lib/documentTypes";
+import { WORLD_COUNTRIES } from "@/lib/worldCountries";
+
+const WORLD_COUNTRY_OPTIONS = WORLD_COUNTRIES.map((name) => ({ value: name, label: name }));
 
 interface Option {
   id: string;
@@ -173,12 +176,24 @@ export default function PartnerCandidateForm({ onSubmitted }: Props) {
           </div>
           <div>
             <label htmlFor="nationality" className={labelCls}>Nationality <span className="text-red-500">*</span></label>
-            <input id="nationality" value={form.nationality} onChange={(e) => set("nationality", e.target.value)} required className="input-field" />
+            <SearchableSelect
+              id="nationality"
+              value={form.nationality}
+              onChange={(value) => set("nationality", value)}
+              required
+              placeholder="Select a country…"
+              options={WORLD_COUNTRY_OPTIONS}
+            />
             {err("nationality") && <p className={errCls}>{err("nationality")}</p>}
           </div>
           <div>
             <label className={labelCls}>Second Nationality (if any)</label>
-            <input value={form.second_nationality} onChange={(e) => set("second_nationality", e.target.value)} className="input-field" />
+            <SearchableSelect
+              value={form.second_nationality}
+              onChange={(value) => set("second_nationality", value)}
+              placeholder="None"
+              options={WORLD_COUNTRY_OPTIONS}
+            />
           </div>
           <div>
             <label htmlFor="passport_number" className={labelCls}>Passport Number <span className="text-red-500">*</span></label>
@@ -338,7 +353,7 @@ export default function PartnerCandidateForm({ onSubmitted }: Props) {
             required
             className="w-4 h-4 mt-0.5"
           />
-          We understand the payment plan above.
+          We understand the payment plan above. <span className="text-red-500">*</span>
         </label>
         {err("payment_plan_acknowledged") && <p className={errCls}>{err("payment_plan_acknowledged")}</p>}
       </section>
@@ -374,16 +389,19 @@ export default function PartnerCandidateForm({ onSubmitted }: Props) {
             />
           </div>
           <div>
-            <label className={labelCls}>Candidate's preferred contact channel</label>
+            <label htmlFor="preferred_contact_channel" className={labelCls}>Candidate's preferred contact channel <span className="text-red-500">*</span></label>
             <SearchableSelect
+              id="preferred_contact_channel"
               value={form.preferred_contact_channel}
               onChange={(value) => set("preferred_contact_channel", value as typeof form.preferred_contact_channel)}
+              required
               options={[
                 { value: "email", label: "Email" },
                 { value: "whatsapp", label: "WhatsApp" },
                 { value: "phone", label: "Phone" },
               ]}
             />
+            {err("preferred_contact_channel") && <p className={errCls}>{err("preferred_contact_channel")}</p>}
           </div>
         </div>
         <div className="flex flex-col sm:flex-row gap-4 mt-4">

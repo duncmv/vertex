@@ -49,6 +49,7 @@ interface CandidateRow {
   user: { full_name: string; email: string } | null;
   recruiter: { id: string; full_name: string } | null;
   country: { id: string; name: string } | null;
+  country_name: string | null;
   partner: { id: string; name: string } | null;
   documents: { id: string; type: string; verification_status: string }[];
 }
@@ -218,7 +219,7 @@ export default function CandidateList({
                       )}
                     </td>
                     <td className="px-5 py-4 text-midnight-900/70">{c.desired_role ?? "—"}</td>
-                    <td className="px-5 py-4 text-midnight-900/70">{c.country?.name ?? "—"}</td>
+                    <td className="px-5 py-4 text-midnight-900/70">{c.country?.name ?? c.country_name ?? "—"}</td>
                     <td className="px-5 py-4 text-midnight-900/70">
                       {c.recruiter?.full_name ?? "—"}
                       {c.source === "partner_sourced" && c.partner && (

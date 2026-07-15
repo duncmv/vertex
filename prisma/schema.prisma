@@ -213,10 +213,15 @@ model Candidate {
   // for now — no formal job/case-matching model exists yet (Phase 4).
   desired_role String?
 
-  // Agent-network attribution (SRS FR-1.4, FR-2.3)
+  // Agent-network attribution (SRS FR-1.4, FR-2.3). country_name is always
+  // set to whatever current-location country the candidate picked from the
+  // full world list; country_id/country only resolves when that name
+  // matches a real, admin-managed Country row (see Application's parallel
+  // current_location_country_name for the full rationale).
   source           CandidateSource          @default(self_registered)
   recruiter_id     String?
   recruiter        User?                    @relation("RecruiterCandidates", fields: [recruiter_id], references: [id], onDelete: SetNull)
+  country_name     String?
   country_id       String?
   country          Country?                 @relation(fields: [country_id], references: [id], onDelete: SetNull)
   lifecycle_status CandidateLifecycleStatus @default(identified)
@@ -563,11 +568,18 @@ model Application {
   // later, from the candidate's own dashboard, once an account exists).
   documents_available String[]
 
-  // Section 5 — Visa & Travel Readiness. current_location_country_id is
-  // also what drives round-robin recruiter assignment for a self-service
-  // submission (matched against User.assigned_country_id) — a real
-  // Country FK, not free text, scoped in the UI to the source-market
-  // regions (Africa, Middle East & Gulf), not the Europe destination list.
+  // Section 5 — Visa & Travel Readiness. The candidate picks their current
+  // country of residence from a full world-country list (not just Vertex's
+  // operational Country rows) — current_location_country_name is always
+  // set to whatever they picked; current_location_country_id/relation is
+  // only set when that name matches a real, admin-managed Country row
+  // (case-insensitive), which is also what round-robin recruiter
+  // assignment keys off (matched against User.assigned_country_id). A
+  // self-service submission whose country doesn't resolve to a Country row
+  // with an available recruiter never reaches this table at all — it's
+  // routed to the public-intake email bridge instead (see
+  // /api/apply/options's recruiterCountryNames + ApplicationForm.tsx).
+  current_location_country_name     String?
   current_location_country_id       String?
   current_location_country          Country?        @relation("CurrentLocationCountry", fields: [current_location_country_id], references: [id], onDelete: SetNull)
   holds_schengen_visa               String?         @db.Text

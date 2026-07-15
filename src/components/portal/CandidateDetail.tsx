@@ -30,6 +30,7 @@ interface ApplicationRow {
   prior_eu_visa_applied: string | null;
   documents_available: string[];
   current_location_country: { id: string; name: string } | null;
+  current_location_country_name: string | null;
   holds_schengen_visa: string | null;
   prior_visa_refusals: string | null;
   available_for_embassy_appointment: boolean;
@@ -337,7 +338,7 @@ export default function CandidateDetail({ candidateId, backHref, canVerify = fal
           </div>
 
           <div className="grid sm:grid-cols-3 gap-4 mb-6">
-            <Field label="Current location" value={app.current_location_country?.name} />
+            <Field label="Current location" value={app.current_location_country?.name ?? app.current_location_country_name ?? undefined} />
             <Field label="Holds Schengen/EU visa" value={app.holds_schengen_visa} />
             <Field label="Prior visa refusals" value={app.prior_visa_refusals} />
             <Field label="Available for embassy appointment" value={app.available_for_embassy_appointment ? "Yes" : "No"} />

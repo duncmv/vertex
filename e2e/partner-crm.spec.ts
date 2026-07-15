@@ -81,7 +81,9 @@ test.describe("Partner CRM (Phase 5, self-service intake)", () => {
 
       await page.getByLabel("Full Name (as per passport)").fill(candidateName);
       await page.getByLabel("Date of Birth").fill("1995-06-15");
-      await page.locator("#nationality").fill("Kenyan");
+      // Nationality is a SearchableSelect (full world-country list) now,
+      // not a free-text input, so pick the option rather than filling text.
+      await pickOption(page, page.locator("#nationality"), "Kenya");
       await page.getByLabel("Passport Number").fill("P" + Date.now());
       await page.getByLabel(/Passport Expiry Date/).fill("2030-01-01");
       await page.getByLabel(/Phone Number/).fill("+254700111222");
@@ -92,6 +94,9 @@ test.describe("Partner CRM (Phase 5, self-service intake)", () => {
       await page.getByLabel(/Earliest Possible Travel Date/).fill("2026-12-01");
 
       await page.getByLabel("We understand the payment plan above.").check();
+
+      // Preferred contact channel is mandatory now.
+      await pickOption(page, page.getByLabel(/preferred contact channel/), "Email");
 
       await pickOption(page, page.getByLabel(/Current Location \(country\)/), "E2E Country");
       await page.locator("form").getByRole("button", { name: "Submit Candidate" }).click();

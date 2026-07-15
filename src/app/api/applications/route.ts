@@ -222,14 +222,22 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  // current_location_country_name is a free choice from the full
+  // world-country list, not a Country FK — resolve it against Vertex's
+  // admin-managed Country rows by name (case-insensitive) so it still
+  // drives recruiter assignment/RBAC territory scoping when it matches one
+  // of Vertex's actual source-market countries; country_id/
+  // current_location_country_id simply stay null when it doesn't (e.g. a
+  // candidate currently in a country Vertex has no recruiter presence in
+  // yet — the raw name is preserved on country_name/
+  // current_location_country_name regardless).
   const [country1, sector, currentLocationCountry] = await Promise.all([
     prisma.country.findUnique({ where: { id: parsed.data.preferred_country_1_id } }),
     prisma.sector.findUnique({ where: { id: parsed.data.preferred_sector_id } }),
-    prisma.country.findUnique({ where: { id: parsed.data.current_location_country_id } }),
+    prisma.country.findFirst({ where: { name: { equals: parsed.data.current_location_country_name, mode: "insensitive" } } }),
   ]);
   if (!country1) return NextResponse.json({ error: "Preferred country (option 1) not found." }, { status: 404 });
   if (!sector) return NextResponse.json({ error: "Preferred type of work not found." }, { status: 404 });
-  if (!currentLocationCountry) return NextResponse.json({ error: "Current location country not found." }, { status: 404 });
 
   const db = auditedPrisma(user?.userId ?? null);
 
@@ -238,14 +246,21 @@ export async function POST(req: NextRequest) {
     // Only an actual Regional Recruiter self-assigns as the owner; any
     // other staff role (a supervisor stepping in, say) triggers the same
     // round-robin assignment an anonymous submission would, rather than
-    // incorrectly attributing the lead to a non-recruiter.
+    // incorrectly attributing the lead to a non-recruiter. A country with
+    // no Country-row match, or one with no recruiter currently assigned,
+    // simply leaves the candidate unassigned here — genuine anonymous
+    // self-service submissions in that situation are expected to have gone
+    // through the public-intake email bridge instead (client-side
+    // decision, based on this same /api/apply/options data), so reaching
+    // here with no available recruiter is a rare edge case, not the
+    // primary enforcement point.
     let recruiterId: string | null;
     if (user?.role === "regional_recruiter") {
       recruiterId = user.userId;
     } else if (user?.role === "admin") {
       recruiterId = null;
     } else {
-      recruiterId = await assignNextRecruiterForCountry(parsed.data.current_location_country_id);
+      recruiterId = currentLocationCountry ? await assignNextRecruiterForCountry(currentLocationCountry.id) : null;
     }
 
     candidate = await db.candidate.create({
@@ -267,7 +282,8 @@ export async function POST(req: NextRequest) {
         consent_at: new Date(),
         source: isStaffSubmission ? "recruiter_sourced" : "self_registered",
         recruiter_id: recruiterId,
-        country_id: parsed.data.current_location_country_id,
+        country_name: parsed.data.current_location_country_name,
+        country_id: currentLocationCountry?.id ?? null,
         lifecycle_status: "identified",
       },
       include: { user: true, documents: { select: { type: true } } },
@@ -313,7 +329,8 @@ export async function POST(req: NextRequest) {
       earliest_travel_date: new Date(parsed.data.earliest_travel_date),
       prior_eu_visa_applied: parsed.data.prior_eu_visa_applied,
       documents_available: parsed.data.documents_available,
-      current_location_country_id: parsed.data.current_location_country_id,
+      current_location_country_name: parsed.data.current_location_country_name,
+      current_location_country_id: currentLocationCountry?.id ?? null,
       holds_schengen_visa: parsed.data.holds_schengen_visa,
       prior_visa_refusals: parsed.data.prior_visa_refusals,
       available_for_embassy_appointment: parsed.data.available_for_embassy_appointment,

@@ -72,8 +72,8 @@ export default function ContactPage() {
                   </div>
                   <div>
                     <h3 className="font-semibold text-midnight-900 tracking-tight">WhatsApp</h3>
-                    <a href="https://wa.me/447440545686" target="_blank" rel="noopener noreferrer"
-                      className="block text-midnight-700 hover:text-gold-600 text-sm font-mono mt-2 transition-colors">+44 7440 545686</a>
+                    <a href="https://wa.me/447438613251" target="_blank" rel="noopener noreferrer"
+                      className="block text-midnight-700 hover:text-gold-600 text-sm font-mono mt-2 transition-colors">+44 7438 613251</a>
                   </div>
                 </div>
 
@@ -85,7 +85,7 @@ export default function ContactPage() {
                   <div>
                     <h3 className="font-semibold text-midnight-900 tracking-tight">Office</h3>
                     <a href="tel:+442030263403"
-                      className="text-midnight-700 hover:text-gold-600 text-sm font-mono mt-2 block transition-colors">+44 20 3026 3403</a>
+                      className="text-midnight-700 hover:text-gold-600 text-sm font-mono mt-2 block transition-colors">+44 2030 263403</a>
                   </div>
                 </div>
 

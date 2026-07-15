@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { MapPin, Tag, CurrencyCircleDollar, Users, ArrowRight, MagnifyingGlass } from "@phosphor-icons/react/dist/ssr";
 import JobsCategoryFilter from "@/components/JobsCategoryFilter";
+import { getPublicJobsList } from "@/server/services/publicJobs";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
@@ -14,33 +15,28 @@ interface Job {
   title: string;
   country: string;
   city: string;
-  category?: string;
-  salary_range?: string;
-  job_description?: string;
+  category: string | null;
+  salary_range: string | null;
+  job_description: string | null;
   status: string;
-  created_at: string;
-  visa_type?: string;
-  duration_permit?: string;
-  service_fee_gbp?: number;
+  created_at: string | Date;
+  visa_type: string | null;
+  duration_permit: string | null;
+  service_fee_gbp: number | null;
   _count: { applications: number };
 }
 
+// Calls the same query the API route uses directly (in-process), rather
+// than self-fetching /api/jobs over HTTP — see server/services/publicJobs.ts.
 async function getJobs(searchParams: { page?: string; country?: string; category?: string; q?: string }) {
-  const page = searchParams.page || "1";
-  const { country = "", category = "", q = "" } = searchParams;
-
-  const params = new URLSearchParams({ page, limit: "15" });
-  if (country) params.append("country", country);
-  if (category) params.append("category", category);
-  if (q) params.append("q", q);
-
   try {
-    const res = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/jobs?${params}`, {
-      cache: "no-store",
+    return await getPublicJobsList({
+      page: Number(searchParams.page || 1),
+      limit: 15,
+      country: searchParams.country || undefined,
+      category: searchParams.category || undefined,
+      q: searchParams.q || undefined,
     });
-    if (!res.ok) return { jobs: [], total: 0, pages: 1 };
-    const data = await res.json();
-    return data?.jobs ? data : { jobs: [], total: 0, pages: 1 };
   } catch {
     return { jobs: [], total: 0, pages: 1 };
   }

@@ -5,6 +5,7 @@ import {
   MapPin, Tag, CurrencyCircleDollar, Users, CalendarBlank, CaretRight,
   IdentificationCard, Clock, ShieldCheck, CheckCircle, ArrowRight,
 } from "@phosphor-icons/react/dist/ssr";
+import { getPublicJobById } from "@/server/services/publicJobs";
 export const dynamic = "force-dynamic";
 
 interface Job {
@@ -12,17 +13,17 @@ interface Job {
   title: string;
   country: string;
   city: string;
-  category?: string;
-  salary_range?: string;
+  category: string | null;
+  salary_range: string | null;
   job_description: string;
   requirements: string;
   status: string;
-  created_at: string;
-  visa_type?: string;
-  duration_permit?: string;
-  processing_time?: string;
-  service_fee_gbp?: number;
-  visa_success_rates?: string;
+  created_at: string | Date;
+  visa_type: string | null;
+  duration_permit: string | null;
+  processing_time: string | null;
+  service_fee_gbp: number | null;
+  visa_success_rates: string | null;
   _count: { applications: number };
 }
 
@@ -35,14 +36,11 @@ const feeStages = (totalGbp: number) => [
   { label: "Stage 3 · 40%", note: "After the visa is granted", amount: Math.round(totalGbp * 0.4) },
 ];
 
+// Calls the same query the API route uses directly (in-process), rather
+// than self-fetching /api/jobs/[id] over HTTP — see server/services/publicJobs.ts.
 async function getJob(id: string): Promise<Job | null> {
   try {
-    const res = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/jobs/${id}`, {
-      cache: "no-store",
-    });
-    if (!res.ok) return null;
-    const data = await res.json();
-    return data?.id ? data : null;
+    return await getPublicJobById(id);
   } catch {
     return null;
   }

@@ -2,17 +2,16 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { createJobSchema } from "@/lib/validations";
 import { getAuthUser, requireRole } from "@/lib/api-auth";
+import { getPublicJobById } from "@/server/services/publicJobs";
 export const dynamic = "force-dynamic";
 
 const JOB_MANAGER_ROLES = ["marketing", "admin"] as const;
 
-// GET /api/jobs/[id] — public
+// GET /api/jobs/[id] — public. Also called directly (in-process, not over
+// HTTP) by /jobs/[id]'s Server Component — see server/services/publicJobs.ts.
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const job = await prisma.job.findUnique({
-    where: { id },
-    include: { _count: { select: { applications: true } } },
-  });
+  const job = await getPublicJobById(id);
   if (!job) return NextResponse.json({ error: "Job not found." }, { status: 404 });
   return NextResponse.json(job);
 }

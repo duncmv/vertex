@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import HomeClient from "@/components/HomeClient";
+import { getPublicJobsList } from "@/server/services/publicJobs";
 
 export const dynamic = "force-dynamic";
 
@@ -11,14 +12,12 @@ export const metadata: Metadata = {
 
 // SRS FR-1.5: real database jobs only — no placeholder fallback. An empty
 // result renders HomeClient's built-in "No jobs available yet" state.
+// Calls the same query the API route uses directly (in-process), rather
+// than self-fetching /api/jobs over HTTP — see server/services/publicJobs.ts.
 async function getFeaturedJobs() {
   try {
-    const res = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/jobs?limit=6`, {
-      cache: "no-store",
-    });
-    if (!res.ok) return [];
-    const data = await res.json();
-    return data.jobs ?? [];
+    const { jobs } = await getPublicJobsList({ limit: 6 });
+    return jobs;
   } catch {
     return [];
   }

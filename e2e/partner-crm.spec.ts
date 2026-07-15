@@ -46,8 +46,16 @@ test.describe("Partner CRM (Phase 5, self-service intake)", () => {
     const candidateEmail = `e2e-partner-candidate-${Date.now()}@test.local`;
     let temporaryPassword = "";
 
-    await test.step("In-House Supervisor adds a partner", async () => {
-      await login(page, "e2e-inhouse@test.local", PASSWORD);
+    // Partner management lives under /management, which is now
+    // director/admin-only (the In-House Supervisor got its own dedicated
+    // /inhouse portal in a later review phase and lost direct /management
+    // access) — the Partner API itself still accepts the wider
+    // inhouse_supervisor/director/admin manager tier, but there's no UI
+    // path there for inhouse_supervisor anymore, so use admin here instead.
+    await test.step("admin adds a partner", async () => {
+      await login(page, "e2e-admin@test.local", PASSWORD);
+      await expect(page).toHaveURL(/\/admin$/);
+      await page.goto("/management");
       await expect(page).toHaveURL(/\/management$/);
 
       await page.goto("/management/partners");

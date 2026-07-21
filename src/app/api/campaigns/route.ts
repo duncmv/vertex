@@ -16,12 +16,44 @@ const CAMPAIGN_MANAGER_ROLES = ["inhouse_supervisor", "director", "admin"] as co
 
 // GET /api/campaigns — every staff role can view (a recruiter needs to see
 // what campaign targets apply to their work), only management can create.
+// ?scope=mine&status=active narrows to active campaigns applicable to the
+// caller's own assigned country (a target scoped directly to that
+// country, to its region, or campaign-wide with no scope at all) — used
+// by the reporting-cycle "Campaign" selector (Supervisory Reporting
+// Framework §3.1) so a recruiter/supervisor/in-house only sees campaigns
+// that actually apply to them, not management's full unfiltered list.
 export async function GET(req: NextRequest) {
   const user = await getAuthUser(req);
   const guardRes = requireRole(user, [...STAFF_ROLES]);
   if (guardRes) return guardRes;
 
+  const statusParam = req.nextUrl.searchParams.get("status");
+  const scopeMine = req.nextUrl.searchParams.get("scope") === "mine";
+
+  let countryId: string | null = null;
+  let regionId: string | null = null;
+  if (scopeMine) {
+    const staff = await prisma.user.findUnique({
+      where: { id: user!.userId },
+      select: { assigned_country_id: true, assigned_country: { select: { region_id: true } } },
+    });
+    countryId = staff?.assigned_country_id ?? null;
+    regionId = staff?.assigned_country?.region_id ?? null;
+  }
+
   const campaigns = await prisma.campaign.findMany({
+    where: {
+      ...(statusParam ? { status: statusParam as never } : {}),
+      ...(scopeMine
+        ? {
+            targets: {
+              some: {
+                OR: [{ country_id: countryId }, { region_id: regionId }, { AND: [{ country_id: null }, { region_id: null }] }],
+              },
+            },
+          }
+        : {}),
+    },
     select: {
       id: true,
       name: true,

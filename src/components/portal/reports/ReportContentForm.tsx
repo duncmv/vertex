@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import type { ReportCycle, Role } from "@prisma/client";
 import SearchableSelect from "@/components/SearchableSelect";
 import EditableRowTable, { type RowValue } from "./EditableRowTable";
@@ -8,6 +9,9 @@ import { REPORT_KPI_LABELS, getReportSections, OVERALL_STATUS_OPTIONS } from "@/
 
 export interface ReportContentValue {
   campaign_or_role?: string;
+  // Auto-filled server-side from the report's own id once it's created
+  // (Supervisory Reporting Framework §3.1's "CRM Submission Ref.") — never
+  // user-entered, so there's no input for it in this form.
   crm_reference?: string;
   executive_summary?: string;
   overall_status?: "green" | "amber" | "red" | "grey";
@@ -82,22 +86,34 @@ interface Props {
  * auto-populated data (candidate lists, target progress) specific to
  * that role.
  */
+interface CampaignOption {
+  id: string;
+  name: string;
+}
+
 export default function ReportContentForm({ role, cycle, value, onChange }: Props) {
   const kpiLabels = REPORT_KPI_LABELS[role]?.[cycle] ?? [];
   const sections = getReportSections(role, cycle);
   const set = <K extends keyof ReportContentValue>(key: K, v: ReportContentValue[K]) => onChange({ ...value, [key]: v });
 
+  const [campaigns, setCampaigns] = useState<CampaignOption[]>([]);
+  useEffect(() => {
+    fetch("/api/campaigns?scope=mine&status=active")
+      .then((r) => r.json())
+      .then((res) => setCampaigns(res.data ?? []))
+      .catch(() => {});
+  }, []);
+
   return (
     <div className="space-y-5">
-      <div className="grid sm:grid-cols-2 gap-3">
-        <div>
-          <label className="block text-xs font-medium text-midnight-900/60 mb-1">Campaign / Job Role</label>
-          <input value={value.campaign_or_role ?? ""} onChange={(e) => set("campaign_or_role", e.target.value)} className="input-field text-sm" />
-        </div>
-        <div>
-          <label className="block text-xs font-medium text-midnight-900/60 mb-1">CRM Submission Ref.</label>
-          <input value={value.crm_reference ?? ""} onChange={(e) => set("crm_reference", e.target.value)} className="input-field text-sm" />
-        </div>
+      <div>
+        <label className="block text-xs font-medium text-midnight-900/60 mb-1">Campaign</label>
+        <SearchableSelect
+          value={value.campaign_or_role ?? ""}
+          onChange={(v) => set("campaign_or_role", v)}
+          options={campaigns.map((c) => ({ value: c.name, label: c.name }))}
+          placeholder={campaigns.length === 0 ? "No active campaigns in your country" : "Select a campaign…"}
+        />
       </div>
 
       <div>

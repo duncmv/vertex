@@ -244,7 +244,7 @@ export default function RecruiterReportsPage() {
       {showForm && (
         <form onSubmit={submit} className="card p-6 mb-6 space-y-4">
           <h3 className="font-semibold text-midnight-900">New report</h3>
-          <div className="grid sm:grid-cols-3 gap-4">
+          <div className={`grid gap-4 ${type === "daily" ? "sm:grid-cols-2" : "sm:grid-cols-3"}`}>
             <SearchableSelect
               value={type}
               onChange={(value) => setType(value as typeof type)}
@@ -254,8 +254,23 @@ export default function RecruiterReportsPage() {
                 { value: "monthly", label: "Monthly Performance Summary" },
               ]}
             />
-            <input required type="date" value={periodStart} onChange={(e) => setPeriodStart(e.target.value)} className="input-field" />
-            <input required type="date" value={periodEnd} onChange={(e) => setPeriodEnd(e.target.value)} className="input-field" />
+            {type === "daily" ? (
+              <input
+                required
+                type="date"
+                value={periodStart}
+                onChange={(e) => {
+                  setPeriodStart(e.target.value);
+                  setPeriodEnd(e.target.value);
+                }}
+                className="input-field"
+              />
+            ) : (
+              <>
+                <input required type="date" value={periodStart} onChange={(e) => setPeriodStart(e.target.value)} className="input-field" />
+                <input required type="date" value={periodEnd} onChange={(e) => setPeriodEnd(e.target.value)} className="input-field" />
+              </>
+            )}
           </div>
 
           {isDateDrivenType && (!periodStart || !periodEnd) && (

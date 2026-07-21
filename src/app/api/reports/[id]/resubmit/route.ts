@@ -43,12 +43,15 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     );
   }
 
+  // CRM Submission Ref. is always the report's own id (never user-entered
+  // — see POST /api/reports), so resubmitting re-asserts it regardless of
+  // whatever the corrected content happened to carry.
   const updated = await auditedPrisma(user!.userId).report.update({
     where: { id },
     data: {
       status: "submitted",
       return_reason: null,
-      content: parsedContent.data,
+      content: { ...parsedContent.data, crm_reference: id },
     },
     select: { id: true, status: true },
   });

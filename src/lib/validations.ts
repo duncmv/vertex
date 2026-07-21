@@ -427,7 +427,9 @@ export const submitReportSchema = z
     content: reportContentSchema,
     child_report_ids: z.array(z.string().cuid()).optional(),
   })
-  .refine((data) => new Date(data.period_end) > new Date(data.period_start), {
+  // A daily report covers a single day (period_start === period_end, one
+  // date picker in the UI); weekly/monthly need a genuine range.
+  .refine((data) => data.type === "daily" || new Date(data.period_end) > new Date(data.period_start), {
     message: "Period end must be after the period start.",
     path: ["period_end"],
   })

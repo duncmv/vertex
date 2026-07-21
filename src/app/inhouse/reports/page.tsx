@@ -288,7 +288,7 @@ export default function InhouseReportsPage() {
                 <h3 className="font-semibold text-midnight-900 flex items-center gap-2">
                   <Stack size={16} weight="regular" /> New portfolio report
                 </h3>
-                <div className="grid sm:grid-cols-3 gap-4">
+                <div className={`grid gap-4 ${submitType === "daily" ? "sm:grid-cols-2" : "sm:grid-cols-3"}`}>
                   <SearchableSelect
                     value={submitType}
                     onChange={(value) => setSubmitType(value as typeof submitType)}
@@ -298,8 +298,23 @@ export default function InhouseReportsPage() {
                       { value: "monthly", label: "Monthly Management Report" },
                     ]}
                   />
-                  <input required type="date" value={submitPeriodStart} onChange={(e) => setSubmitPeriodStart(e.target.value)} className="input-field" />
-                  <input required type="date" value={submitPeriodEnd} onChange={(e) => setSubmitPeriodEnd(e.target.value)} className="input-field" />
+                  {submitType === "daily" ? (
+                    <input
+                      required
+                      type="date"
+                      value={submitPeriodStart}
+                      onChange={(e) => {
+                        setSubmitPeriodStart(e.target.value);
+                        setSubmitPeriodEnd(e.target.value);
+                      }}
+                      className="input-field"
+                    />
+                  ) : (
+                    <>
+                      <input required type="date" value={submitPeriodStart} onChange={(e) => setSubmitPeriodStart(e.target.value)} className="input-field" />
+                      <input required type="date" value={submitPeriodEnd} onChange={(e) => setSubmitPeriodEnd(e.target.value)} className="input-field" />
+                    </>
+                  )}
                 </div>
 
                 {submitType !== "daily" && (

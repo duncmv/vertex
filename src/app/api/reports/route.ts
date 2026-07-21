@@ -189,7 +189,16 @@ export async function POST(req: NextRequest) {
       period_end: new Date(period_end),
       status: "submitted",
     },
-    select: { id: true, type: true, scope_level: true, status: true },
+    select: { id: true, type: true, scope_level: true, status: true, content: true },
+  });
+
+  // "CRM Submission Ref." (§2.1's report-identification section) is the
+  // report's own id — there's no meaningful value for it until the row
+  // exists, so it's never user-entered; fill it in immediately after
+  // creation rather than asking the submitter to type anything.
+  await prisma.report.update({
+    where: { id: report.id },
+    data: { content: { ...(report.content as object), crm_reference: report.id } },
   });
 
   if (childReports.length > 0) {
@@ -199,5 +208,5 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  return NextResponse.json({ data: report }, { status: 201 });
+  return NextResponse.json({ data: { id: report.id, type: report.type, scope_level: report.scope_level, status: report.status } }, { status: 201 });
 }

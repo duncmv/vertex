@@ -17,6 +17,12 @@ export default function ReportContentView({ content }: { content: Partial<Report
 
   return (
     <div className="space-y-3 text-xs">
+      {(content.campaign_or_role || content.crm_reference) && (
+        <div className="flex flex-wrap gap-x-3 text-midnight-900/50">
+          {content.campaign_or_role && <span>{content.campaign_or_role}</span>}
+          {content.crm_reference && <span className="font-mono">Ref: {content.crm_reference}</span>}
+        </div>
+      )}
       {content.overall_status && (
         <div className="flex items-center gap-1.5">
           <span className={`w-2 h-2 rounded-full ${STATUS_DOT[content.overall_status] ?? "bg-midnight-900/30"}`} />

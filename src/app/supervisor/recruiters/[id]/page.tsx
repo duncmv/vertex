@@ -4,6 +4,7 @@ import { use, useEffect, useState } from "react";
 import Link from "next/link";
 import PortalShell from "@/components/portal/PortalShell";
 import { SUPERVISOR_NAV_ITEMS } from "@/components/portal/supervisorNav";
+import StaffScorecardPanel from "@/components/portal/StaffScorecardPanel";
 import { CaretLeft, Target, FileText, ChatCircleText, PaperPlaneTilt } from "@phosphor-icons/react";
 
 interface TargetProgress {
@@ -44,7 +45,7 @@ interface ReportRow {
   period_start: string;
   period_end: string;
   return_reason: string | null;
-  content: { notes?: string };
+  content: { notes?: string; executive_summary?: string };
 }
 
 interface NoteRow {
@@ -285,7 +286,9 @@ export default function SupervisorRecruiterDetailPage({ params }: { params: Prom
                       </div>
                       <button onClick={() => verify(r.id)} className="text-xs font-semibold text-emerald-600 hover:underline shrink-0">Verify</button>
                     </div>
-                    {r.content?.notes && <p className="text-sm text-midnight-900/70 mb-3">{r.content.notes}</p>}
+                    {(r.content?.notes || r.content?.executive_summary) && (
+                      <p className="text-sm text-midnight-900/70 mb-3">{r.content.notes || r.content.executive_summary}</p>
+                    )}
                     <div className="flex items-center gap-2">
                       <textarea
                         placeholder="Reason for return…"
@@ -308,6 +311,10 @@ export default function SupervisorRecruiterDetailPage({ params }: { params: Prom
                 ))}
               </div>
             )}
+          </div>
+
+          <div className="card p-6 mb-8">
+            <StaffScorecardPanel staffId={detail.recruiter.id} />
           </div>
 
           <div className="card p-6">

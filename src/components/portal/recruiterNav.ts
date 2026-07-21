@@ -1,5 +1,5 @@
 import type { PortalNavItem } from "./PortalShell";
-import { Gauge, Users, ClipboardText, FileText, Airplane } from "@phosphor-icons/react";
+import { Gauge, Users, ClipboardText, FileText, Airplane, Warning } from "@phosphor-icons/react";
 
 export const RECRUITER_NAV_ITEMS: PortalNavItem[] = [
   { href: "/recruiter/overview", label: "Overview", icon: Gauge },
@@ -7,4 +7,5 @@ export const RECRUITER_NAV_ITEMS: PortalNavItem[] = [
   { href: "/recruiter/applications", label: "Applications", icon: ClipboardText },
   { href: "/recruiter/cases", label: "Cases", icon: Airplane },
   { href: "/recruiter/reports", label: "Reports", icon: FileText },
+  { href: "/recruiter/exceptions", label: "Exceptions", icon: Warning },
 ];

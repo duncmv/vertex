@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { auditedPrisma } from "@/lib/audit";
-import { getAuthUser, requireAdmin } from "@/lib/api-auth";
+import { getAuthUser, requireAdmin, requireRole } from "@/lib/api-auth";
 import { hashPassword, generateTemporaryPassword } from "@/lib/auth";
 import { createStaffUserSchema } from "@/lib/validations";
 import { isStaffRole } from "@/lib/rbac";
@@ -16,7 +16,11 @@ const STAFF_ROLES: Role[] = ["regional_recruiter", "country_supervisor", "inhous
 // role param always narrows to that role regardless of q.
 export async function GET(req: NextRequest) {
   const user = await getAuthUser(req);
-  const guardRes = requireAdmin(user);
+  // Read-only staff directory access is also needed by Management/Director
+  // for the Supervisory Performance Scorecard (§7) — director scores an
+  // In-House Supervisor, which needs the staff list to pick from. Staff
+  // creation/editing below stays admin-only.
+  const guardRes = requireRole(user, ["admin", "director"]);
   if (guardRes) return guardRes;
 
   const roleParam = req.nextUrl.searchParams.get("role") as Role | null;

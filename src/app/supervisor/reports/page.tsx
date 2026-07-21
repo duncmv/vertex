@@ -1,22 +1,14 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import PortalShell from "@/components/portal/PortalShell";
 import { SUPERVISOR_NAV_ITEMS } from "@/components/portal/supervisorNav";
 import SearchableSelect from "@/components/SearchableSelect";
 import Pagination from "@/components/Pagination";
 import { usePagination } from "@/lib/usePagination";
+import ReportContentForm, { EMPTY_REPORT_CONTENT, type ReportContentValue } from "@/components/portal/reports/ReportContentForm";
+import ReportContentView from "@/components/portal/reports/ReportContentView";
 import { Plus, Stack, ListChecks, CalendarBlank } from "@phosphor-icons/react";
-
-interface ReportCandidateSnapshot {
-  id?: string;
-  name: string;
-  region: string | null;
-  role: string | null;
-  contact: string | null;
-  status: string;
-}
 
 interface ReportRow {
   id: string;
@@ -26,7 +18,7 @@ interface ReportRow {
   period_start: string;
   period_end: string;
   return_reason: string | null;
-  content: { notes?: string; candidates?: ReportCandidateSnapshot[] };
+  content: Partial<ReportContentValue>;
   submitter: { id: string; full_name: string };
   child_reports: { id: string; status: string; submitter: { full_name: string } }[];
 }
@@ -35,8 +27,11 @@ const STATUS_STYLES: Record<string, string> = {
   draft: "bg-slate-100 text-slate-700",
   submitted: "bg-yellow-100 text-yellow-800",
   verified: "bg-emerald-100 text-emerald-800",
+  approved: "bg-emerald-100 text-emerald-800",
   returned: "bg-red-100 text-red-700",
   consolidated: "bg-blue-100 text-blue-700",
+  escalated: "bg-orange-100 text-orange-800",
+  closed: "bg-slate-100 text-slate-700",
 };
 
 const REPORT_TYPES: ReportRow["type"][] = ["daily", "weekly", "monthly"];
@@ -54,7 +49,6 @@ function RecruiterReportCard({
   onVerify: () => void;
   onReturn: () => void;
 }) {
-  const candidates = r.content?.candidates ?? [];
   return (
     <div className="card p-5">
       <div className="flex items-start justify-between gap-4 mb-2">
@@ -72,30 +66,9 @@ function RecruiterReportCard({
         </div>
       </div>
 
-      {r.content?.notes && <p className="text-sm text-midnight-900/70 mb-3">{r.content.notes}</p>}
-
-      {candidates.length > 0 && (
-        <div className="mb-3">
-          <div className="text-[11px] text-midnight-900/45 uppercase tracking-wider mb-1.5">Candidates mentioned — click to act</div>
-          <div className="flex flex-wrap gap-1.5">
-            {candidates.map((c, i) =>
-              c.id ? (
-                <Link
-                  key={c.id}
-                  href={`/supervisor/candidates/${c.id}`}
-                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs bg-ivory-100 border border-midnight-900/10 text-midnight-900/70 hover:border-gold-400 hover:text-midnight-900"
-                >
-                  {c.name} <span className="text-midnight-900/40">· {c.status.replace(/_/g, " ")}</span>
-                </Link>
-              ) : (
-                <span key={i} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs bg-ivory-100 border border-midnight-900/10 text-midnight-900/50">
-                  {c.name} <span className="text-midnight-900/40">· {c.status.replace(/_/g, " ")}</span>
-                </span>
-              )
-            )}
-          </div>
-        </div>
-      )}
+      <div className="mb-3">
+        <ReportContentView content={r.content} />
+      </div>
 
       {r.status === "returned" && r.return_reason && (
         <div className="text-xs text-red-500 mb-2"><span className="font-semibold">Returned:</span> {r.return_reason}</div>
@@ -123,7 +96,10 @@ export default function SupervisorReportsPage() {
   const [error, setError] = useState("");
   const [returnDrafts, setReturnDrafts] = useState<Record<string, string>>({});
   const [showConsolidate, setShowConsolidate] = useState(false);
-  const [consolidateForm, setConsolidateForm] = useState({ type: "weekly", period_start: "", period_end: "", notes: "" });
+  const [consolidateType, setConsolidateType] = useState<"weekly" | "monthly">("weekly");
+  const [consolidatePeriodStart, setConsolidatePeriodStart] = useState("");
+  const [consolidatePeriodEnd, setConsolidatePeriodEnd] = useState("");
+  const [consolidateContent, setConsolidateContent] = useState<ReportContentValue>(EMPTY_REPORT_CONTENT);
   const [selectedChildren, setSelectedChildren] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [viewMode, setViewMode] = useState<"outstanding" | "byPeriod">("outstanding");
@@ -196,16 +172,19 @@ export default function SupervisorReportsPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          type: consolidateForm.type,
-          period_start: consolidateForm.period_start,
-          period_end: consolidateForm.period_end,
-          content: { notes: consolidateForm.notes },
+          type: consolidateType,
+          period_start: consolidatePeriodStart,
+          period_end: consolidatePeriodEnd,
+          content: consolidateContent,
           child_report_ids: selectedChildren,
         }),
       });
       const body = await res.json();
       if (!res.ok) throw new Error(body.error?.message ?? "Failed to submit country report.");
-      setConsolidateForm({ type: "weekly", period_start: "", period_end: "", notes: "" });
+      setConsolidateType("weekly");
+      setConsolidatePeriodStart("");
+      setConsolidatePeriodEnd("");
+      setConsolidateContent(EMPTY_REPORT_CONTENT);
       setSelectedChildren([]);
       setShowConsolidate(false);
       load();
@@ -313,15 +292,15 @@ export default function SupervisorReportsPage() {
           </p>
           <div className="grid sm:grid-cols-3 gap-4">
             <SearchableSelect
-              value={consolidateForm.type}
-              onChange={(value) => setConsolidateForm({ ...consolidateForm, type: value })}
+              value={consolidateType}
+              onChange={(value) => setConsolidateType(value as typeof consolidateType)}
               options={[
-                { value: "weekly", label: "Weekly country report" },
-                { value: "monthly", label: "Monthly performance summary" },
+                { value: "weekly", label: "Weekly Consolidated Report" },
+                { value: "monthly", label: "Monthly Country Performance Report" },
               ]}
             />
-            <input required type="date" value={consolidateForm.period_start} onChange={(e) => setConsolidateForm({ ...consolidateForm, period_start: e.target.value })} className="input-field" />
-            <input required type="date" value={consolidateForm.period_end} onChange={(e) => setConsolidateForm({ ...consolidateForm, period_end: e.target.value })} className="input-field" />
+            <input required type="date" value={consolidatePeriodStart} onChange={(e) => setConsolidatePeriodStart(e.target.value)} className="input-field" />
+            <input required type="date" value={consolidatePeriodEnd} onChange={(e) => setConsolidatePeriodEnd(e.target.value)} className="input-field" />
           </div>
 
           <div>
@@ -340,9 +319,10 @@ export default function SupervisorReportsPage() {
             )}
           </div>
 
-          <textarea placeholder="Notes for In-House" value={consolidateForm.notes} onChange={(e) => setConsolidateForm({ ...consolidateForm, notes: e.target.value })} rows={3} className="input-field w-full resize-none" />
-          <button type="submit" disabled={saving} className="btn-primary text-xs disabled:opacity-60">
-            {saving ? "Submitting…" : "Submit Country Report"}
+          <ReportContentForm role="country_supervisor" cycle={consolidateType} value={consolidateContent} onChange={setConsolidateContent} />
+
+          <button type="submit" disabled={saving || !consolidateContent.certified} className="btn-primary text-xs disabled:opacity-60">
+            {saving ? "Submitting…" : "Certify & Submit Country Report"}
           </button>
         </form>
       )}
@@ -360,8 +340,9 @@ export default function SupervisorReportsPage() {
               <div className="text-xs text-midnight-900/45 mb-2">
                 {new Date(r.period_start).toLocaleDateString()} – {new Date(r.period_end).toLocaleDateString()} · {r.child_reports.length} recruiter report(s) consolidated
               </div>
+              <ReportContentView content={r.content} />
               {r.status === "returned" && r.return_reason && (
-                <div className="text-xs text-red-500"><span className="font-semibold">Returned:</span> {r.return_reason}</div>
+                <div className="text-xs text-red-500 mt-2"><span className="font-semibold">Returned:</span> {r.return_reason}</div>
               )}
             </div>
           ))}

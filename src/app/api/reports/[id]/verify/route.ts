@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { auditedPrisma } from "@/lib/audit";
 import { getAuthUser, requireRole } from "@/lib/api-auth";
 import { canReviewReport } from "@/server/services/reportWorkflow";
-import { maybeAutoConsolidate } from "@/server/services/reportConsolidation";
+import { maybeAutoConsolidate, maybeAutoConsolidateToInhouse } from "@/server/services/reportConsolidation";
 
 const REVIEWER_ROLES = ["country_supervisor", "inhouse_supervisor", "director", "admin"] as const;
 
@@ -47,14 +47,21 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     return NextResponse.json({ error: { code: "invalid_transition", message: `A report in '${report.status}' status cannot be verified.` } }, { status: 422 });
   }
 
+  // Country Supervisor "verifies"; Management/Director "approves" — same
+  // action (the report's one controlling position accepting it as
+  // submitted), different terminal status per the framework's own
+  // vocabulary (§8.2) for the top of the reporting line.
   const updated = await auditedPrisma(user!.userId).report.update({
     where: { id },
-    data: { status: "verified", return_reason: null },
+    data: { status: report.scope_level === "inhouse" ? "approved" : "verified", return_reason: null },
     select: { id: true, status: true },
   });
 
   if (report.scope_level === "recruiter" && report.country_id) {
     await maybeAutoConsolidate(report.country_id, report.type, report.period_start, report.period_end);
+  }
+  if (report.scope_level === "country" && report.country_id) {
+    await maybeAutoConsolidateToInhouse(report.country_id, report.type, report.period_start, report.period_end);
   }
 
   return NextResponse.json({ data: updated });

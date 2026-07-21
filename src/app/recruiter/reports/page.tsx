@@ -6,6 +6,9 @@ import { RECRUITER_NAV_ITEMS } from "@/components/portal/recruiterNav";
 import SearchableSelect from "@/components/SearchableSelect";
 import Pagination from "@/components/Pagination";
 import { DEFAULT_PAGE_SIZE } from "@/lib/usePagination";
+import ReportContentForm, { EMPTY_REPORT_CONTENT, type ReportContentValue } from "@/components/portal/reports/ReportContentForm";
+import ReportContentView from "@/components/portal/reports/ReportContentView";
+import type { KpiRow } from "@/components/portal/reports/ReportKpiTable";
 import { Plus, PaperPlaneTilt, Target } from "@phosphor-icons/react";
 
 interface ReportRow {
@@ -15,7 +18,7 @@ interface ReportRow {
   period_start: string;
   period_end: string;
   return_reason: string | null;
-  content: { notes?: string; challenges?: string; performance_updates?: string };
+  content: Partial<ReportContentValue>;
   created_at: string;
 }
 
@@ -44,24 +47,17 @@ const STATUS_STYLES: Record<string, string> = {
   draft: "bg-slate-100 text-slate-700",
   submitted: "bg-yellow-100 text-yellow-800",
   verified: "bg-emerald-100 text-emerald-800",
+  approved: "bg-emerald-100 text-emerald-800",
   returned: "bg-red-100 text-red-700",
   consolidated: "bg-blue-100 text-blue-700",
+  escalated: "bg-orange-100 text-orange-800",
+  closed: "bg-slate-100 text-slate-700",
 };
 
 const METRIC_LABELS: Record<string, string> = {
   agent_signups: "Agent Sign-ups",
   applicant_flow: "Applicant Flow",
   conversion_rate: "Conversion Rate (%)",
-};
-
-const LIFECYCLE_LABELS: Record<string, string> = {
-  identified: "Identified",
-  screened: "Screened",
-  guided_to_apply: "Guided to Apply",
-  submitted: "Submitted",
-  reported: "Reported",
-  verified: "Verified",
-  approved: "Approved",
 };
 
 function TargetProgressList({ progress }: { progress: TargetProgress[] }) {
@@ -86,14 +82,46 @@ function TargetProgressList({ progress }: { progress: TargetProgress[] }) {
   );
 }
 
+// Fills in `actual` for whichever KPI labels have a directly computable
+// source from the period's candidate list — target and any KPI without a
+// clean computed source (CRM quality, reporting timeliness, etc.) stay
+// for the recruiter to fill in manually.
+function autoKpis(type: "daily" | "weekly" | "monthly", candidates: CandidateForReport[]): KpiRow[] {
+  if (type === "daily") return [];
+  const screeningEvaluated = candidates.filter((c) => c.screening_result !== null).length;
+  const screened = candidates.filter((c) => c.screening_result === true).length;
+  const submittedOrBeyond = candidates.filter((c) => ["submitted", "reported", "verified", "approved"].includes(c.lifecycle_status)).length;
+  const verifiedOrBeyond = candidates.filter((c) => ["verified", "approved"].includes(c.lifecycle_status)).length;
+  const passRate = screeningEvaluated === 0 ? undefined : Math.round((screened / screeningEvaluated) * 1000) / 10;
+
+  if (type === "weekly") {
+    return [
+      { label: "Candidate identification", actual: candidates.length },
+      { label: "Screening completion", actual: screeningEvaluated },
+      { label: "Screening pass rate", actual: passRate },
+      { label: "Application submission", actual: submittedOrBeyond },
+    ];
+  }
+  return [
+    { label: "Candidates identified", actual: candidates.length },
+    { label: "Candidates screened", actual: screeningEvaluated },
+    { label: "Qualified candidates", actual: screened },
+    { label: "Applications submitted", actual: submittedOrBeyond },
+    { label: "Verified candidates", actual: verifiedOrBeyond },
+  ];
+}
+
 export default function RecruiterReportsPage() {
   const [reports, setReports] = useState<ReportRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState({ type: "daily", period_start: "", period_end: "", notes: "", challenges: "", performance_updates: "" });
-  const [resubmitNotes, setResubmitNotes] = useState<Record<string, string>>({});
+  const [type, setType] = useState<"daily" | "weekly" | "monthly">("daily");
+  const [periodStart, setPeriodStart] = useState("");
+  const [periodEnd, setPeriodEnd] = useState("");
+  const [content, setContent] = useState<ReportContentValue>(EMPTY_REPORT_CONTENT);
+  const [resubmitContent, setResubmitContent] = useState<Record<string, ReportContentValue>>({});
 
   const [periodCandidates, setPeriodCandidates] = useState<CandidateForReport[]>([]);
   const [targetProgress, setTargetProgress] = useState<TargetProgress[]>([]);
@@ -117,21 +145,16 @@ export default function RecruiterReportsPage() {
   useEffect(() => load(), [page]);
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const isDateDrivenType = type === "weekly" || type === "monthly";
 
-  const isDateDrivenType = form.type === "weekly" || form.type === "monthly";
-
-  // Weekly/monthly reports auto-populate from the selected date range —
-  // both the candidate list (weekly) and the summary stats it's rolled up
-  // into (monthly) come from the same fetch; targets vs actuals is the
-  // same regardless of type.
   useEffect(() => {
-    if (!isDateDrivenType || !form.period_start || !form.period_end) {
+    if (!isDateDrivenType || !periodStart || !periodEnd) {
       setPeriodCandidates([]);
       setTargetProgress([]);
       return;
     }
     setLoadingPeriodData(true);
-    const params = new URLSearchParams({ period_start: form.period_start, period_end: form.period_end });
+    const params = new URLSearchParams({ period_start: periodStart, period_end: periodEnd });
     Promise.all([
       fetch(`/api/candidates?${params}`).then((r) => r.json()),
       fetch(`/api/recruiter-targets/progress?${params}`).then((r) => r.json()),
@@ -142,72 +165,40 @@ export default function RecruiterReportsPage() {
       })
       .catch(() => {})
       .finally(() => setLoadingPeriodData(false));
-  }, [isDateDrivenType, form.type, form.period_start, form.period_end]);
+  }, [isDateDrivenType, type, periodStart, periodEnd]);
 
-  const monthlySummary = useMemo(() => {
-    const byStatus: Record<string, number> = {};
-    let screened = 0;
-    let screeningEvaluated = 0;
-    for (const c of periodCandidates) {
-      byStatus[c.lifecycle_status] = (byStatus[c.lifecycle_status] ?? 0) + 1;
-      if (c.screening_result !== null) {
-        screeningEvaluated += 1;
-        if (c.screening_result) screened += 1;
-      }
-    }
-    return {
-      total: periodCandidates.length,
-      byStatus,
-      screeningPassRate: screeningEvaluated === 0 ? null : Math.round((screened / screeningEvaluated) * 1000) / 10,
-    };
-  }, [periodCandidates]);
+  // Re-derive the auto-computable KPI actuals whenever the period's
+  // candidate list changes, without clobbering anything the recruiter has
+  // already typed into target/comment for those same rows.
+  useEffect(() => {
+    if (!isDateDrivenType) return;
+    const computed = autoKpis(type, periodCandidates);
+    setContent((c) => ({
+      ...c,
+      kpis: computed.map((row) => {
+        const existing = c.kpis.find((k) => k.label === row.label);
+        return { ...row, target: existing?.target, comment: existing?.comment };
+      }),
+    }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [periodCandidates, type, isDateDrivenType]);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
     setError("");
     try {
-      let content: Record<string, unknown>;
-      if (form.type === "daily") {
-        content = { notes: form.notes };
-      } else if (form.type === "weekly") {
-        content = {
-          candidates: periodCandidates.map((c) => ({
-            id: c.id,
-            name: c.user?.full_name ?? c.full_name ?? "— unnamed lead —",
-            region: c.country?.region?.name ?? null,
-            role: c.desired_role,
-            contact: c.user?.email ?? c.email ?? c.phone ?? null,
-            screening_result: c.screening_result,
-            status: c.lifecycle_status,
-            date_of_application: c.created_at,
-          })),
-          targets_vs_actuals: targetProgress,
-          challenges: form.challenges,
-          performance_updates: form.performance_updates,
-        };
-      } else {
-        content = {
-          summary: monthlySummary,
-          targets_vs_actuals: targetProgress,
-          challenges: form.challenges,
-          performance_updates: form.performance_updates,
-        };
-      }
-
       const res = await fetch("/api/reports", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          type: form.type,
-          period_start: form.period_start,
-          period_end: form.period_end,
-          content,
-        }),
+        body: JSON.stringify({ type, period_start: periodStart, period_end: periodEnd, content }),
       });
       const body = await res.json();
       if (!res.ok) throw new Error(body.error?.message ?? "Failed to submit report.");
-      setForm({ type: "daily", period_start: "", period_end: "", notes: "", challenges: "", performance_updates: "" });
+      setType("daily");
+      setPeriodStart("");
+      setPeriodEnd("");
+      setContent(EMPTY_REPORT_CONTENT);
       setShowForm(false);
       setPage(1);
       load(1);
@@ -219,12 +210,14 @@ export default function RecruiterReportsPage() {
   };
 
   const resubmit = async (id: string) => {
-    await fetch(`/api/reports/${id}/resubmit`, {
+    const value = resubmitContent[id];
+    if (!value) return;
+    const res = await fetch(`/api/reports/${id}/resubmit`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ content: { notes: resubmitNotes[id] ?? "" } }),
+      body: JSON.stringify({ content: value }),
     });
-    load();
+    if (res.ok) load();
   };
 
   return (
@@ -242,9 +235,8 @@ export default function RecruiterReportsPage() {
         </button>
       </div>
       <p className="text-midnight-900/55 font-light mb-8 max-w-2xl">
-        Daily status updates go to your country supervisor as a quick note. Weekly and monthly reports
-        auto-populate from the candidates you sourced in the period you pick, plus your progress against
-        whatever target your supervisor has set for you.
+        Daily, weekly, and monthly reports follow the Supervisory Reporting Framework — weekly/monthly KPI
+        actuals auto-populate from the candidates you sourced in the period you pick.
       </p>
 
       {error && <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg p-4 text-sm mb-6">{error}</div>}
@@ -254,115 +246,37 @@ export default function RecruiterReportsPage() {
           <h3 className="font-semibold text-midnight-900">New report</h3>
           <div className="grid sm:grid-cols-3 gap-4">
             <SearchableSelect
-              value={form.type}
-              onChange={(value) => setForm({ ...form, type: value })}
+              value={type}
+              onChange={(value) => setType(value as typeof type)}
               options={[
-                { value: "daily", label: "Daily status update" },
-                { value: "weekly", label: "Weekly candidate list" },
-                { value: "monthly", label: "Monthly summary" },
+                { value: "daily", label: "Daily Activity Report" },
+                { value: "weekly", label: "Weekly Performance Report" },
+                { value: "monthly", label: "Monthly Performance Summary" },
               ]}
             />
-            <input required type="date" value={form.period_start} onChange={(e) => setForm({ ...form, period_start: e.target.value })} className="input-field" />
-            <input required type="date" value={form.period_end} onChange={(e) => setForm({ ...form, period_end: e.target.value })} className="input-field" />
+            <input required type="date" value={periodStart} onChange={(e) => setPeriodStart(e.target.value)} className="input-field" />
+            <input required type="date" value={periodEnd} onChange={(e) => setPeriodEnd(e.target.value)} className="input-field" />
           </div>
 
-          {form.type === "daily" && (
-            <textarea placeholder="Notes for your supervisor" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} rows={3} className="input-field w-full resize-none" />
+          {isDateDrivenType && (!periodStart || !periodEnd) && (
+            <p className="text-xs text-midnight-900/40">Pick a period above to auto-populate this report.</p>
           )}
+          {isDateDrivenType && periodStart && periodEnd && loadingPeriodData && <p className="text-xs text-midnight-900/40">Loading…</p>}
 
-          {isDateDrivenType && (
+          {(!isDateDrivenType || (periodStart && periodEnd && !loadingPeriodData)) && (
             <>
-              {!form.period_start || !form.period_end ? (
-                <p className="text-xs text-midnight-900/40">Pick a period above to auto-populate this report.</p>
-              ) : loadingPeriodData ? (
-                <p className="text-xs text-midnight-900/40">Loading…</p>
-              ) : (
-                <>
-                  {form.type === "weekly" ? (
-                    periodCandidates.length === 0 ? (
-                      <p className="text-xs text-midnight-900/40">No candidates sourced in this period.</p>
-                    ) : (
-                      <div className="border border-midnight-900/10 rounded-lg overflow-x-auto">
-                        <table className="w-full text-xs">
-                          <thead>
-                            <tr className="border-b border-midnight-900/10 text-left text-midnight-900/40 uppercase tracking-wider">
-                              <th className="px-3 py-2 font-semibold">Name</th>
-                              <th className="px-3 py-2 font-semibold">Region</th>
-                              <th className="px-3 py-2 font-semibold">Role</th>
-                              <th className="px-3 py-2 font-semibold">Contact</th>
-                              <th className="px-3 py-2 font-semibold">Screening</th>
-                              <th className="px-3 py-2 font-semibold">Status</th>
-                              <th className="px-3 py-2 font-semibold">Applied</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {periodCandidates.map((c) => (
-                              <tr key={c.id} className="border-b border-midnight-900/5 last:border-0">
-                                <td className="px-3 py-2 font-medium text-midnight-900">{c.user?.full_name ?? c.full_name ?? "— unnamed lead —"}</td>
-                                <td className="px-3 py-2 text-midnight-900/70">{c.country?.region?.name ?? "—"}</td>
-                                <td className="px-3 py-2 text-midnight-900/70">{c.desired_role ?? "—"}</td>
-                                <td className="px-3 py-2 text-midnight-900/70">{c.user?.email ?? c.email ?? c.phone ?? "—"}</td>
-                                <td className="px-3 py-2">
-                                  {c.screening_result === null ? "—" : c.screening_result ? (
-                                    <span className="text-emerald-600 font-medium">Passed</span>
-                                  ) : (
-                                    <span className="text-red-500 font-medium">Failed</span>
-                                  )}
-                                </td>
-                                <td className="px-3 py-2 text-midnight-900/70 capitalize">{c.lifecycle_status.replace(/_/g, " ")}</td>
-                                <td className="px-3 py-2 text-midnight-900/60">{new Date(c.created_at).toLocaleDateString()}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    )
-                  ) : (
-                    <div className="border border-midnight-900/10 rounded-lg p-4 space-y-3">
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
-                        <div>
-                          <div className="text-xl font-semibold text-midnight-900">{monthlySummary.total}</div>
-                          <div className="text-[11px] text-midnight-900/45 uppercase tracking-wider">Candidates</div>
-                        </div>
-                        <div>
-                          <div className="text-xl font-semibold text-midnight-900">
-                            {monthlySummary.screeningPassRate === null ? "—" : `${monthlySummary.screeningPassRate}%`}
-                          </div>
-                          <div className="text-[11px] text-midnight-900/45 uppercase tracking-wider">Screening Pass Rate</div>
-                        </div>
-                        <div>
-                          <div className="text-xl font-semibold text-midnight-900">{monthlySummary.byStatus.reported ?? 0}</div>
-                          <div className="text-[11px] text-midnight-900/45 uppercase tracking-wider">Reported</div>
-                        </div>
-                        <div>
-                          <div className="text-xl font-semibold text-midnight-900">{monthlySummary.byStatus.approved ?? 0}</div>
-                          <div className="text-[11px] text-midnight-900/45 uppercase tracking-wider">Approved</div>
-                        </div>
-                      </div>
-                      <div className="flex flex-wrap gap-1.5 pt-2 border-t border-midnight-900/10">
-                        {Object.entries(monthlySummary.byStatus).map(([status, count]) => (
-                          <span key={status} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs bg-ivory-100 border border-midnight-900/10 text-midnight-900/70">
-                            {LIFECYCLE_LABELS[status] ?? status}: <span className="font-semibold">{count}</span>
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  <div>
-                    <div className="text-xs font-semibold text-midnight-900/50 uppercase tracking-wider mb-2">Progress vs Target</div>
-                    <TargetProgressList progress={targetProgress} />
-                  </div>
-
-                  <textarea placeholder="Challenges this period" value={form.challenges} onChange={(e) => setForm({ ...form, challenges: e.target.value })} rows={2} className="input-field w-full resize-none" />
-                  <textarea placeholder="Performance updates" value={form.performance_updates} onChange={(e) => setForm({ ...form, performance_updates: e.target.value })} rows={2} className="input-field w-full resize-none" />
-                </>
+              <ReportContentForm role="regional_recruiter" cycle={type} value={content} onChange={setContent} />
+              {isDateDrivenType && (
+                <div>
+                  <div className="text-xs font-semibold text-midnight-900/50 uppercase tracking-wider mb-2">Progress vs Target</div>
+                  <TargetProgressList progress={targetProgress} />
+                </div>
               )}
             </>
           )}
 
-          <button type="submit" disabled={saving} className="btn-primary text-xs disabled:opacity-60">
-            {saving ? "Submitting…" : "Submit Report"}
+          <button type="submit" disabled={saving || !content.certified} className="btn-primary text-xs disabled:opacity-60">
+            {saving ? "Submitting…" : "Certify & Submit"}
           </button>
         </form>
       )}
@@ -379,40 +293,43 @@ export default function RecruiterReportsPage() {
                 <th className="px-5 py-3 font-semibold">Period</th>
                 <th className="px-5 py-3 font-semibold">Type</th>
                 <th className="px-5 py-3 font-semibold">Status</th>
-                <th className="px-5 py-3 font-semibold">Notes</th>
+                <th className="px-5 py-3 font-semibold">Content</th>
               </tr>
             </thead>
             <tbody>
               {reports.map((r) => (
                 <tr key={r.id} className="border-b border-midnight-900/5 last:border-0 align-top">
-                  <td className="px-5 py-4 text-midnight-900/70">
+                  <td className="px-5 py-4 text-midnight-900/70 whitespace-nowrap">
                     {new Date(r.period_start).toLocaleDateString()} – {new Date(r.period_end).toLocaleDateString()}
                   </td>
                   <td className="px-5 py-4 text-midnight-900/70 capitalize">{r.type}</td>
                   <td className="px-5 py-4">
                     <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${STATUS_STYLES[r.status]}`}>{r.status}</span>
                     {r.status === "returned" && r.return_reason && (
-                      <div className="text-xs text-red-500 mt-2 max-w-[220px]">
+                      <div className="text-xs text-red-500 mt-2 max-w-[260px]">
                         <span className="font-semibold">Returned:</span> {r.return_reason}
                       </div>
                     )}
                     {r.status === "returned" && (
-                      <div className="mt-2 flex flex-col gap-1.5 max-w-[240px]">
-                        <textarea
-                          placeholder="Updated notes"
-                          value={resubmitNotes[r.id] ?? r.content?.notes ?? ""}
-                          onChange={(e) => setResubmitNotes((prev) => ({ ...prev, [r.id]: e.target.value }))}
-                          rows={2}
-                          className="input-field text-xs resize-none"
+                      <div className="mt-3 max-w-md">
+                        <ReportContentForm
+                          role="regional_recruiter"
+                          cycle={r.type as "daily" | "weekly" | "monthly"}
+                          value={resubmitContent[r.id] ?? { ...EMPTY_REPORT_CONTENT, ...r.content }}
+                          onChange={(v) => setResubmitContent((prev) => ({ ...prev, [r.id]: v }))}
                         />
-                        <button onClick={() => resubmit(r.id)} className="btn-secondary py-1.5 px-3 text-xs w-fit">
+                        <button
+                          onClick={() => resubmit(r.id)}
+                          disabled={!(resubmitContent[r.id]?.certified ?? r.content.certified)}
+                          className="btn-secondary py-1.5 px-3 text-xs w-fit mt-2 disabled:opacity-60"
+                        >
                           <PaperPlaneTilt size={12} weight="bold" /> Resubmit
                         </button>
                       </div>
                     )}
                   </td>
-                  <td className="px-5 py-4 text-midnight-900/60 text-xs max-w-[240px]">
-                    {r.content?.notes || r.content?.challenges || r.content?.performance_updates || "—"}
+                  <td className="px-5 py-4 max-w-[320px]">
+                    <ReportContentView content={r.content} />
                   </td>
                 </tr>
               ))}

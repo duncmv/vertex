@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import PortalShell from "@/components/portal/PortalShell";
 import { INHOUSE_NAV_ITEMS } from "@/components/portal/inhouseNav";
+import StaffScorecardPanel from "@/components/portal/StaffScorecardPanel";
 import { Users, UserCheck, CheckCircle, Target, FileText, ClipboardText } from "@phosphor-icons/react";
 
 interface Overview {
@@ -13,6 +14,7 @@ interface Overview {
   candidateFunnel: Record<string, number>;
   pendingCountryReports: number;
   campaignTargets: { id: string; metric: string; targetValue: number; actualValue: number; campaignName: string }[];
+  countrySupervisor: { id: string; full_name: string } | null;
 }
 
 const STAGE_LABELS: Record<string, string> = {
@@ -157,6 +159,15 @@ export default function InhouseOverviewPage() {
               Go to Reports →
             </Link>
           </div>
+
+          {data.countrySupervisor && (
+            <div className="card p-6 mt-8">
+              <h2 className="text-sm font-semibold text-midnight-900/70 uppercase tracking-wider mb-4 flex items-center gap-2">
+                <UserCheck size={16} weight="bold" className="text-gold-600" /> {data.countrySupervisor.full_name} — Country Supervisor
+              </h2>
+              <StaffScorecardPanel staffId={data.countrySupervisor.id} />
+            </div>
+          )}
         </>
       ) : null}
     </PortalShell>

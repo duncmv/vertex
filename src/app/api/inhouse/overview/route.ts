@@ -23,7 +23,7 @@ export async function GET(req: NextRequest) {
 
   const countryId = supervisor.assigned_country_id;
 
-  const [recruiters, candidateFunnel, pendingCountryReports, activeCampaignTargets] = await Promise.all([
+  const [recruiters, candidateFunnel, pendingCountryReports, activeCampaignTargets, countrySupervisor] = await Promise.all([
     prisma.user.findMany({
       where: { role: "regional_recruiter", assigned_country_id: countryId },
       select: { id: true, full_name: true },
@@ -35,6 +35,13 @@ export async function GET(req: NextRequest) {
       where: { country_id: countryId, campaign: { status: "active" } },
       select: { id: true, metric: true, target_value: true, campaign: { select: { id: true, name: true } } },
       orderBy: { created_at: "desc" },
+    }),
+    // For the Supervisory Performance Scorecard panel (§7) — the one
+    // Country Supervisor In-House scores, matching the existing confirmed
+    // single-country scoping.
+    prisma.user.findFirst({
+      where: { role: "country_supervisor", assigned_country_id: countryId },
+      select: { id: true, full_name: true },
     }),
   ]);
 
@@ -88,6 +95,7 @@ export async function GET(req: NextRequest) {
       candidateFunnel,
       pendingCountryReports,
       campaignTargets,
+      countrySupervisor,
     },
   });
 }

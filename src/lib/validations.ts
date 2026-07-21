@@ -316,17 +316,115 @@ export const createRecruiterNoteSchema = z.object({
   message: z.string().min(1).max(2000),
 });
 
-// Reporting cycle (SRS FR-3.4) — a recruiter submits daily/weekly reports;
-// a supervisor consolidates verified recruiter reports (child_report_ids)
-// into a country report. `content` is free-form JSON since it snapshots
-// whatever the submitter reports at the time (candidate list, notes,
-// KPI summary) rather than a fixed schema.
+// Supervisory Reporting Framework §2.1's mandatory sections, expressed as
+// one shared, structured content shape reused across every daily/weekly/
+// monthly report regardless of role — the specific KPI/row *names* per
+// role and cycle are a frontend concern (src/lib/reportTemplates.ts), not
+// a schema one, since the underlying arrays are structurally identical
+// (a labeled row with a handful of optional values) whether it's a
+// recruiter's daily KPI table or an in-house supervisor's monthly one.
+// Every array defaults to empty since not every section applies to every
+// cycle (e.g. a daily report has no competency self-rating table).
+const reportKpiRowSchema = z.object({
+  label: z.string().min(1),
+  target: z.number().optional(),
+  actual: z.number().optional(),
+  comment: z.string().max(1000).optional(),
+});
+
+// Weekly funnel-stage table (§3.2/§4.2) — candidate-lifecycle stage counts
+// moving through opening/added/moved-forward/closed/closing.
+const reportPipelineRowSchema = z.object({
+  stage: z.string().min(1),
+  opening: z.number().optional(),
+  added: z.number().optional(),
+  moved_forward: z.number().optional(),
+  closed_rejected: z.number().optional(),
+  closing: z.number().optional(),
+  target: z.number().optional(),
+});
+
+// Daily candidate-level activity table (§3.1) — one row per candidate touched that day.
+const reportActivityRowSchema = z.object({
+  candidate_ref: z.string().min(1),
+  role: z.string().max(150).optional(),
+  current_status: z.string().max(100).optional(),
+  action_completed: z.string().max(500).optional(),
+  next_action: z.string().max(500).optional(),
+});
+
+// Issue/Blocker (daily) or Challenge/Risk (weekly) table — same shape,
+// different column labels rendered per cycle.
+const reportIssueRowSchema = z.object({
+  label: z.string().min(1),
+  detail: z.string().max(1000).optional(),
+  action: z.string().max(1000).optional(),
+  owner: z.string().max(150).optional(),
+  due_date: z.string().optional(),
+  status: z.string().max(100).optional(),
+  escalation: z.boolean().optional(),
+});
+
+// Next-week/next-month priority/objective table.
+const reportPriorityRowSchema = z.object({
+  label: z.string().min(1),
+  planned_activity: z.string().max(500).optional(),
+  target_measure: z.string().max(300).optional(),
+  support_required: z.string().max(500).optional(),
+  owner: z.string().max(150).optional(),
+  due_date: z.string().optional(),
+});
+
+// Weekly "Top Achievement" table.
+const reportAchievementRowSchema = z.object({
+  label: z.string().min(1),
+  evidence: z.string().max(1000).optional(),
+  business_impact: z.string().max(1000).optional(),
+});
+
+// Monthly Competency/Control Area self + supervisor rating table (§3.3) —
+// this is the recruiter's own self-assessment inside their monthly
+// report, distinct from the separate Supervisory Performance Scorecard
+// (StaffScorecard model), which is the supervisor's independent review.
+const reportCompetencyRowSchema = z.object({
+  area: z.string().min(1),
+  self_rating: z.number().min(1).max(5).optional(),
+  evidence: z.string().max(1000).optional(),
+  supervisor_rating: z.number().min(1).max(5).optional(),
+});
+
+export const reportContentSchema = z.object({
+  campaign_or_role: z.string().max(200).optional(),
+  crm_reference: z.string().max(200).optional(),
+  executive_summary: z.string().max(3000).optional(),
+  overall_status: z.enum(["green", "amber", "red", "grey"]).optional(),
+  kpis: z.array(reportKpiRowSchema).default([]),
+  pipeline: z.array(reportPipelineRowSchema).default([]),
+  activity: z.array(reportActivityRowSchema).default([]),
+  issues: z.array(reportIssueRowSchema).default([]),
+  achievements: z.array(reportAchievementRowSchema).default([]),
+  priorities: z.array(reportPriorityRowSchema).default([]),
+  competencies: z.array(reportCompetencyRowSchema).default([]),
+  key_achievement: z.string().max(500).optional(),
+  next_priority: z.string().max(500).optional(),
+  // The framework's "Reporter Certification: I confirm..." + signature —
+  // simplified to a plain confirmation flag on an authenticated submit;
+  // the Report row's own submitted_by/created_at is the timestamp/identity
+  // record, no separate typed attestation.
+  certified: z.literal(true, { message: "You must certify this report before submitting." }),
+});
+
+// Reporting cycle (SRS FR-3.4; Supervisory Reporting Framework §3-§5) — a
+// recruiter submits daily/weekly/monthly reports; a country_supervisor
+// consolidates verified recruiter reports (child_report_ids) into a
+// country report; an inhouse_supervisor consolidates their verified
+// country report into a portfolio report submitted to Management/Director.
 export const submitReportSchema = z
   .object({
     type: z.enum(["daily", "weekly", "monthly"]),
     period_start: z.string(),
     period_end: z.string(),
-    content: z.record(z.string(), z.unknown()).default({}),
+    content: reportContentSchema,
     child_report_ids: z.array(z.string().cuid()).optional(),
   })
   .refine((data) => new Date(data.period_end) > new Date(data.period_start), {
@@ -340,6 +438,89 @@ export const submitReportSchema = z
 
 export const returnReportSchema = z.object({
   return_reason: z.string().min(5).max(1000),
+});
+
+// Supervisory Reporting Framework §6 — a standalone exception/escalation
+// report, raised ad hoc at any time by any tier, independent of the
+// daily/weekly/monthly cadence above.
+export const raiseExceptionSchema = z.object({
+  category: z.enum([
+    "candidate_eligibility_screening",
+    "documentation_data_integrity",
+    "crm_system_issue",
+    "target_capacity_performance",
+    "compliance_legal_ethical_risk",
+    "candidate_welfare_conduct",
+    "operational_timeline_dependency",
+    "other",
+  ]),
+  candidate_id: z.string().cuid().optional(),
+  reference_note: z.string().max(300).optional(),
+  issue_statement: z.string().min(10, "Describe what happened.").max(2000),
+  immediate_impact: z.string().min(5, "Describe the immediate impact.").max(2000),
+  actions_taken: z.string().max(2000).optional(),
+  root_cause: z.string().max(2000).optional(),
+  options_considered: z.string().max(2000).optional(),
+  recommendation: z.string().max(2000).optional(),
+  decision_required: z.string().min(5, "State the decision required.").max(1000),
+  decision_deadline: z.string().min(1, "A decision deadline is required."),
+  corrective_actions: z
+    .array(
+      z.object({
+        action: z.string().min(1).max(500),
+        owner_id: z.string().cuid().optional(),
+        due_date: z.string().optional(),
+        success_measure: z.string().max(500).optional(),
+      })
+    )
+    .default([]),
+});
+
+// Escalate (move up one tier) or decide (close out) an existing exception.
+export const escalateExceptionSchema = z.object({
+  action: z.literal("escalate"),
+});
+
+export const decideExceptionSchema = z.object({
+  action: z.literal("decide"),
+  decision: z.enum(["approved", "modified", "rejected", "escalated"]),
+  decision_notes: z.string().max(2000).optional(),
+});
+
+export const updateExceptionSchema = z.discriminatedUnion("action", [escalateExceptionSchema, decideExceptionSchema]);
+
+// Supervisory Reporting Framework §7 — a supervisor's monthly, evidence-
+// based review of one direct report's own performance (never self-
+// submitted). Weights are fixed by the framework's own table (20/20/15/
+// 15/15/10/5) and enforced server-side, not trusted from the client.
+export const SCORECARD_AREAS = [
+  { key: "target_achievement", weight: 0.2, label: "Target Achievement / Productivity" },
+  { key: "quality_accuracy", weight: 0.2, label: "Quality and Accuracy" },
+  { key: "reporting_timeliness", weight: 0.15, label: "Reporting Timeliness" },
+  { key: "compliance_data_discipline", weight: 0.15, label: "Compliance and Data Discipline" },
+  { key: "supervision_collaboration", weight: 0.15, label: "Supervision / Collaboration" },
+  { key: "issue_resolution_escalation", weight: 0.1, label: "Issue Resolution / Escalation" },
+  { key: "professional_conduct", weight: 0.05, label: "Professional Conduct" },
+] as const;
+
+const scorecardAreaKeys = SCORECARD_AREAS.map((a) => a.key) as [string, ...string[]];
+
+export const upsertStaffScorecardSchema = z.object({
+  staff_id: z.string().cuid(),
+  period_month: z.string().min(1),
+  areas: z
+    .array(
+      z.object({
+        area_key: z.enum(scorecardAreaKeys),
+        rating: z.number().min(1).max(5).optional(),
+        evidence: z.string().max(1000).optional(),
+      })
+    )
+    .max(SCORECARD_AREAS.length),
+});
+
+export const finalizeStaffScorecardSchema = z.object({
+  review_date: z.string().optional(),
 });
 
 // Contact form

@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { auditedPrisma } from "@/lib/audit";
 import { getAuthUser, requireRole } from "@/lib/api-auth";
+import { reportContentSchema } from "@/lib/validations";
 
-const STAFF_ROLES = ["regional_recruiter", "country_supervisor", "admin"] as const;
+const STAFF_ROLES = ["regional_recruiter", "country_supervisor", "inhouse_supervisor", "admin"] as const;
 
 // PATCH /api/reports/:id/resubmit — only the original submitter can
 // correct and resubmit a returned report (SRS FR-3.5).
@@ -27,12 +28,19 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     return NextResponse.json({ error: { code: "invalid_transition", message: "Only a returned report can be resubmitted." } }, { status: 422 });
   }
 
-  let content: unknown;
+  let body: unknown;
   try {
-    const body = await req.json();
-    content = body?.content;
+    body = await req.json();
   } catch {
-    content = undefined;
+    return NextResponse.json({ error: { code: "invalid_json", message: "Invalid JSON" } }, { status: 400 });
+  }
+
+  const parsedContent = reportContentSchema.safeParse((body as { content?: unknown })?.content);
+  if (!parsedContent.success) {
+    return NextResponse.json(
+      { error: { code: "validation_error", message: "Validation failed", details: parsedContent.error.flatten().fieldErrors } },
+      { status: 422 }
+    );
   }
 
   const updated = await auditedPrisma(user!.userId).report.update({
@@ -40,7 +48,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     data: {
       status: "submitted",
       return_reason: null,
-      ...(content !== undefined ? { content } : {}),
+      content: parsedContent.data,
     },
     select: { id: true, status: true },
   });

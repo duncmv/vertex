@@ -80,6 +80,12 @@ model User {
   recruiter_notes_authored    RecruiterNote[]    @relation("RecruiterNoteAuthor")
   candidate_messages_sent     CandidateMessage[]
 
+  exceptions_raised           Exception[]                 @relation("ExceptionRaiser")
+  exceptions_decided          Exception[]                 @relation("ExceptionDecider")
+  exception_actions_owned     ExceptionCorrectiveAction[] @relation("ExceptionActionOwner")
+  scorecards_received         StaffScorecard[]            @relation("ScorecardSubject")
+  scorecards_authored         StaffScorecard[]            @relation("ScorecardReviewer")
+
   @@index([email])
   @@index([supervisor_id])
   @@index([assigned_country_id])
@@ -118,6 +124,7 @@ model Country {
   partner_preferred_by_2     PartnerCandidate[]           @relation("PartnerPreferredCountry2")
   partner_preferred_by_3     PartnerCandidate[]           @relation("PartnerPreferredCountry3")
   partner_current_located_by PartnerCandidate[]           @relation("PartnerCurrentLocation")
+  exceptions                 Exception[]
 
   @@index([region_id])
 }
@@ -254,6 +261,7 @@ model Candidate {
   // (future job-assignment step, not exercised yet) rather than created
   // directly.
   partner_candidate_origin PartnerCandidate?
+  exceptions               Exception[]
 
   @@index([user_id])
   @@index([recruiter_id])
@@ -340,6 +348,12 @@ enum ReportCycle {
 enum ScopeLevel {
   recruiter
   country
+  // An In-House Supervisor's own portfolio-level report (Supervisory
+  // Reporting Framework §5), consolidated from their assigned countries'
+  // country-scope reports — addressed to Management/Director, the top of
+  // the reporting line. Added alongside the framework's daily/weekly/
+  // monthly upward-reporting templates for this tier (2026-07-21).
+  inhouse
 }
 
 enum ReportStatus {
@@ -348,6 +362,13 @@ enum ReportStatus {
   verified
   consolidated
   returned
+  // Added for the Supervisory Reporting Framework's fuller status
+  // vocabulary (§8.2) — the top of the reporting line (Management/
+  // Director reviewing an In-House portfolio report) uses these instead
+  // of "verified"/"consolidated", which are recruiter/country-tier terms.
+  approved
+  escalated
+  closed
 }
 
 // A recruiter's daily/weekly submission (scope_level: recruiter) rolls up
@@ -388,6 +409,180 @@ model Report {
   // period_end range; at 40-country/800-recruiter scale this runs on
   // every dashboard load, not just occasionally.
   @@index([country_id, type, period_end])
+}
+
+// ── Supervisory Reporting Framework §6: Exception, Escalation and
+// Corrective Action Report ──────────────────────────────────────────────
+// Deliberately a standalone model, not a Report.type value — unlike the
+// daily/weekly/monthly cycle reports, an exception is raised ad hoc at any
+// time by any tier and moves independently up the same escalation line
+// (Regional Recruiter → Country Supervisor → In-House Supervisor →
+// Management), tracked by its own reference number and decision workflow.
+enum ExceptionCategory {
+  candidate_eligibility_screening
+  documentation_data_integrity
+  crm_system_issue
+  target_capacity_performance
+  compliance_legal_ethical_risk
+  candidate_welfare_conduct
+  operational_timeline_dependency
+  other
+}
+
+enum EscalationLevel {
+  regional
+  country
+  inhouse
+  management
+}
+
+enum ExceptionStatus {
+  open
+  decided
+  closed
+}
+
+enum ExceptionDecision {
+  approved
+  modified
+  rejected
+  escalated
+}
+
+model Exception {
+  id       String            @id @default(cuid())
+  // "EXC-000123" — sequential, human-referenceable (framework §6's own
+  // "Exception Reference: EXC-___" field), generated at creation time.
+  reference String           @unique
+  category  ExceptionCategory
+
+  raised_by     String
+  raiser        User          @relation("ExceptionRaiser", fields: [raised_by], references: [id], onDelete: Cascade)
+  // Snapshot at raise time — a promotion/role change afterward shouldn't
+  // rewrite history of what tier actually raised this.
+  role_at_raise Role
+
+  country_id   String?
+  country      Country?    @relation(fields: [country_id], references: [id], onDelete: SetNull)
+  // The framework's own form has a single combined "Campaign/Candidate CRM
+  // Ref." blank — modeled as an optional structured link to the specific
+  // candidate when there is one, plus free text for anything else (a
+  // campaign name, or a reference that doesn't fit a clean FK).
+  candidate_id String?
+  candidate    Candidate?  @relation(fields: [candidate_id], references: [id], onDelete: SetNull)
+  reference_note String?   @db.Text
+
+  issue_statement    String   @db.Text
+  immediate_impact   String   @db.Text
+  actions_taken      String?  @db.Text
+  root_cause         String?  @db.Text
+  options_considered String?  @db.Text
+  recommendation     String?  @db.Text
+  decision_required  String   @db.Text
+  decision_deadline  DateTime
+
+  escalation_level EscalationLevel @default(regional)
+  status           ExceptionStatus @default(open)
+
+  decision       ExceptionDecision?
+  decision_notes String?            @db.Text
+  decided_by     String?
+  decider        User?              @relation("ExceptionDecider", fields: [decided_by], references: [id], onDelete: SetNull)
+  decided_at     DateTime?
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  corrective_actions ExceptionCorrectiveAction[]
+
+  @@index([raised_by])
+  @@index([country_id])
+  @@index([status])
+  @@index([escalation_level])
+}
+
+enum CorrectiveActionStatus {
+  open
+  in_progress
+  done
+}
+
+model ExceptionCorrectiveAction {
+  id           String                 @id @default(cuid())
+  exception_id String
+  exception    Exception              @relation(fields: [exception_id], references: [id], onDelete: Cascade)
+  action        String                @db.Text
+  owner_id      String?
+  owner         User?                 @relation("ExceptionActionOwner", fields: [owner_id], references: [id], onDelete: SetNull)
+  due_date      DateTime?
+  success_measure String?             @db.Text
+  status        CorrectiveActionStatus @default(open)
+  evidence      String?               @db.Text
+  created_at    DateTime               @default(now())
+  updated_at    DateTime               @updatedAt
+
+  @@index([exception_id])
+  @@index([owner_id])
+}
+
+// ── Supervisory Reporting Framework §7: Supervisory Performance
+// Scorecard ───────────────────────────────────────────────────────────
+// A monthly, evidence-based review of a staff member's own performance —
+// distinct from candidate-pipeline reporting (Report model above).
+// Authored by the direct supervisor (Country Supervisor rates a Regional
+// Recruiter; In-House rates a Country Supervisor; Director rates an
+// In-House Supervisor), never self-submitted, matching the framework's
+// three-column table (Regional Recruiter / Country Supervisor / In-House
+// Supervisor) and its uniform 20/20/15/15/15/10/5 area weighting.
+enum ScorecardStatus {
+  draft
+  finalized
+}
+
+model StaffScorecard {
+  id           String   @id @default(cuid())
+  staff_id     String
+  staff        User     @relation("ScorecardSubject", fields: [staff_id], references: [id], onDelete: Cascade)
+  reviewer_id  String
+  reviewer     User     @relation("ScorecardReviewer", fields: [reviewer_id], references: [id], onDelete: Cascade)
+  // First-of-month marker for the review period (e.g. 2026-07-01).
+  period_month DateTime
+
+  status              ScorecardStatus @default(draft)
+  overall_score        Float?
+  // "Exceptional / Strong / Effective / Improvement Required /
+  // Unsatisfactory" (framework §7) — derived from overall_score at
+  // finalization time, stored so a later weight/threshold change doesn't
+  // silently rewrite a past review's category.
+  performance_category String?
+  // "Recognition / Maintain / Coaching / Improvement Plan / Formal
+  // Review" (framework §7).
+  required_action       String?
+  review_date            DateTime?
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  areas StaffScorecardArea[]
+
+  @@unique([staff_id, period_month])
+  @@index([reviewer_id])
+  @@index([staff_id])
+}
+
+model StaffScorecardArea {
+  id            String         @id @default(cuid())
+  scorecard_id  String
+  scorecard     StaffScorecard @relation(fields: [scorecard_id], references: [id], onDelete: Cascade)
+  // target_achievement | quality_accuracy | reporting_timeliness |
+  // compliance_data_discipline | supervision_collaboration |
+  // issue_resolution_escalation | professional_conduct
+  area_key String
+  weight   Float
+  rating   Int?
+  evidence String? @db.Text
+
+  @@unique([scorecard_id, area_key])
 }
 
 enum CampaignStatus {

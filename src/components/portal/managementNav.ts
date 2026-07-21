@@ -1,5 +1,5 @@
 import type { PortalNavItem } from "./PortalShell";
-import { Gauge, Target, FileText, Airplane, ClipboardText, HandCoins, Handshake, Buildings } from "@phosphor-icons/react";
+import { Gauge, Target, FileText, Airplane, ClipboardText, HandCoins, Handshake, Buildings, Warning, UserCheck } from "@phosphor-icons/react";
 
 // Applications and Fee Policy live here rather than under System
 // Administrator — "sets policy & criteria... approves & controls the
@@ -18,4 +18,6 @@ export const MANAGEMENT_NAV_ITEMS: PortalNavItem[] = [
   { href: "/management/fee-policy", label: "Fee Policy", icon: HandCoins },
   { href: "/management/cases", label: "Cases", icon: Airplane },
   { href: "/management/reports", label: "Reports", icon: FileText },
+  { href: "/management/exceptions", label: "Exceptions", icon: Warning },
+  { href: "/management/staff-scorecards", label: "Staff Scorecards", icon: UserCheck },
 ];

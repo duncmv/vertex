@@ -1,5 +1,5 @@
 import type { PortalNavItem } from "./PortalShell";
-import { Gauge, ClipboardText, FileText, Airplane, UsersThree, Users } from "@phosphor-icons/react";
+import { Gauge, ClipboardText, FileText, Airplane, UsersThree, Users, Warning } from "@phosphor-icons/react";
 
 export const SUPERVISOR_NAV_ITEMS: PortalNavItem[] = [
   { href: "/supervisor", label: "Overview", icon: Gauge },
@@ -8,4 +8,5 @@ export const SUPERVISOR_NAV_ITEMS: PortalNavItem[] = [
   { href: "/supervisor/applications", label: "Applications", icon: ClipboardText },
   { href: "/supervisor/cases", label: "Cases", icon: Airplane },
   { href: "/supervisor/reports", label: "Reports", icon: FileText },
+  { href: "/supervisor/exceptions", label: "Exceptions", icon: Warning },
 ];

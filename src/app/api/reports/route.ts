@@ -45,11 +45,15 @@ export async function GET(req: NextRequest) {
     // In-House Supervisor is assigned to one specific country (same as
     // Country Supervisor) — sees that country's own recruiter-level
     // reports (daily-submission visibility) and its country-level reports
-    // (the ones they're the controlling reviewer for), never other
-    // countries'.
+    // (the ones they're the controlling reviewer for), plus their own
+    // portfolio-level (inhouse-scope) reports submitted upward to
+    // Management/Director — those have no single country_id of their own,
+    // so they're matched by submitted_by instead.
     case "inhouse_supervisor": {
       const supervisor = await prisma.user.findUnique({ where: { id: user!.userId }, select: { assigned_country_id: true } });
-      where = supervisor?.assigned_country_id ? { country_id: supervisor.assigned_country_id } : { id: "__none__" };
+      where = supervisor?.assigned_country_id
+        ? { OR: [{ country_id: supervisor.assigned_country_id }, { submitted_by: user!.userId }] }
+        : { id: "__none__" };
       break;
     }
     default:
@@ -101,12 +105,16 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ data: reports, total, page, pageSize });
 }
 
-// POST /api/reports — submit a new report (SRS FR-3.4). A recruiter
-// submits at their own scope; a country_supervisor consolidates verified
-// recruiter reports (child_report_ids) into a country report.
+// POST /api/reports — submit a new report (SRS FR-3.4; Supervisory
+// Reporting Framework §3-§5). A recruiter submits at their own scope; a
+// country_supervisor consolidates verified recruiter reports
+// (child_report_ids) into a country report; an inhouse_supervisor
+// consolidates their (single-country, per the existing confirmed
+// portfolio-of-one scoping) verified country report into their own
+// portfolio report, submitted upward to Management/Director.
 export async function POST(req: NextRequest) {
   const user = await getAuthUser(req);
-  const guardRes = requireRole(user, ["regional_recruiter", "country_supervisor"]);
+  const guardRes = requireRole(user, ["regional_recruiter", "country_supervisor", "inhouse_supervisor"]);
   if (guardRes) return guardRes;
 
   let body: unknown;
@@ -129,22 +137,29 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: { code: "no_country", message: "You must be assigned a country before submitting a report." } }, { status: 422 });
   }
 
-  const scopeLevel: ScopeLevel = user!.role === "regional_recruiter" ? "recruiter" : "country";
+  const scopeLevel: ScopeLevel =
+    user!.role === "regional_recruiter" ? "recruiter" : user!.role === "country_supervisor" ? "country" : "inhouse";
   const { period_start, period_end, child_report_ids, ...rest } = parsed.data;
 
   if (scopeLevel === "recruiter" && child_report_ids?.length) {
     return NextResponse.json(
-      { error: { code: "invalid_scope", message: "Only a country-level report can consolidate child reports." } },
+      { error: { code: "invalid_scope", message: "Only a country-level or portfolio-level report can consolidate child reports." } },
       { status: 422 }
     );
   }
+
+  // A country-scope report consolidates verified recruiter reports from
+  // the same country; a portfolio-scope (inhouse) report consolidates a
+  // verified country report from that same country (portfolio-of-one, per
+  // the existing confirmed single-country in-house scoping).
+  const childScopeLevel: ScopeLevel = scopeLevel === "country" ? "recruiter" : "country";
 
   let childReports: { id: string }[] = [];
   if (child_report_ids?.length) {
     childReports = await prisma.report.findMany({
       where: {
         id: { in: child_report_ids },
-        scope_level: "recruiter",
+        scope_level: childScopeLevel,
         status: "verified",
         country_id: submitter.assigned_country_id,
       },
@@ -152,7 +167,7 @@ export async function POST(req: NextRequest) {
     });
     if (childReports.length !== child_report_ids.length) {
       return NextResponse.json(
-        { error: { code: "invalid_children", message: "Every consolidated report must be a verified recruiter report from your own country." } },
+        { error: { code: "invalid_children", message: "Every consolidated report must be a verified report from your own country." } },
         { status: 422 }
       );
     }
@@ -160,11 +175,15 @@ export async function POST(req: NextRequest) {
 
   const db = auditedPrisma(user!.userId);
 
+  // An inhouse-scope report has no single country of its own (it's a
+  // portfolio roll-up, addressed to Management/Director) — country_id
+  // stays null for it, same nullability already used for preferred-
+  // country/current-location fields elsewhere in this schema.
   const report = await db.report.create({
     data: {
       ...rest,
       scope_level: scopeLevel,
-      country_id: submitter.assigned_country_id,
+      country_id: scopeLevel === "inhouse" ? null : submitter.assigned_country_id,
       submitted_by: user!.userId,
       period_start: new Date(period_start),
       period_end: new Date(period_end),

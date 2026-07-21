@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { auditedPrisma } from "@/lib/audit";
 import { getAuthUser, requireRole } from "@/lib/api-auth";
 import { submitReportSchema } from "@/lib/validations";
+import { getReportScopeFilter } from "@/server/services/reportWorkflow";
 import type { Prisma, ScopeLevel } from "@prisma/client";
 
 const STAFF_ROLES = ["regional_recruiter", "country_supervisor", "inhouse_supervisor", "director", "admin"] as const;
@@ -23,42 +24,7 @@ export async function GET(req: NextRequest) {
   const status = searchParams.get("status") ?? undefined;
   const recruiterId = searchParams.get("recruiter_id") ?? undefined;
 
-  let where: Prisma.ReportWhereInput;
-  switch (user!.role) {
-    case "regional_recruiter":
-      where = { submitted_by: user!.userId };
-      break;
-    case "country_supervisor": {
-      const supervisor = await prisma.user.findUnique({ where: { id: user!.userId }, select: { assigned_country_id: true } });
-      if (!supervisor?.assigned_country_id) {
-        where = { id: "__none__" }; // fails closed, matching scope.ts's convention
-      } else {
-        where = {
-          OR: [
-            { submitted_by: user!.userId },
-            { scope_level: "recruiter", country_id: supervisor.assigned_country_id },
-          ],
-        };
-      }
-      break;
-    }
-    // In-House Supervisor is assigned to one specific country (same as
-    // Country Supervisor) — sees that country's own recruiter-level
-    // reports (daily-submission visibility) and its country-level reports
-    // (the ones they're the controlling reviewer for), plus their own
-    // portfolio-level (inhouse-scope) reports submitted upward to
-    // Management/Director — those have no single country_id of their own,
-    // so they're matched by submitted_by instead.
-    case "inhouse_supervisor": {
-      const supervisor = await prisma.user.findUnique({ where: { id: user!.userId }, select: { assigned_country_id: true } });
-      where = supervisor?.assigned_country_id
-        ? { OR: [{ country_id: supervisor.assigned_country_id }, { submitted_by: user!.userId }] }
-        : { id: "__none__" };
-      break;
-    }
-    default:
-      where = {}; // director, admin — unrestricted
-  }
+  const where = await getReportScopeFilter(user!);
 
   const combinedWhere: Prisma.ReportWhereInput = {
     AND: [

@@ -1,15 +1,15 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import PortalShell from "@/components/portal/PortalShell";
 import { RECRUITER_NAV_ITEMS } from "@/components/portal/recruiterNav";
 import SearchableSelect from "@/components/SearchableSelect";
 import Pagination from "@/components/Pagination";
 import { DEFAULT_PAGE_SIZE } from "@/lib/usePagination";
 import ReportContentForm, { EMPTY_REPORT_CONTENT, type ReportContentValue } from "@/components/portal/reports/ReportContentForm";
-import ReportContentView from "@/components/portal/reports/ReportContentView";
 import type { KpiRow } from "@/components/portal/reports/ReportKpiTable";
-import { Plus, PaperPlaneTilt, Target } from "@phosphor-icons/react";
+import { Plus, Target, ArrowRight } from "@phosphor-icons/react";
 
 interface ReportRow {
   id: string;
@@ -121,7 +121,6 @@ export default function RecruiterReportsPage() {
   const [periodStart, setPeriodStart] = useState("");
   const [periodEnd, setPeriodEnd] = useState("");
   const [content, setContent] = useState<ReportContentValue>(EMPTY_REPORT_CONTENT);
-  const [resubmitContent, setResubmitContent] = useState<Record<string, ReportContentValue>>({});
 
   const [periodCandidates, setPeriodCandidates] = useState<CandidateForReport[]>([]);
   const [targetProgress, setTargetProgress] = useState<TargetProgress[]>([]);
@@ -207,17 +206,6 @@ export default function RecruiterReportsPage() {
     } finally {
       setSaving(false);
     }
-  };
-
-  const resubmit = async (id: string) => {
-    const value = resubmitContent[id];
-    if (!value) return;
-    const res = await fetch(`/api/reports/${id}/resubmit`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ content: value }),
-    });
-    if (res.ok) load();
   };
 
   return (
@@ -308,43 +296,26 @@ export default function RecruiterReportsPage() {
                 <th className="px-5 py-3 font-semibold">Period</th>
                 <th className="px-5 py-3 font-semibold">Type</th>
                 <th className="px-5 py-3 font-semibold">Status</th>
-                <th className="px-5 py-3 font-semibold">Content</th>
+                <th className="px-5 py-3 font-semibold text-right">Actions</th>
               </tr>
             </thead>
             <tbody>
               {reports.map((r) => (
-                <tr key={r.id} className="border-b border-midnight-900/5 last:border-0 align-top">
+                <tr key={r.id} className="border-b border-midnight-900/5 last:border-0">
                   <td className="px-5 py-4 text-midnight-900/70 whitespace-nowrap">
                     {new Date(r.period_start).toLocaleDateString()} – {new Date(r.period_end).toLocaleDateString()}
                   </td>
                   <td className="px-5 py-4 text-midnight-900/70 capitalize">{r.type}</td>
                   <td className="px-5 py-4">
                     <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${STATUS_STYLES[r.status]}`}>{r.status}</span>
-                    {r.status === "returned" && r.return_reason && (
-                      <div className="text-xs text-red-500 mt-2 max-w-[260px]">
-                        <span className="font-semibold">Returned:</span> {r.return_reason}
-                      </div>
-                    )}
-                    {r.status === "returned" && (
-                      <div className="mt-3 max-w-md">
-                        <ReportContentForm
-                          role="regional_recruiter"
-                          cycle={r.type as "daily" | "weekly" | "monthly"}
-                          value={resubmitContent[r.id] ?? { ...EMPTY_REPORT_CONTENT, ...r.content }}
-                          onChange={(v) => setResubmitContent((prev) => ({ ...prev, [r.id]: v }))}
-                        />
-                        <button
-                          onClick={() => resubmit(r.id)}
-                          disabled={!(resubmitContent[r.id]?.certified ?? r.content.certified)}
-                          className="btn-secondary py-1.5 px-3 text-xs w-fit mt-2 disabled:opacity-60"
-                        >
-                          <PaperPlaneTilt size={12} weight="bold" /> Resubmit
-                        </button>
-                      </div>
-                    )}
                   </td>
-                  <td className="px-5 py-4 max-w-[320px]">
-                    <ReportContentView content={r.content} />
+                  <td className="px-5 py-4 text-right">
+                    <Link
+                      href={`/recruiter/reports/${r.id}`}
+                      className="inline-flex items-center gap-1.5 text-xs font-semibold text-gold-600 hover:underline"
+                    >
+                      {r.status === "returned" ? "View & Resubmit" : "View"} <ArrowRight size={12} weight="bold" />
+                    </Link>
                   </td>
                 </tr>
               ))}

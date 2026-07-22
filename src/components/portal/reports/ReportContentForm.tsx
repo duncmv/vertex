@@ -91,6 +91,14 @@ interface CampaignOption {
   name: string;
 }
 
+interface CandidateOption {
+  id: string;
+  full_name: string | null;
+  user: { full_name: string } | null;
+  phone: string | null;
+  email: string | null;
+}
+
 export default function ReportContentForm({ role, cycle, value, onChange }: Props) {
   const kpiLabels = REPORT_KPI_LABELS[role]?.[cycle] ?? [];
   const sections = getReportSections(role, cycle);
@@ -103,6 +111,37 @@ export default function ReportContentForm({ role, cycle, value, onChange }: Prop
       .then((res) => setCampaigns(res.data ?? []))
       .catch(() => {});
   }, []);
+
+  // The recruiter's Daily Activity Report's "Candidate / CRM ID" column
+  // (§3.1) is a searchable select over their own candidates, not free
+  // text — a recruiter's own candidates only, matching /api/candidates'
+  // own role-based scoping. Other roles' daily activity tables reuse the
+  // same underlying column key for a different subject (a recruiter, or
+  // a country), so this only applies for regional_recruiter.
+  const [candidates, setCandidates] = useState<CandidateOption[]>([]);
+  useEffect(() => {
+    if (role !== "regional_recruiter" || cycle !== "daily") return;
+    fetch("/api/candidates?pageSize=100")
+      .then((r) => r.json())
+      .then((res) => setCandidates(res.data ?? []))
+      .catch(() => {});
+  }, [role, cycle]);
+
+  const activityColumns =
+    role === "regional_recruiter" && sections.activity
+      ? sections.activity.columns.map((c) =>
+          c.key === "candidate_ref"
+            ? {
+                ...c,
+                type: "select" as const,
+                options: candidates.map((cand) => ({
+                  value: cand.user?.full_name ?? cand.full_name ?? "— unnamed lead —",
+                  label: `${cand.user?.full_name ?? cand.full_name ?? "— unnamed lead —"}${cand.phone ? ` · ${cand.phone}` : cand.email ? ` · ${cand.email}` : ""}`,
+                })),
+              }
+            : c
+        )
+      : sections.activity?.columns;
 
   return (
     <div className="space-y-5">
@@ -143,8 +182,8 @@ export default function ReportContentForm({ role, cycle, value, onChange }: Prop
         <EditableRowTable title={sections.pipeline.title} columns={PIPELINE_COLUMNS} rows={value.pipeline} onChange={(rows) => set("pipeline", rows)} />
       )}
 
-      {sections.activity && (
-        <EditableRowTable title={sections.activity.title} columns={sections.activity.columns} rows={value.activity} onChange={(rows) => set("activity", rows)} />
+      {sections.activity && activityColumns && (
+        <EditableRowTable title={sections.activity.title} columns={activityColumns} rows={value.activity} onChange={(rows) => set("activity", rows)} />
       )}
 
       {sections.achievements && (

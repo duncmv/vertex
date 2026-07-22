@@ -1,11 +1,17 @@
 "use client";
 
 import { Plus, Trash } from "@phosphor-icons/react";
+import SearchableSelect from "@/components/SearchableSelect";
 
 export interface RowColumn {
   key: string;
   label: string;
-  type?: "text" | "number" | "date" | "boolean";
+  type?: "text" | "number" | "date" | "boolean" | "select";
+  // Only meaningful when type is "select" — e.g. a recruiter's own
+  // candidates for the Daily Activity Report's "Candidate / CRM ID"
+  // column, populated by the caller (src/components/portal/reports/
+  // ReportContentForm.tsx) rather than fetched by this generic component.
+  options?: { value: string; label: string }[];
 }
 
 export type RowValue = string | number | boolean | undefined;
@@ -69,6 +75,13 @@ export default function EditableRowTable({ title, columns, rows, onChange, addLa
                           checked={Boolean(row[c.key])}
                           onChange={(e) => setCell(i, c.key, e.target.checked)}
                           className="w-4 h-4"
+                        />
+                      ) : c.type === "select" ? (
+                        <SearchableSelect
+                          value={(row[c.key] as string | undefined) ?? ""}
+                          onChange={(v) => setCell(i, c.key, v)}
+                          options={c.options ?? []}
+                          className="input-field text-xs py-1 px-2 min-w-[160px]"
                         />
                       ) : (
                         <input

@@ -436,7 +436,26 @@ export const submitReportSchema = z
   .refine((data) => new Date(data.period_end) <= new Date(), {
     message: "A report can't cover a period that hasn't happened yet.",
     path: ["period_end"],
-  });
+  })
+  // A weekly report is always a fixed Monday-Sunday, 7-day window — not a
+  // free-form range. Without this, two recruiters covering "the same
+  // week" could submit different day-ranges (Mon-Fri vs Mon-Sat) that
+  // never exactly match, silently breaking the consolidation logic, which
+  // groups reports by exact period_start/period_end equality. Applies at
+  // every tier (recruiter, country, in-house), since the same matching
+  // logic is used at each level.
+  .refine((data) => data.type !== "weekly" || new Date(data.period_start).getUTCDay() === 1, {
+    message: "A weekly report must start on a Monday.",
+    path: ["period_start"],
+  })
+  .refine(
+    (data) => {
+      if (data.type !== "weekly") return true;
+      const diffDays = (new Date(data.period_end).getTime() - new Date(data.period_start).getTime()) / (24 * 60 * 60 * 1000);
+      return diffDays === 6;
+    },
+    { message: "A weekly report must cover exactly 7 days (Monday through Sunday).", path: ["period_end"] }
+  );
 
 export const returnReportSchema = z.object({
   return_reason: z.string().min(5).max(1000),

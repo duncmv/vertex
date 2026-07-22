@@ -3,7 +3,6 @@ import { prisma } from "@/lib/prisma";
 import { auditedPrisma } from "@/lib/audit";
 import { getAuthUser, requireRole } from "@/lib/api-auth";
 import { canReviewReport } from "@/server/services/reportWorkflow";
-import { maybeAutoConsolidate, maybeAutoConsolidateToInhouse } from "@/server/services/reportConsolidation";
 
 const REVIEWER_ROLES = ["country_supervisor", "inhouse_supervisor", "director", "admin"] as const;
 
@@ -50,19 +49,19 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   // Country Supervisor "verifies"; Management/Director "approves" — same
   // action (the report's one controlling position accepting it as
   // submitted), different terminal status per the framework's own
-  // vocabulary (§8.2) for the top of the reporting line.
+  // vocabulary (§8.2) for the top of the reporting line. Verifying a
+  // recruiter/country report no longer auto-creates and auto-submits the
+  // parent (country/portfolio) report — the supervisor/in-house initiates
+  // that themselves via the "Create Report" flow, which previews the
+  // same computed roll-up but always requires an explicit review and
+  // Certify & Submit (confirmed with the business: several fields in the
+  // weekly/monthly templates need manual input, and a silent auto-submit
+  // gave no chance to fill those in or catch a mistake before it went out).
   const updated = await auditedPrisma(user!.userId).report.update({
     where: { id },
     data: { status: report.scope_level === "inhouse" ? "approved" : "verified", return_reason: null },
     select: { id: true, status: true },
   });
-
-  if (report.scope_level === "recruiter" && report.country_id) {
-    await maybeAutoConsolidate(report.country_id, report.type, report.period_start, report.period_end);
-  }
-  if (report.scope_level === "country" && report.country_id) {
-    await maybeAutoConsolidateToInhouse(report.country_id, report.type, report.period_start, report.period_end);
-  }
 
   return NextResponse.json({ data: updated });
 }

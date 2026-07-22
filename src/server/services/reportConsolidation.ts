@@ -1,5 +1,4 @@
 import { prisma } from "@/lib/prisma";
-import { auditedPrisma } from "@/lib/audit";
 import type { ReportCycle, ScopeLevel } from "@prisma/client";
 
 // Mirrors src/lib/validations.ts's reportContentSchema — a local, loosely
@@ -59,100 +58,99 @@ function taggedRows(reports: { content: ReportContent; submitter: { full_name: s
   return out;
 }
 
-async function consolidate(
+export interface ConsolidationRosterEntry {
+  id: string;
+  full_name: string;
+  reportId: string | null;
+  status: string | null;
+}
+
+export interface ConsolidationPreview {
+  // Every recruiter (or, for the inhouse tier, the one country supervisor
+  // — portfolio-of-one) in scope, cross-referenced against whether they
+  // have a report for this exact period — so the supervisor can see who's
+  // missing before deciding whether to submit now or wait.
+  roster: ConsolidationRosterEntry[];
+  verifiedReportIds: string[];
+  alreadyConsolidated: boolean;
+  content: {
+    executive_summary?: string;
+    kpis: ReportContentRow[];
+    issues: ReportContentRow[];
+    achievements: ReportContentRow[];
+    priorities: ReportContentRow[];
+  };
+}
+
+const CHILD_ROLE_BY_SCOPE: Record<string, "regional_recruiter" | "country_supervisor"> = {
+  recruiter: "regional_recruiter",
+  country: "country_supervisor",
+};
+
+/**
+ * Supervisor/In-House-initiated preview for a weekly or monthly
+ * consolidated report (Supervisory Reporting Framework §4.2/§4.3, §5.2/
+ * §5.3): given a type + exact period, finds the matching source reports
+ * (recruiter-scope for a country report, country-scope for a portfolio
+ * report) and computes what the consolidated content *would* look like
+ * from the verified ones — without writing anything. The supervisor
+ * reviews this, fills in whatever manual-only fields the framework
+ * requires, and submits explicitly (POST /api/reports with
+ * child_report_ids) — there is no automatic/background submission.
+ */
+export async function buildConsolidationPreview(
   childScopeLevel: ScopeLevel,
   parentScopeLevel: ScopeLevel,
   countryId: string,
   type: ReportCycle,
   periodStart: Date,
-  periodEnd: Date,
-  parentSubmitterRole: "country_supervisor" | "inhouse_supervisor"
-): Promise<void> {
-  if (type === "daily") return;
-
-  const siblings = await prisma.report.findMany({
-    where: { scope_level: childScopeLevel, country_id: countryId, type, period_start: periodStart, period_end: periodEnd },
-    select: { id: true, status: true, content: true, submitter: { select: { full_name: true } } },
-  });
+  periodEnd: Date
+): Promise<ConsolidationPreview> {
+  const [siblings, roster] = await Promise.all([
+    prisma.report.findMany({
+      where: { scope_level: childScopeLevel, country_id: countryId, type, period_start: periodStart, period_end: periodEnd },
+      select: { id: true, status: true, content: true, submitted_by: true, submitter: { select: { full_name: true } } },
+    }),
+    prisma.user.findMany({
+      where: { role: CHILD_ROLE_BY_SCOPE[childScopeLevel], assigned_country_id: countryId },
+      select: { id: true, full_name: true },
+      orderBy: { full_name: "asc" },
+    }),
+  ]);
 
   const verified = siblings.filter((r: (typeof siblings)[number]) => r.status === "verified");
-  const stillPending = siblings.some((r: (typeof siblings)[number]) => r.status === "submitted");
-  if (stillPending || verified.length === 0) return;
 
   const alreadyConsolidated = await prisma.report.findFirst({
     where: { scope_level: parentScopeLevel, country_id: parentScopeLevel === "inhouse" ? null : countryId, type, period_start: periodStart, period_end: periodEnd },
     select: { id: true },
   });
-  if (alreadyConsolidated) return;
 
-  const submitter = await prisma.user.findFirst({
-    where: { role: parentSubmitterRole, assigned_country_id: countryId },
-    select: { id: true },
-  });
-  if (!submitter) return;
+  const reportBySubmitter = new Map<string, (typeof siblings)[number]>(siblings.map((r: (typeof siblings)[number]) => [r.submitted_by, r]));
 
-  const typedVerified = verified as (typeof verified)[number][];
-  const db = auditedPrisma(submitter.id);
-
-  const parentReport = await db.report.create({
-    data: {
-      type,
-      scope_level: parentScopeLevel,
-      country_id: parentScopeLevel === "inhouse" ? null : countryId,
-      submitted_by: submitter.id,
-      period_start: periodStart,
-      period_end: periodEnd,
-      status: "submitted",
-      content: {
-        auto_consolidated: true,
-        source_reports: typedVerified.map((r) => ({ id: r.id, submitter: r.submitter.full_name })),
-        executive_summary: typedVerified
-          .map((r) => (r.content as ReportContent).executive_summary)
-          .filter(Boolean)
-          .join(" "),
-        kpis: mergeKpis(typedVerified as { content: ReportContent }[]),
-        issues: taggedRows(typedVerified as { content: ReportContent; submitter: { full_name: string } }[], "issues"),
-        achievements: taggedRows(typedVerified as { content: ReportContent; submitter: { full_name: string } }[], "achievements"),
-        priorities: taggedRows(typedVerified as { content: ReportContent; submitter: { full_name: string } }[], "priorities"),
-        pipeline: [],
-        activity: [],
-        competencies: [],
-        // Auto-generated from already-verified sources — certified by
-        // construction, same reasoning as the pre-existing auto-consolidation.
-        certified: true,
-      },
+  return {
+    roster: roster.map((u: (typeof roster)[number]) => {
+      const report = reportBySubmitter.get(u.id);
+      return { id: u.id, full_name: u.full_name, reportId: report?.id ?? null, status: report?.status ?? null };
+    }),
+    verifiedReportIds: verified.map((r: (typeof verified)[number]) => r.id),
+    alreadyConsolidated: !!alreadyConsolidated,
+    content: {
+      executive_summary: verified
+        .map((r: (typeof verified)[number]) => (r.content as ReportContent).executive_summary)
+        .filter(Boolean)
+        .join(" "),
+      kpis: mergeKpis(verified as { content: ReportContent }[]),
+      issues: taggedRows(verified as { content: ReportContent; submitter: { full_name: string } }[], "issues"),
+      achievements: taggedRows(verified as { content: ReportContent; submitter: { full_name: string } }[], "achievements"),
+      priorities: taggedRows(verified as { content: ReportContent; submitter: { full_name: string } }[], "priorities"),
     },
-    select: { id: true },
-  });
-
-  await prisma.report.updateMany({
-    where: { id: { in: typedVerified.map((r) => r.id) } },
-    data: { parent_report_id: parentReport.id, status: "consolidated" },
-  });
+  };
 }
 
-/**
- * "Country supervisors submit weekly/monthly reports automatically after
- * consolidating from the recruiters' reports" — called after a recruiter
- * report is verified (PATCH /api/reports/:id/verify). Fires the country
- * report the moment no recruiter report for this exact type/period is
- * still awaiting review (some recruiters may never file for a given
- * period — e.g. leave — so this doesn't wait for every recruiter, only for
- * every *submitted* report to be resolved), and only if at least one was
- * actually verified. A daily report never auto-consolidates — recruiters'
- * daily notes stay a recruiter-to-supervisor channel.
- */
-export async function maybeAutoConsolidate(countryId: string, type: ReportCycle, periodStart: Date, periodEnd: Date): Promise<void> {
-  await consolidate("recruiter", "country", countryId, type, periodStart, periodEnd, "country_supervisor");
+export async function previewCountryConsolidation(countryId: string, type: ReportCycle, periodStart: Date, periodEnd: Date) {
+  return buildConsolidationPreview("recruiter", "country", countryId, type, periodStart, periodEnd);
 }
 
-/**
- * Supervisory Reporting Framework §5 — an In-House Supervisor's own
- * weekly/monthly portfolio report auto-submits upward to Management/
- * Director once their (single, per the existing confirmed portfolio-of-
- * one scoping) country's report is verified — the same event-driven
- * pattern as recruiter→country above, not a background scheduler.
- */
-export async function maybeAutoConsolidateToInhouse(countryId: string, type: ReportCycle, periodStart: Date, periodEnd: Date): Promise<void> {
-  await consolidate("country", "inhouse", countryId, type, periodStart, periodEnd, "inhouse_supervisor");
+export async function previewInhouseConsolidation(countryId: string, type: ReportCycle, periodStart: Date, periodEnd: Date) {
+  return buildConsolidationPreview("country", "inhouse", countryId, type, periodStart, periodEnd);
 }

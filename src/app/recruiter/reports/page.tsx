@@ -9,6 +9,7 @@ import Pagination from "@/components/Pagination";
 import { DEFAULT_PAGE_SIZE } from "@/lib/usePagination";
 import ReportContentForm, { EMPTY_REPORT_CONTENT, type ReportContentValue } from "@/components/portal/reports/ReportContentForm";
 import type { KpiRow } from "@/components/portal/reports/ReportKpiTable";
+import { weekRangeContaining } from "@/lib/reportPeriods";
 import { Plus, Target, ArrowRight } from "@phosphor-icons/react";
 
 interface ReportRow {
@@ -232,7 +233,7 @@ export default function RecruiterReportsPage() {
       {showForm && (
         <form onSubmit={submit} className="card p-6 mb-6 space-y-4">
           <h3 className="font-semibold text-midnight-900">New report</h3>
-          <div className={`grid gap-4 ${type === "daily" ? "sm:grid-cols-2" : "sm:grid-cols-3"}`}>
+          <div className={`grid gap-4 ${type === "monthly" ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}>
             <SearchableSelect
               value={type}
               onChange={(value) => setType(value as typeof type)}
@@ -253,6 +254,26 @@ export default function RecruiterReportsPage() {
                 }}
                 className="input-field"
               />
+            ) : type === "weekly" ? (
+              <div>
+                <input
+                  required
+                  type="date"
+                  value={periodStart}
+                  onChange={(e) => {
+                    const { start, end } = weekRangeContaining(e.target.value);
+                    setPeriodStart(start);
+                    setPeriodEnd(end);
+                  }}
+                  className="input-field w-full"
+                />
+                {periodStart && periodEnd && (
+                  <p className="text-[11px] text-midnight-900/40 mt-1">
+                    Week: {new Date(periodStart).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })} –{" "}
+                    {new Date(periodEnd).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })}
+                  </p>
+                )}
+              </div>
             ) : (
               <>
                 <input required type="date" value={periodStart} onChange={(e) => setPeriodStart(e.target.value)} className="input-field" />

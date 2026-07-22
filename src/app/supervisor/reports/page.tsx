@@ -1,14 +1,14 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import PortalShell from "@/components/portal/PortalShell";
 import { SUPERVISOR_NAV_ITEMS } from "@/components/portal/supervisorNav";
-import SearchableSelect from "@/components/SearchableSelect";
 import Pagination from "@/components/Pagination";
 import { usePagination } from "@/lib/usePagination";
-import ReportContentForm, { EMPTY_REPORT_CONTENT, type ReportContentValue } from "@/components/portal/reports/ReportContentForm";
+import type { ReportContentValue } from "@/components/portal/reports/ReportContentForm";
 import ReportContentView from "@/components/portal/reports/ReportContentView";
-import { Plus, Stack, ListChecks, CalendarBlank } from "@phosphor-icons/react";
+import { Plus, ListChecks, CalendarBlank } from "@phosphor-icons/react";
 
 interface ReportRow {
   id: string;
@@ -95,13 +95,6 @@ export default function SupervisorReportsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [returnDrafts, setReturnDrafts] = useState<Record<string, string>>({});
-  const [showConsolidate, setShowConsolidate] = useState(false);
-  const [consolidateType, setConsolidateType] = useState<"weekly" | "monthly">("weekly");
-  const [consolidatePeriodStart, setConsolidatePeriodStart] = useState("");
-  const [consolidatePeriodEnd, setConsolidatePeriodEnd] = useState("");
-  const [consolidateContent, setConsolidateContent] = useState<ReportContentValue>(EMPTY_REPORT_CONTENT);
-  const [selectedChildren, setSelectedChildren] = useState<string[]>([]);
-  const [saving, setSaving] = useState(false);
   const [viewMode, setViewMode] = useState<"outstanding" | "byPeriod">("outstanding");
   const [byPeriodType, setByPeriodType] = useState<ReportRow["type"]>("daily");
 
@@ -126,7 +119,6 @@ export default function SupervisorReportsPage() {
 
   const recruiterReports = useMemo(() => reports.filter((r) => r.scope_level === "recruiter"), [reports]);
   const recruiterInbox = useMemo(() => recruiterReports.filter((r) => r.status === "submitted"), [recruiterReports]);
-  const verifiedForConsolidation = useMemo(() => recruiterReports.filter((r) => r.status === "verified"), [recruiterReports]);
   const myCountryReports = useMemo(() => reports.filter((r) => r.scope_level === "country"), [reports]);
 
   const byPeriod = useMemo(() => {
@@ -160,42 +152,6 @@ export default function SupervisorReportsPage() {
     load();
   };
 
-  const toggleChild = (id: string) => {
-    setSelectedChildren((prev) => (prev.includes(id) ? prev.filter((c) => c !== id) : [...prev, id]));
-  };
-
-  const submitConsolidated = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSaving(true);
-    setError("");
-    try {
-      const res = await fetch("/api/reports", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          type: consolidateType,
-          period_start: consolidatePeriodStart,
-          period_end: consolidatePeriodEnd,
-          content: consolidateContent,
-          child_report_ids: selectedChildren,
-        }),
-      });
-      const body = await res.json();
-      if (!res.ok) throw new Error(body.error?.message ?? "Failed to submit country report.");
-      setConsolidateType("weekly");
-      setConsolidatePeriodStart("");
-      setConsolidatePeriodEnd("");
-      setConsolidateContent(EMPTY_REPORT_CONTENT);
-      setSelectedChildren([]);
-      setShowConsolidate(false);
-      load();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to submit country report.");
-    } finally {
-      setSaving(false);
-    }
-  };
-
   return (
     <PortalShell roleLabel="Country Supervisor" navItems={SUPERVISOR_NAV_ITEMS}>
       <p className="eyebrow mb-3">
@@ -204,8 +160,9 @@ export default function SupervisorReportsPage() {
       </p>
       <h1 className="section-title text-3xl md:text-4xl mb-2">Reports.</h1>
       <p className="text-midnight-900/55 font-light mb-8 max-w-2xl">
-        Verify or return your recruiters&rsquo; submissions — weekly and monthly country reports for In-House
-        consolidate automatically once your recruiters&rsquo; reports for that period are resolved.
+        Verify or return your recruiters&rsquo; submissions, then create your own weekly or monthly country report
+        — it previews what&rsquo;s ready to pull in from their verified reports, but you always review and submit
+        it yourself.
       </p>
 
       {error && <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg p-4 text-sm mb-6">{error}</div>}
@@ -295,55 +252,10 @@ export default function SupervisorReportsPage() {
 
       <div className="flex items-center justify-between mb-3">
         <h2 className="text-sm font-semibold text-midnight-900/50 uppercase tracking-wider">Country reports (to In-House)</h2>
-        <button onClick={() => setShowConsolidate((v) => !v)} className="btn-secondary text-xs">
-          <Plus size={14} weight="bold" /> Consolidate manually
-        </button>
+        <Link href="/supervisor/reports/new" className="btn-secondary text-xs">
+          <Plus size={14} weight="bold" /> Create Report
+        </Link>
       </div>
-
-      {showConsolidate && (
-        <form onSubmit={submitConsolidated} className="card p-6 mb-6 space-y-4">
-          <h3 className="font-semibold text-midnight-900 flex items-center gap-2"><Stack size={16} weight="regular" /> New country report</h3>
-          <p className="text-xs text-midnight-900/45">
-            Weekly and monthly country reports normally submit themselves once your recruiters&rsquo; reports for a
-            period are all resolved — use this only to cover a period where that hasn&rsquo;t happened (e.g. no
-            recruiter reported at all) or to send a note-only report.
-          </p>
-          <div className="grid sm:grid-cols-3 gap-4">
-            <SearchableSelect
-              value={consolidateType}
-              onChange={(value) => setConsolidateType(value as typeof consolidateType)}
-              options={[
-                { value: "weekly", label: "Weekly Consolidated Report" },
-                { value: "monthly", label: "Monthly Country Performance Report" },
-              ]}
-            />
-            <input required type="date" value={consolidatePeriodStart} onChange={(e) => setConsolidatePeriodStart(e.target.value)} className="input-field" />
-            <input required type="date" value={consolidatePeriodEnd} onChange={(e) => setConsolidatePeriodEnd(e.target.value)} className="input-field" />
-          </div>
-
-          <div>
-            <div className="text-xs text-midnight-900/45 uppercase tracking-wider mb-2">Verified recruiter reports to include</div>
-            {verifiedForConsolidation.length === 0 ? (
-              <p className="text-xs text-midnight-900/40">No verified recruiter reports available yet.</p>
-            ) : (
-              <div className="space-y-1.5">
-                {verifiedForConsolidation.map((r) => (
-                  <label key={r.id} className="flex items-center gap-2 text-sm">
-                    <input type="checkbox" checked={selectedChildren.includes(r.id)} onChange={() => toggleChild(r.id)} />
-                    {r.submitter.full_name} — {r.type} ({new Date(r.period_start).toLocaleDateString()})
-                  </label>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <ReportContentForm role="country_supervisor" cycle={consolidateType} value={consolidateContent} onChange={setConsolidateContent} />
-
-          <button type="submit" disabled={saving || !consolidateContent.certified} className="btn-primary text-xs disabled:opacity-60">
-            {saving ? "Submitting…" : "Certify & Submit Country Report"}
-          </button>
-        </form>
-      )}
 
       {myCountryReports.length === 0 ? (
         <div className="card p-10 text-center text-midnight-900/50">No country reports submitted yet.</div>

@@ -1,12 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import PortalShell from "@/components/portal/PortalShell";
 import { INHOUSE_NAV_ITEMS } from "@/components/portal/inhouseNav";
-import SearchableSelect from "@/components/SearchableSelect";
-import ReportContentForm, { EMPTY_REPORT_CONTENT, type ReportContentValue } from "@/components/portal/reports/ReportContentForm";
+import type { ReportContentValue } from "@/components/portal/reports/ReportContentForm";
 import ReportContentView from "@/components/portal/reports/ReportContentView";
-import { CheckCircle, XCircle, CaretDown, CaretUp, ArrowRight, Plus, Stack } from "@phosphor-icons/react";
+import { CheckCircle, XCircle, CaretDown, CaretUp, ArrowRight, Plus } from "@phosphor-icons/react";
 
 interface ReportRow {
   id: string;
@@ -122,13 +122,6 @@ export default function InhouseReportsPage() {
   const [overview, setOverview] = useState<Overview | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [showSubmit, setShowSubmit] = useState(false);
-  const [submitType, setSubmitType] = useState<"daily" | "weekly" | "monthly">("weekly");
-  const [submitPeriodStart, setSubmitPeriodStart] = useState("");
-  const [submitPeriodEnd, setSubmitPeriodEnd] = useState("");
-  const [submitContent, setSubmitContent] = useState<ReportContentValue>(EMPTY_REPORT_CONTENT);
-  const [selectedChild, setSelectedChild] = useState("");
-  const [saving, setSaving] = useState(false);
 
   // Country-scoped but still derives grouped/expandable views from one
   // fetch — pageSize=200 (the API's own cap) is a protective bound
@@ -154,43 +147,7 @@ export default function InhouseReportsPage() {
   const weeklyReports = useMemo(() => countryReports.filter((r) => r.type === "weekly"), [countryReports]);
   const monthlyReports = useMemo(() => countryReports.filter((r) => r.type === "monthly"), [countryReports]);
   const outstanding = useMemo(() => countryReports.filter((r) => r.status === "submitted"), [countryReports]);
-  // Portfolio-of-one (the existing confirmed single-country in-house
-  // scoping) — a verified country report is the only thing that can ever
-  // be consolidated into this supervisor's own portfolio report.
-  const verifiedCountryReports = useMemo(() => countryReports.filter((r) => r.status === "verified"), [countryReports]);
   const myPortfolioReports = useMemo(() => reports.filter((r) => r.scope_level === "inhouse"), [reports]);
-
-  const submitPortfolioReport = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSaving(true);
-    setError("");
-    try {
-      const res = await fetch("/api/reports", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          type: submitType,
-          period_start: submitPeriodStart,
-          period_end: submitPeriodEnd,
-          content: submitContent,
-          child_report_ids: selectedChild ? [selectedChild] : undefined,
-        }),
-      });
-      const body = await res.json();
-      if (!res.ok) throw new Error(body.error?.message ?? "Failed to submit portfolio report.");
-      setSubmitType("weekly");
-      setSubmitPeriodStart("");
-      setSubmitPeriodEnd("");
-      setSubmitContent(EMPTY_REPORT_CONTENT);
-      setSelectedChild("");
-      setShowSubmit(false);
-      load();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to submit portfolio report.");
-    } finally {
-      setSaving(false);
-    }
-  };
 
   return (
     <PortalShell roleLabel="In-House Supervisor" navItems={INHOUSE_NAV_ITEMS}>
@@ -278,77 +235,10 @@ export default function InhouseReportsPage() {
           <section>
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-sm font-semibold text-midnight-900/70 uppercase tracking-wider">Your portfolio reports (to Management)</h2>
-              <button onClick={() => setShowSubmit((v) => !v)} className="btn-secondary text-xs">
-                <Plus size={14} weight="bold" /> Submit portfolio report
-              </button>
+              <Link href="/inhouse/reports/new" className="btn-secondary text-xs">
+                <Plus size={14} weight="bold" /> Create Report
+              </Link>
             </div>
-
-            {showSubmit && (
-              <form onSubmit={submitPortfolioReport} className="card p-6 mb-4 space-y-4">
-                <h3 className="font-semibold text-midnight-900 flex items-center gap-2">
-                  <Stack size={16} weight="regular" /> New portfolio report
-                </h3>
-                <div className={`grid gap-4 ${submitType === "daily" ? "sm:grid-cols-2" : "sm:grid-cols-3"}`}>
-                  <SearchableSelect
-                    value={submitType}
-                    onChange={(value) => setSubmitType(value as typeof submitType)}
-                    options={[
-                      { value: "daily", label: "Daily Management Exception Report" },
-                      { value: "weekly", label: "Weekly Portfolio Review" },
-                      { value: "monthly", label: "Monthly Management Report" },
-                    ]}
-                  />
-                  {submitType === "daily" ? (
-                    <input
-                      required
-                      type="date"
-                      value={submitPeriodStart}
-                      onChange={(e) => {
-                        setSubmitPeriodStart(e.target.value);
-                        setSubmitPeriodEnd(e.target.value);
-                      }}
-                      className="input-field"
-                    />
-                  ) : (
-                    <>
-                      <input required type="date" value={submitPeriodStart} onChange={(e) => setSubmitPeriodStart(e.target.value)} className="input-field" />
-                      <input required type="date" value={submitPeriodEnd} onChange={(e) => setSubmitPeriodEnd(e.target.value)} className="input-field" />
-                    </>
-                  )}
-                </div>
-
-                {submitType !== "daily" && (
-                  <div>
-                    <div className="text-xs text-midnight-900/45 uppercase tracking-wider mb-2">Verified country report to include</div>
-                    {verifiedCountryReports.length === 0 ? (
-                      <p className="text-xs text-midnight-900/40">No verified country report available yet for this period.</p>
-                    ) : (
-                      <div className="space-y-1.5">
-                        {verifiedCountryReports
-                          .filter((r) => r.type === submitType)
-                          .map((r) => (
-                            <label key={r.id} className="flex items-center gap-2 text-sm">
-                              <input
-                                type="radio"
-                                name="child-country-report"
-                                checked={selectedChild === r.id}
-                                onChange={() => setSelectedChild(r.id)}
-                              />
-                              {r.type} report ({new Date(r.period_start).toLocaleDateString()} – {new Date(r.period_end).toLocaleDateString()})
-                            </label>
-                          ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                <ReportContentForm role="inhouse_supervisor" cycle={submitType} value={submitContent} onChange={setSubmitContent} />
-
-                <button type="submit" disabled={saving || !submitContent.certified} className="btn-primary text-xs disabled:opacity-60">
-                  {saving ? "Submitting…" : "Certify & Submit to Management"}
-                </button>
-              </form>
-            )}
 
             {myPortfolioReports.length === 0 ? (
               <div className="card p-10 text-center text-midnight-900/50">No portfolio reports submitted yet.</div>

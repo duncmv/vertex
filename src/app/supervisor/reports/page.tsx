@@ -103,16 +103,16 @@ export default function SupervisorReportsPage() {
   const [selectedChildren, setSelectedChildren] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [viewMode, setViewMode] = useState<"outstanding" | "byPeriod">("outstanding");
+  const [byPeriodType, setByPeriodType] = useState<ReportRow["type"]>("daily");
 
   // This page derives several client-side views (outstanding-to-review,
-  // by-period grouping, the consolidation checklist) from one fetch, so
-  // it can't just take a server-paginated page the way a flat table can
-  // — slicing the base fetch would silently drop older reports from the
-  // grouped views instead of offering a real "next page". pageSize=200
-  // (the API's own cap) is a protective bound against the previous fully
-  // unbounded query, not true pagination for this page — that needs each
-  // tab restructured into its own filtered, independently-paginated
-  // query, which is a separate piece of work.
+  // by-period grouping, the consolidation checklist) from one fetch —
+  // pageSize=200 (the API's own cap) is a protective bound against a
+  // fully unbounded query. Each view then paginates its own slice
+  // client-side (usePagination) so a country with 20 recruiters and
+  // months of history never renders more than one page of cards at once;
+  // this still isn't a true server-paginated query per tab (that's a
+  // separate, larger piece of work), but it's no longer an unbounded list.
   const load = () => {
     setLoading(true);
     fetch("/api/reports?pageSize=200")
@@ -142,6 +142,7 @@ export default function SupervisorReportsPage() {
 
   const inboxPage = usePagination(recruiterInbox);
   const countryReportsPage = usePagination(myCountryReports);
+  const byPeriodPage = usePagination(byPeriod[byPeriodType]);
 
   const verify = async (id: string) => {
     await fetch(`/api/reports/${id}/verify`, { method: "PATCH" });
@@ -248,30 +249,47 @@ export default function SupervisorReportsPage() {
           )}
         </>
       ) : (
-        <div className="space-y-8 mb-8">
-          {REPORT_TYPES.map((type) => (
-            <div key={type}>
-              <h2 className="text-sm font-semibold text-midnight-900/50 uppercase tracking-wider mb-3 capitalize">
+        <div className="mb-8">
+          <div className="flex items-center gap-1 mb-4">
+            {REPORT_TYPES.map((type) => (
+              <button
+                key={type}
+                onClick={() => {
+                  setByPeriodType(type);
+                  byPeriodPage.setPage(1);
+                }}
+                className={`px-4 py-1.5 rounded-full text-xs font-semibold capitalize transition-colors ${
+                  byPeriodType === type ? "bg-midnight-950 text-ivory-50" : "bg-ivory-100 text-midnight-900/60"
+                }`}
+              >
                 {type} ({byPeriod[type].length})
-              </h2>
-              {byPeriod[type].length === 0 ? (
-                <div className="card p-6 text-center text-midnight-900/40">No {type} reports yet.</div>
-              ) : (
-                <div className="space-y-3">
-                  {byPeriod[type].map((r) => (
-                    <RecruiterReportCard
-                      key={r.id}
-                      r={r}
-                      returnDraft={returnDrafts[r.id] ?? ""}
-                      onReturnDraftChange={(v) => setReturnDrafts((prev) => ({ ...prev, [r.id]: v }))}
-                      onVerify={() => verify(r.id)}
-                      onReturn={() => returnReport(r.id)}
-                    />
-                  ))}
-                </div>
-              )}
+              </button>
+            ))}
+          </div>
+
+          {byPeriod[byPeriodType].length === 0 ? (
+            <div className="card p-6 text-center text-midnight-900/40">No {byPeriodType} reports yet.</div>
+          ) : (
+            <div className="space-y-3">
+              {byPeriodPage.paged.map((r) => (
+                <RecruiterReportCard
+                  key={r.id}
+                  r={r}
+                  returnDraft={returnDrafts[r.id] ?? ""}
+                  onReturnDraftChange={(v) => setReturnDrafts((prev) => ({ ...prev, [r.id]: v }))}
+                  onVerify={() => verify(r.id)}
+                  onReturn={() => returnReport(r.id)}
+                />
+              ))}
+              <Pagination
+                page={byPeriodPage.page}
+                totalPages={byPeriodPage.totalPages}
+                onPageChange={byPeriodPage.setPage}
+                total={byPeriodPage.total}
+                pageSize={byPeriodPage.pageSize}
+              />
             </div>
-          ))}
+          )}
         </div>
       )}
 
